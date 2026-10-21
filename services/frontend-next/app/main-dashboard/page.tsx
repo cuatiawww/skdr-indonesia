@@ -50,6 +50,7 @@ import CountryFlag from "@/components/CountryFlag";
 import { caseDateText, caseDateTitle, countText, signalDate, takeUniqueSignals } from "@/lib/signal-feed.mjs";
 import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
 import SkdrFilterBar, { type SkdrFilterState as EpiFilterState } from "@/components/SkdrFilterBar";
+import SourceBadge from "@/components/analytics/SourceBadge";
 import { getCurrentEpiWeek } from "@/lib/epi-week";
 
 import type { OutbreakLocation, PublicDashboard } from "@/types";
@@ -270,7 +271,9 @@ export default function DashboardPage() {
       const kab = sp.get("kabkota_id");
       const src = sp.get("source");
       if (sY || sW || eY || eW || dis || prov || kab || src) {
-        setFilters((prev) => ({
+        // PR 012: URL filters (e.g. ?source=pe from a disease page) are applied immediately, not only pre-filled.
+        setFilters((prev) => {
+          const next: EpiFilterState = {
           ...prev,
           startYear: sY ? Number(sY) : prev.startYear,
           startWeek: sW ? Number(sW) : prev.startWeek,
@@ -279,8 +282,11 @@ export default function DashboardPage() {
           disease: dis || prev.disease,
           provinceId: prov ? Number(prov) : prev.provinceId,
           kabkotaId: kab ? Number(kab) : prev.kabkotaId,
-          source: src === "form" || src === "ebs" ? src : prev.source,
-        }));
+          source: src === "pe" || src === "ebs" ? src : src === "form" ? "pe" : prev.source,
+          };
+          queueMicrotask(() => setApplied(next));
+          return next;
+        });
       }
     }
   }, []);
@@ -307,7 +313,7 @@ export default function DashboardPage() {
   }), []);
 
   const refreshKpis = useCallback(async () => {
-    const kpiData = await fetchKpiSnapshot(dashboardApiFilters(filters)).catch(() => null);
+    const kpiData = await fetchKpiSnapshot({ ...dashboardApiFilters(filters), source: filters.source === "pe" ? "pe" : "ebs" }).catch(() => null);
     if (!kpiData?.kpis) return;
     setData((prev) => (prev ? { ...prev, kpis: { ...prev.kpis, ...kpiData.kpis } } : prev));
   }, [dashboardApiFilters, filters]);
@@ -316,7 +322,8 @@ export default function DashboardPage() {
     const active = customFilters || filters;
     try {
       setError("");
-      const dashboardFilters = dashboardApiFilters(active);
+      // PR 012: the map shows one source at a time (EBS by default, Kasus PE when Sumber = Kasus PE) so totals are never summed.
+      const dashboardFilters = { ...dashboardApiFilters(active), source: active.source === "pe" ? "pe" : "ebs" };
       const [dashData, kpiData] = await Promise.all([
         fetchPublicDashboard(dashboardFilters),
         fetchKpiSnapshot(dashboardFilters).catch(() => null),
@@ -416,9 +423,13 @@ export default function DashboardPage() {
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex-1">
-                <h3 className="text-xl font-black uppercase leading-tight text-slate-900 sm:text-2xl">
+                <h3 className="flex flex-wrap items-center gap-2 text-xl font-black uppercase leading-tight text-slate-900 sm:text-2xl">
                   {t("dashboard.spatialTitle")}
+                  <SourceBadge source={applied.source === "pe" ? "pe" : "ebs"} />
                 </h3>
+                {applied.source !== "pe" && applied.source !== "ebs" ? (
+                  <p className="mt-1 text-xs text-slate-500">{t("skdr.source.mapAllNote")}</p>
+                ) : null}
                 <p className="mt-1.5 text-sm font-normal leading-relaxed text-slate-600 sm:text-base">
                   {t("dashboard.spatialDesc")}
                 </p>

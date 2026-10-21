@@ -9,14 +9,14 @@ import type { StatusFilter } from '@/lib/skdr-master-api'
 export const inputCls =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-2xs focus:border-[#0060A9] focus:outline-none focus:ring-2 focus:ring-blue-100'
 
-export function MasterHeader({ icon, title, subtitle, loading, onRefresh, onAdd, addLabel }: {
-  icon: ReactNode; title: string; subtitle: string; loading: boolean; onRefresh: () => void; onAdd: () => void; addLabel: string
+/** PR 012: text-only header (icon prop kept for compatibility, not rendered). */
+export function MasterHeader({ title, subtitle, loading, onRefresh, onAdd, addLabel }: {
+  icon?: ReactNode; title: string; subtitle: string; loading: boolean; onRefresh: () => void; onAdd: () => void; addLabel: string
 }) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0060A9]/10 text-[#0060A9]">{icon}</div>
         <div>
           <h1 className="text-xl font-bold uppercase tracking-[0.04em] text-slate-900">{title}</h1>
           <p className="text-xs text-slate-500">{subtitle}</p>

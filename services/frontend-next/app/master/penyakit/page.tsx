@@ -104,6 +104,7 @@ function DiseaseForm({ item, onCancel, onSaved }: { item: AdminDisease | null; o
     code: item?.code ?? '', name: item?.name ?? '', english_name: item?.english_name ?? '', category: item?.category ?? '',
     is_zoonotic: item?.is_zoonotic ?? false, description: item?.description ?? '', aliases: (item?.aliases_id || []).join(', '),
     is_active: item?.is_active ?? true,
+    icd10: (item as any)?.icd10 ?? '', symptoms: (item as any)?.symptoms ?? '', transmission: (item as any)?.transmission ?? '',
   })
   const [saving, setSaving] = useState(false)
   const submit = async (e: FormEvent) => {
@@ -116,6 +117,7 @@ function DiseaseForm({ item, onCancel, onSaved }: { item: AdminDisease | null; o
       const body = {
         code, name: f.name.trim(), english_name: f.english_name, category: f.category, is_zoonotic: f.is_zoonotic, description: f.description,
         aliases_id: f.aliases.split(',').map((s) => s.trim()).filter(Boolean), is_active: f.is_active,
+        icd10: f.icd10, symptoms: f.symptoms, transmission: f.transmission,
       }
       if (item) await masterSend('PUT', `${P}/${item.id}`, body)
       else await masterSend('POST', P, body)
@@ -146,6 +148,20 @@ function DiseaseForm({ item, onCancel, onSaved }: { item: AdminDisease | null; o
         <div className="sm:col-span-2">
           <Field label={t('skdr.master.dis.description')}>
             <textarea className={inputCls} rows={3} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+          </Field>
+        </div>
+        {/* PR 012: info halaman Penyakit */}
+        <Field label={t('skdr.master.dis.icd10')} hint={t('skdr.master.dis.icd10Hint')}>
+          <input className={`${inputCls} font-mono`} value={f.icd10} maxLength={20} onChange={(e) => setF({ ...f, icd10: e.target.value })} />
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label={t('skdr.master.dis.symptoms')}>
+            <textarea className={inputCls} rows={3} value={f.symptoms} onChange={(e) => setF({ ...f, symptoms: e.target.value })} />
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label={t('skdr.master.dis.transmission')}>
+            <textarea className={inputCls} rows={2} value={f.transmission} onChange={(e) => setF({ ...f, transmission: e.target.value })} />
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700">

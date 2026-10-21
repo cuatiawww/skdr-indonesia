@@ -194,16 +194,17 @@ export default function DashboardHeader({
                   <Tv className="h-4 w-4" />
                   {t("header.tvMode")}
                 </Link>
+                {/* PR 012: legacy "Laporan Kasus" (/reports) hidden; header shortcut now opens the Penyakit pages. */}
                 <Link
-                  href="/reports"
+                  href="/penyakit"
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    pathname?.startsWith("/reports") || pathname?.startsWith("/laporan")
+                    pathname?.startsWith("/penyakit")
                       ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
                       : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
                   }`}
                 >
                   <FileSpreadsheet className="h-4 w-4" />
-                  {t("header.reports") || "REPORTS"}
+                  {t("header.penyakit")}
                 </Link>
               </div>
             )}

@@ -53,7 +53,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         .and_then(|r| serde_json::from_str(&r.get::<_, String>(0)).ok())
         .unwrap_or(Value::Null);
     let groups_cfg: Vec<Value> = cfg.get("groups").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let show_ebs = f.source.as_deref() != Some("form");
+    let show_ebs = !matches!(f.source.as_deref(), Some("form") | Some("pe"));
     let show_ind = f.source.as_deref() != Some("ebs");
 
     // disease filter -> groups (by master code or name); a non-zoonosis disease leaves no group
@@ -186,7 +186,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         nik_den += rows.iter().filter(|r| !nik_ex.contains(&r.0)).map(|r| r.4).sum::<i64>();
         nik_num += rows.iter().filter(|r| !nik_ex.contains(&r.0) && r.3).map(|r| r.4).sum::<i64>();
         cards.push(json!({
-            "code": g.get("code"), "label": g.get("label"), "color": g.get("color"), "pe_form": form, "link": g.get("link"),
+            "code": g.get("code"), "label": g.get("label"), "color": g.get("color"), "pe_form": form, "link": g.get("link"), "disease_code": strs(g.get("disease_codes")).first().cloned(),
             "ebs": ebs_subs, "individual": { "total": total, "by_status": by_cls, "unclassified": other_cls, "deaths": deaths,
                                                "split": g.get("individual_split"), "status_defs": g.get("pe_status") },
         }));

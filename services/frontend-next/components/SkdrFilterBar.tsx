@@ -162,7 +162,7 @@ export default function SkdrFilterBar({
             <div className={box}>
               <select id="select-source" value={draft.source || 'all'} onChange={(e) => setDraft({ ...draft, source: e.target.value })} className={sel}>
                 <option value="all">{t('skdr.filter.sourceAll')}</option>
-                <option value="form">{t('skdr.filter.sourceForm')}</option>
+                <option value="pe">{t('skdr.filter.sourcePe')}</option>
                 <option value="ebs">{t('skdr.filter.sourceEbs')}</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />

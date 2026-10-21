@@ -1,7 +1,7 @@
 'use client'
 // PR 005: Sinkronisasi EBS (SKDR Kemenkes API) — status, log, "Sinkron sekarang", pemetaan diagnosa -> master penyakit.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Radio, RefreshCw, PlayCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { RefreshCw, PlayCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
@@ -83,7 +83,6 @@ export default function EbsSyncPage() {
     <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0060A9]/10 text-[#0060A9]"><Radio className="h-5 w-5" /></div>
           <div>
             <h1 className="text-xl font-bold uppercase tracking-[0.04em] text-slate-900">{t('skdr.ebs.title')}</h1>
             <p className="text-xs text-slate-500">{t('skdr.ebs.subtitle')}</p>

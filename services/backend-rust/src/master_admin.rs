@@ -307,7 +307,8 @@ pub async fn kabkota_status(State(s): State<AppState>, Path(id): Path<i32>, Json
 // ---------------- Penyakit ----------------
 
 const DIS_SQL: &str = "SELECT d.id, d.code, d.name, d.english_name, d.category, d.is_zoonotic, d.description, d.aliases_id, d.is_active,
-    (SELECT count(*) FROM case_reports r WHERE r.disease_id = d.id) AS report_count, count(*) OVER () AS total
+    (SELECT count(*) FROM case_reports r WHERE r.disease_id = d.id) AS report_count, count(*) OVER () AS total,
+    d.icd10, d.symptoms, d.transmission
     FROM master_diseases d
     WHERE ($1::text IS NULL OR d.name ILIKE $1 OR d.code ILIKE $1 OR d.english_name ILIKE $1 OR d.category ILIKE $1 OR d.aliases_id::text ILIKE $1)
       AND ($2::bool IS NULL OR d.is_active = $2)";
@@ -328,6 +329,7 @@ pub async fn diseases_list(State(s): State<AppState>, Query(q): Query<ListQuery>
             "english_name": r.get::<_, Option<String>>(3), "category": r.get::<_, Option<String>>(4),
             "is_zoonotic": r.get::<_, bool>(5), "description": r.get::<_, Option<String>>(6),
             "aliases_id": r.get::<_, Value>(7), "is_active": r.get::<_, bool>(8), "report_count": r.get::<_, i64>(9),
+            "icd10": r.get::<_, Option<String>>(11), "symptoms": r.get::<_, Option<String>>(12), "transmission": r.get::<_, Option<String>>(13),
         }))
         .collect();
     Ok(list_json(data, total, &p))
@@ -343,6 +345,9 @@ pub struct DiseaseBody {
     description: Option<String>,
     aliases_id: Option<Vec<String>>,
     is_active: Option<bool>,
+    icd10: Option<String>,
+    symptoms: Option<String>,
+    transmission: Option<String>,
 }
 
 fn check_disease(b: &DiseaseBody) -> Result<(String, String, Value), ApiError> {
@@ -363,10 +368,10 @@ pub async fn disease_create(State(s): State<AppState>, Json(b): Json<DiseaseBody
     let c = s.pool.get().await.map_err(internal)?;
     let r = c
         .query_one(
-            "INSERT INTO master_diseases (code, name, canonical_name, english_name, category, is_zoonotic, description, aliases_id, is_active)
-             VALUES ($1, $2, $1, $3, $4, $5, $6, $7, $8) RETURNING id",
+            "INSERT INTO master_diseases (code, name, canonical_name, english_name, category, is_zoonotic, description, aliases_id, is_active, icd10, symptoms, transmission)
+             VALUES ($1, $2, $1, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
             &[&code, &name, &opt(&b.english_name), &opt(&b.category), &b.is_zoonotic.unwrap_or(false), &opt(&b.description), &aliases,
-              &b.is_active.unwrap_or(true)],
+              &b.is_active.unwrap_or(true), &opt(&b.icd10), &opt(&b.symptoms), &opt(&b.transmission)],
         )
         .await
         .map_err(|e| db_err(e, DIS_DUP))?;
@@ -379,9 +384,9 @@ pub async fn disease_update(State(s): State<AppState>, Path(id): Path<i32>, Json
     let n = c
         .execute(
             "UPDATE master_diseases SET code = $2, name = $3, english_name = $4, category = $5, is_zoonotic = $6, description = $7,
-             aliases_id = $8, is_active = COALESCE($9, is_active), updated_at = now() WHERE id = $1",
+             aliases_id = $8, is_active = COALESCE($9, is_active), icd10 = $10, symptoms = $11, transmission = $12, updated_at = now() WHERE id = $1",
             &[&id, &code, &name, &opt(&b.english_name), &opt(&b.category), &b.is_zoonotic.unwrap_or(false), &opt(&b.description), &aliases,
-              &b.is_active],
+              &b.is_active, &opt(&b.icd10), &opt(&b.symptoms), &opt(&b.transmission)],
         )
         .await
         .map_err(|e| db_err(e, DIS_DUP))?;

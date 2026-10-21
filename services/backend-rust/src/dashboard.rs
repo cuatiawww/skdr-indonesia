@@ -18,6 +18,9 @@ pub struct DashQuery {
     pub end_year: Option<i32>,
     pub end_week: Option<i32>,
     pub source: Option<String>,
+    /// PR 012: explicit date range (YYYY-MM-DD), used by the disease pages; overrides the epi-week range.
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
 }
 
 /// MMWR week 1 starts on the Sunday on or before 4 January.
@@ -93,6 +96,9 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
         (Some(y), Some(w)) => Some(mmwr_week_start(y, w) + Duration::days(6)),
         _ => None,
     };
+    let pd = |s: &Option<String>| s.as_deref().and_then(|s| NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d").ok());
+    let start = pd(&q.start_date).or(start);
+    let end = pd(&q.end_date).or(end);
     let disease = q.disease.clone().map(|d| d.trim().to_string()).filter(|d| !d.is_empty() && d.to_lowercase() != "all");
     // Scope label: kab/kota name, else province name, else Indonesia.
     let scope = if let Some(k) = q.kabkota_id {
@@ -102,7 +108,8 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
     } else {
         None
     };
-    let source = q.source.clone().map(|s| s.trim().to_lowercase()).filter(|s| s == "form" || s == "ebs");
+    // PR 012: "pe" = Kasus PE (individual reports); "form" = legacy case_reports (hidden menu, data kept)
+    let source = q.source.clone().map(|s| s.trim().to_lowercase()).filter(|s| s == "form" || s == "ebs" || s == "pe");
     Ok(Resolved { start, end, province: q.province_id, kabkota: q.kabkota_id, disease, source, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
 }
 

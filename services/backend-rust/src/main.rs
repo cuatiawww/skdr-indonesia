@@ -3,6 +3,7 @@ mod dashboard;
 mod db;
 mod ebs;
 mod exec_dash;
+mod analytics;
 mod master;
 mod master_admin;
 mod pe;
@@ -86,6 +87,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/public-dashboard", get(dashboard::public_dashboard))
         .route("/api/v1/kpi-snapshot", get(dashboard::kpi_snapshot))
         .route("/api/v1/dashboard/executive", get(exec_dash::executive))
+        .route("/api/v1/analytics/overview", get(analytics::overview))
+        .route("/api/v1/analytics/diseases", get(analytics::diseases))
+        .route("/api/v1/analytics/diseases/:code", get(analytics::disease))
         .route("/api/v1/crawling-stats", get(dashboard::crawling_stats))
         .route("/api/v1/crawling-stats/live", get(dashboard::crawling_stats_live))
         .route("/api/v1/crawl-history/summary", get(dashboard::crawl_history_summary))

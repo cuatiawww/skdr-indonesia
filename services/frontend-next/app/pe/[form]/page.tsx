@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Eye, FilePlus2, FileText, Pencil, RefreshCw, Search, Trash2, TriangleAlert } from 'lucide-react'
+import { Eye, FilePlus2, Pencil, RefreshCw, Search, Trash2, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import Modal from '@/components/Modal'
 import Pagination from '@/components/Pagination'
@@ -92,7 +92,6 @@ export default function PeListPage() {
     <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0060A9]/10 text-[#0060A9]"><FileText className="h-5 w-5" /></div>
           <div>
             <h1 className="text-xl font-bold uppercase tracking-[0.04em] text-slate-900">{info?.title || t('skdr.pe.formPe')}</h1>
             <p className="text-xs text-slate-500">{t('skdr.pe.listSubtitle', { v: info?.version ?? '—' })}</p>
