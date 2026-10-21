@@ -47,12 +47,12 @@ export default function DashboardHeader({
     <header className={`w-full ${transparent ? "bg-transparent" : "border-b border-rule bg-white"}`} data-testid="app-header">
       <div className={`relative flex min-h-[118px] items-stretch overflow-visible ${transparent ? "bg-transparent" : "bg-white"}`}>
         {transparent ? null : <>
-        {/* PR 018: light line-art banner (public/header.jpg), right-aligned so the illustrations stay visible;
+        {/* light line-art banner (public/header.jpg), right-aligned so the illustrations stay visible;
             a white fade on the left keeps the dark-teal title readable (stronger on mobile, where the image is cropped). */}
         <div
           aria-hidden
           className="absolute inset-0 bg-cover bg-no-repeat bg-[position:right_center]"
-          style={{ backgroundImage: `url(${PUBLIC_BASE_PATH}/header.webp), url(${PUBLIC_BASE_PATH}/header.jpg)` }}
+          style={{ backgroundImage: `url(${PUBLIC_BASE_PATH}/header.jpg)` }}
         />
         <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 md:via-white/50 md:to-transparent" />
         </>}

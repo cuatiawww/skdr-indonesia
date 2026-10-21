@@ -30,7 +30,7 @@ export default function AppShell({
   const toggleCollapse = () => setCollapsed((c) => { window.localStorage.setItem("skdr_sidebar_collapsed", c ? "0" : "1"); return !c; });
   const authenticated = true; // SKDR: no auth
   const isDirectoryPage = false;
-  // PR 018: on Beranda the header is transparent and home.webp / home.jpg runs continuously from the very top (behind the
+  // on Beranda the header is transparent and home.jpg runs continuously from the very top (behind the
   // header) to the bottom of the hero, measured from [data-testid=home-hero] so there is no seam between them.
   const isHome = pathname === "/";
   const homeWrapRef = useRef<HTMLDivElement>(null);
@@ -88,7 +88,7 @@ export default function AppShell({
       <div ref={homeWrapRef} className={isHome ? "relative isolate flex flex-1 flex-col" : "contents"}>
         {isHome ? (
           <>
-            <div aria-hidden data-testid="home-bg" className="pointer-events-none absolute inset-x-0 top-0 -z-10 bg-white bg-cover bg-no-repeat bg-[position:right_top]" style={{ height: homeBgH || "100vh", backgroundImage: `url(${PUBLIC_BASE_PATH}/home.webp), url(${PUBLIC_BASE_PATH}/home.jpg)` }} />
+            <div aria-hidden data-testid="home-bg" className="pointer-events-none absolute inset-x-0 top-0 -z-10 bg-white bg-cover bg-no-repeat bg-[position:right_top]" style={{ height: homeBgH || "100vh", backgroundImage: `url(${PUBLIC_BASE_PATH}/home.jpg)` }} />
             <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 bg-gradient-to-r from-white/90 via-white/50 to-transparent lg:from-white/70 lg:via-white/20" style={{ height: homeBgH || "100vh" }} />
           </>
         ) : null}
