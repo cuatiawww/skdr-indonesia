@@ -2941,7 +2941,7 @@ export default function AseanMap({
             </div>
           </div>
 
-          {/* Public NLP metrics in English (ABVC Theme Consistent) */}
+          {/* Public NLP metrics in English (theme consistent) */}
           <div className="mt-3.5 grid grid-cols-3 gap-2">
             {/* Total Cases */}
             <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 p-2 text-center">

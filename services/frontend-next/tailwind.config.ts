@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-// Theme copied from NLP-PENYAKIT frontend-next (ASEAN palette).
+// Theme copied from NLP-PENYAKIT frontend-next (legacy palette, internal token name).
 const config: Config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",

@@ -82,7 +82,7 @@ export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
     return hit(sub.href);
   };
 
-  const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
+  const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/Logo-Kemenkes.png`;
   const appTitle = settings.app_name || tr("skdr.layout.appName");
   const appSubtitle = settings.app_tagline || tr("skdr.layout.appTagline");
 
@@ -109,7 +109,7 @@ export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
               alt={tr("skdr.layout.logo")}
               className="h-auto w-full max-h-8 object-contain"
               onError={(e) => {
-                e.currentTarget.src = `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
+                e.currentTarget.style.display = 'none';
               }}
             />
           </div>

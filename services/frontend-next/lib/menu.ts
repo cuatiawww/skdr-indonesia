@@ -149,139 +149,143 @@ export type SidebarGroup = {
   items: SidebarItem[]
 }
 
-// Default Hierarchical Navigation Configuration (Navigasi -> Modul -> Sub-Modul)
+// PR 014: default (pre-settings) menu = the SKDR menu from app_settings.navigation_menu (migration 021),
+// so the first paint never shows the old NLP modules.
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   {
-    id: 'grp_monitoring',
-    title: 'MONITORING',
-    titleKey: 'sidebar.sections.monitoring',
-    order: 1,
-    enabled: true,
-    items: [
-      { id: 'mod_home', label: 'Home', labelKey: 'sidebar.items.home', icon: 'Home', href: '/', order: 1, enabled: true },
-      { id: 'mod_main_dashboard', label: 'Main Dashboard', labelKey: 'sidebar.items.mainDashboard', icon: 'LayoutDashboard', href: '/main-dashboard', order: 2, enabled: true },
-      { id: 'mod_main_dashboard_prototype', label: 'Prototype Showcase', icon: 'LayoutDashboard', href: '/main-dashboard-prototype', order: 2.5, enabled: true },
-      { id: 'mod_asean_countries', label: 'ASEAN Countries', icon: 'Globe2', href: '/asean-countries', order: 3, enabled: true },
-      { id: 'mod_prototype_asean_dashboard', label: 'Prototype ASEAN Dashboard', icon: 'Globe2', href: '/prototype-asean-dashboard', order: 3.5, enabled: true },
-      { id: 'mod_asean_3', label: 'ASEAN +3', icon: 'Globe2', href: '/asean-3', order: 4, enabled: true },
-      { id: 'mod_outside_asean', label: 'Outside ASEAN', icon: 'Globe2', href: '/outside-asean', order: 5, enabled: true },
-      { id: 'mod_analysis_dashboard', label: 'Analysis Dashboard', icon: 'Activity', href: '/analysis-dashboard', order: 5, enabled: true },
-      { id: 'mod_web_services_dashboard', label: 'Web Services Dashboard', icon: 'Cpu', href: '/web-services-dashboard', order: 6, enabled: true },
-      { id: 'mod_ibs_dashboard', label: 'IBS Dashboard', icon: 'BarChart3', href: '/ibs-dashboard', order: 7, enabled: true },
-      { id: 'mod_regions', label: 'Regions/Country', labelKey: 'sidebar.items.regionsCountry', icon: 'Globe2', href: '/countries', order: 7, enabled: true },
-      { id: 'mod_diseases', label: 'Diseases', labelKey: 'sidebar.items.diseases', icon: 'Stethoscope', href: '/diseases', order: 5, enabled: true },
-      { id: 'mod_sources', label: 'Data Sources', labelKey: 'sidebar.items.sources', icon: 'Radio', href: '/sources', order: 6, enabled: true },
+    "id": "grp_surveillance",
+    "items": [
       {
-        id: 'mod_indicator_sources',
-        label: 'IBS Sources',
-        labelKey: 'sidebar.items.indicatorSources',
-        icon: 'Radio',
-        href: '/indicator-sources',
-        order: 6,
-        enabled: true,
-        subItems: [
-          { id: 'sub_ibs_dashboard', label: 'IBS Dashboard', href: '/ibs-dashboard', icon: 'BarChart3', order: 1, enabled: true },
-          { id: 'sub_ibs_matrix', label: 'IBS Crawling Matrix', href: '/ibs-crawling', icon: 'FileSpreadsheet', order: 2, enabled: true },
-          { id: 'sub_ibs_registry', label: 'IBS Source Registry', href: '/indicator-sources', icon: 'Radio', order: 3, enabled: true },
-        ]
+        "id": "mod_main_dashboard",
+        "href": "/main-dashboard",
+        "icon": "LayoutDashboard",
+        "label": "Dasbor Utama",
+        "order": 1,
+        "enabled": true
       },
-      { id: 'mod_events', label: 'Events', labelKey: 'sidebar.items.events', icon: 'Database', href: '/events', order: 7, enabled: true },
       {
-        id: 'mod_analyze',
-        label: 'URL Analysis',
-        labelKey: 'sidebar.items.analyze',
-        icon: 'Search',
-        href: '/analyze',
-        order: 6,
-        enabled: true,
-        subItems: [
-          { id: 'sub_analyze_live', label: 'Live Article Analysis', href: '/analyze', icon: 'Search', order: 1, enabled: true },
-          { id: 'sub_analyze_manual', label: 'Manual Crawler Job', href: '/manual-crawler', icon: 'FileText', order: 2, enabled: true },
-        ]
+        "id": "mod_penyakit",
+        "href": "/penyakit",
+        "icon": "Stethoscope",
+        "label": "Penyakit",
+        "order": 2,
+        "enabled": true
       },
-      { id: 'mod_crawler', label: 'Manual Crawler', labelKey: 'sidebar.items.manualCrawler', icon: 'FileText', href: '/manual-crawler', order: 7, enabled: true },
       {
-        id: 'mod_crawl_history',
-        label: 'Crawl History',
-        icon: 'History',
-        href: '/crawl-history',
-        order: 8,
-        enabled: true,
-        subItems: [
-          { id: 'sub_crawl_matrix', label: 'Feed Matrix & Articles', href: '/crawl-history', icon: 'FileSpreadsheet', order: 1, enabled: true },
-          { id: 'sub_data_crawl_p1', label: 'Data Crawl Phase 1', href: '/data-crawl-phase-1', icon: 'Database', order: 2, enabled: true },
-          { id: 'sub_ibs_crawling', label: 'IBS Crawling Matrix', href: '/ibs-crawling', icon: 'Radio', order: 3, enabled: true },
-          { id: 'sub_monitoring_crawling', label: 'Crawling Monitoring', href: '/monitoring-crawling', icon: 'Activity', order: 4, enabled: true },
-          { id: 'sub_crawling_log', label: 'Crawling & Collector Logs', href: '/crawling-log', icon: 'History', order: 5, enabled: true },
-          { id: 'sub_activity_log', label: 'Activity Log', href: '/activity-log', icon: 'History', order: 6, enabled: true },
-        ]
+        "id": "mod_ebs_sync",
+        "href": "/ebs",
+        "icon": "Radio",
+        "label": "Sinkronisasi EBS",
+        "order": 3,
+        "enabled": true
       },
-      { id: 'mod_processing', label: 'Processing', labelKey: 'sidebar.items.processing', icon: 'Activity', href: '/processing', order: 9, enabled: true },
       {
-        id: 'mod_reports',
-        label: 'Reports',
-        labelKey: 'sidebar.items.reports',
-        icon: 'FileText',
-        href: '/reports',
-        order: 10,
-        enabled: true,
-        subItems: [
-          { id: 'sub_reports_list', label: 'Publications', href: '/reports', icon: 'FileText', order: 1, enabled: true },
-          { id: 'sub_reports_epi', label: 'Epi Weeks (MMWR)', href: '/epi-calendar', icon: 'CalendarDays', order: 2, enabled: true },
-        ]
-      },
-      { id: 'mod_matrix', label: 'Matrix & Ledger', labelKey: 'sidebar.items.eventMatrix', icon: 'FileSpreadsheet', href: '/reports/matriks-ledger', order: 11, enabled: true },
-      { id: 'mod_epi_calendar', label: 'Epi Weeks (MMWR)', icon: 'CalendarDays', href: '/epi-calendar', order: 12, enabled: true },
+        "id": "mod_dokumentasi",
+        "href": "/dokumentasi",
+        "icon": "BookText",
+        "label": "Dokumentasi",
+        "order": 5,
+        "enabled": true
+      }
     ],
+    "order": 1,
+    "title": "SURVEILANS",
+    "enabled": true
   },
   {
-    id: 'grp_configuration',
-    title: 'CONFIGURATION',
-    titleKey: 'sidebar.sections.configuration',
-    order: 2,
-    enabled: true,
-    items: [
-      { id: 'mod_locations', label: 'Locations', labelKey: 'sidebar.items.locations', icon: 'MapPin', href: '/locations', order: 1, enabled: true },
-      { id: 'mod_master_countries', label: 'Master Countries & Regions', icon: 'Globe2', href: '/master-countries', order: 2, enabled: true },
-      { id: 'mod_border_countries', label: 'Border Countries', icon: 'Waypoints', href: '/border-countries', order: 3, enabled: true },
-      { id: 'mod_disease_master', label: 'Disease Master', labelKey: 'sidebar.items.diseaseMaster', icon: 'Stethoscope', href: '/disease-master', order: 4, enabled: true },
-      { id: 'mod_credibility', label: 'Credibility', labelKey: 'sidebar.items.credibility', icon: 'ShieldCheck', href: '/source-credibility', order: 5, enabled: true },
-      { id: 'mod_outbreak_rules', label: 'Outbreak Rules', labelKey: 'sidebar.items.outbreakRules', icon: 'AlertTriangle', href: '/outbreak-rules', order: 6, enabled: true },
+    "id": "grp_master_data",
+    "items": [
       {
-        id: 'mod_nlp',
-        label: 'NLP Configuration',
-        icon: 'Cpu',
-        href: '/nlp-labels',
-        order: 7,
-        enabled: true,
-        subItems: [
-          { id: 'sub_nlp_labels', label: 'NLP Labels', labelKey: 'sidebar.items.nlpLabels', icon: 'Tags', href: '/nlp-labels', order: 1, enabled: true },
-          { id: 'sub_nlp_keywords', label: 'NLP Keywords', labelKey: 'sidebar.items.nlpKeywords', icon: 'BookText', href: '/nlp-keywords', order: 2, enabled: true },
-          { id: 'sub_nlp_markers', label: 'Language Markers', labelKey: 'sidebar.items.languageMarkers', icon: 'Languages', href: '/language-markers', order: 3, enabled: true },
-          { id: 'sub_nlp_extraction', label: 'Extraction Rules', labelKey: 'sidebar.items.extractionRules', icon: 'Braces', href: '/extraction-rules', order: 4, enabled: true },
-          { id: 'sub_nlp_models', label: 'Language Models', labelKey: 'sidebar.items.languageModels', icon: 'Cpu', href: '/language-models', order: 5, enabled: true },
+        "id": "mod_master_data",
+        "href": "#",
+        "icon": "Database",
+        "label": "Master Data",
+        "order": 1,
+        "enabled": true,
+        "subItems": [
+          {
+            "id": "sub_master_provinsi",
+            "href": "/master/provinsi",
+            "icon": "Globe2",
+            "label": "Data Provinsi",
+            "order": 1,
+            "enabled": true
+          },
+          {
+            "id": "sub_master_kabupaten",
+            "href": "/master/kabupaten",
+            "icon": "MapPin",
+            "label": "Data Kabupaten/Kota",
+            "order": 2,
+            "enabled": true
+          },
+          {
+            "id": "sub_master_penyakit",
+            "href": "/master/penyakit",
+            "icon": "Stethoscope",
+            "label": "Data Penyakit",
+            "order": 3,
+            "enabled": true
+          }
         ]
-      },
-      { id: 'mod_nlp_labels', label: 'NLP Labels', labelKey: 'sidebar.items.nlpLabels', icon: 'Tags', href: '/nlp-labels', order: 8, enabled: true },
-      { id: 'mod_nlp_keywords', label: 'NLP Keywords', labelKey: 'sidebar.items.nlpKeywords', icon: 'BookText', href: '/nlp-keywords', order: 9, enabled: true },
-      { id: 'mod_interoperability', label: 'Interoperability', icon: 'Settings', href: '/interoperability', order: 10, enabled: true },
-      { id: 'mod_user_log_activity', label: 'User Log Activity', icon: 'History', href: '/console/user-log-activity', order: 11, enabled: true },
+      }
     ],
+    "order": 3,
+    "title": "MASTER DATA",
+    "enabled": true
   },
   {
-    id: 'grp_documentation',
-    title: 'DOCUMENTATION',
-    titleKey: 'sidebar.sections.documentation',
-    order: 3,
-    enabled: true,
-    items: [
-      { id: 'mod_business_process', label: 'Business Process', icon: 'BookText', href: '/business-process', order: 1, enabled: true },
-      { id: 'mod_abvc_platform', label: 'ABVC Platform', icon: 'Braces', href: '/abvc-platform', order: 2, enabled: true },
+    "id": "grp_form_pe",
+    "items": [
+      {
+        "id": "mod_form_pe",
+        "href": "#",
+        "icon": "FileText",
+        "label": "Form PE",
+        "order": 1,
+        "enabled": true,
+        "subItems": [
+          {
+            "id": "sub_pe_lepto",
+            "href": "/pe/lepto",
+            "icon": "Activity",
+            "label": "Leptospirosis",
+            "order": 1,
+            "enabled": true
+          },
+          {
+            "id": "sub_pe_rabies",
+            "href": "/pe/rabies",
+            "icon": "Bell",
+            "label": "Rabies/GHPR",
+            "order": 2,
+            "enabled": true
+          },
+          {
+            "id": "sub_pe_antraks",
+            "href": "/pe/antraks",
+            "icon": "Flame",
+            "label": "Antraks",
+            "order": 3,
+            "enabled": true
+          },
+          {
+            "id": "sub_pe_ai",
+            "href": "/pe/ai",
+            "icon": "Globe2",
+            "label": "Avian Influenza",
+            "order": 4,
+            "enabled": true
+          }
+        ]
+      }
     ],
-  },
+    "order": 2,
+    "title": "FORM PE",
+    "enabled": true
+  }
 ]
 
-// Convert configuration items to standard SidebarGroup for backward compatibility
 export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): SidebarGroup[] {
   return config
     .filter((grp) => grp.enabled)

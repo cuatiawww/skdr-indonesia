@@ -16,12 +16,13 @@ export interface SystemSettings {
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
-  app_name: 'ASEAN Real-time AI Surveillance Data',
-  app_tagline: 'Real-time multilingual data monitoring',
+  // PR 014: SKDR branding defaults = first paint / SSR fallback (no legacy-branding flash before /console/settings loads).
+  app_name: 'SKDR INDONESIA',
+  app_tagline: 'Sistem Kewaspadaan Dini dan Respons',
   sidebar_logo_url: '',
   login_logo_url: '',
   favicon_url: '',
-  footer_text: 'ASEAN Real-time AI Surveillance Data',
+  footer_text: 'SKDR Indonesia',
   ticker_text: '',
   navigation_menu: DEFAULT_NAVIGATION_CONFIG,
 };
@@ -65,9 +66,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             ...DEFAULT_SETTINGS,
             ...config,
             navigation_menu: navMenu,
-            app_name: config.app_name === 'ASEAN Disease Outbreak Surveillance AI'
-              ? DEFAULT_SETTINGS.app_name
-              : config.app_name,
+            app_name: config.app_name || DEFAULT_SETTINGS.app_name,
             app_tagline: config.app_tagline === 'Real-time Multilingual Disease Monitoring'
               ? DEFAULT_SETTINGS.app_tagline
               : config.app_tagline,

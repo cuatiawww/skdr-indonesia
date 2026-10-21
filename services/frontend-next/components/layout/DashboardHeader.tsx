@@ -33,33 +33,22 @@ export default function DashboardHeader({
   const { t } = useTranslation();
   const { settings } = useSettings();
 
-  const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
+  const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/Logo-Kemenkes.png`;
   
-  const isPrototype =
-    pathname === '/main-dashboard-prototype' ||
-    pathname.startsWith('/main-dashboard-prototype') ||
-    pathname === '/prototype' ||
-    pathname.startsWith('/prototype');
 
-  const appTitle = isPrototype
-    ? "ABVC DATA CRAWLING"
-    : consoleMode
+  const appTitle = consoleMode
     ? tr("skdr.layout.console")
     : (settings.app_name || tr("skdr.layout.appName"));
     
-  const appSubtitle = isPrototype
-    ? ""
-    : consoleMode
+  const appSubtitle = consoleMode
     ? tr("skdr.layout.consoleSub")
     : (settings.app_tagline || tr("skdr.layout.appTagline"));
 
   return (
     <header className="w-full border-b border-white/20 bg-[#102f78]">
       <div className="relative flex min-h-[118px] items-stretch overflow-visible bg-[#102f78]">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-100"
-          style={{ backgroundImage: `url('${PUBLIC_BASE_PATH}/bg%20header_abvc%20nlp.webp')` }}
-        />
+        {/* PR 014: neutral SKDR/Kemenkes gradient (old NLP header image removed) */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0b3a66] via-[#0060A9] to-[#00A3AD]" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#061b50]/25 via-transparent to-black/10" />
         <div className="relative grid w-full gap-5 px-4 py-4 md:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-4">
@@ -80,7 +69,7 @@ export default function DashboardHeader({
                 alt={tr("skdr.layout.logo")}
                 className="h-auto max-h-[62px] w-[132px] shrink-0 object-contain md:w-[168px]"
                 onError={(e) => {
-                  e.currentTarget.src = `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
+                  e.currentTarget.style.display = 'none';
                 }}
               />
               <div className="min-w-0 border-white/35 md:border-l md:pl-5">

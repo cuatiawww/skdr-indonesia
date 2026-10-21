@@ -184,7 +184,7 @@ export function statusFromPayload(count, payload) {
     }
     return { state: "ok", count, source, message: label }
   }
-  return { state: "empty", count: 0, source, message: error || "No data in the ASEAN window" }
+  return { state: "empty", count: 0, source, message: error || "Tidak ada data pada rentang ini" }
 }
 
 export async function fetchMapLayer({

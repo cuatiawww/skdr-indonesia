@@ -14,13 +14,9 @@ export interface SystemModule {
 export const SYSTEM_MODULES: SystemModule[] = [
   // Surveillance & Monitoring
   { id: 'home', label: 'Home Portal', description: 'Personalized command landing page, surveillance overview, and launchpad', category: 'Surveillance & Monitoring', path: '/' },
-  { id: 'main_dashboard', label: 'Main Dashboard', description: 'ASEAN disease spatial outbreak map, outbreak events, and epidemiological surveillance metrics', category: 'Surveillance & Monitoring', path: '/main-dashboard' },
+  { id: 'main_dashboard', label: 'Main Dashboard', description: 'Dasbor eksekutif SKDR: peta sebaran, tren, dan indikator surveilans', category: 'Surveillance & Monitoring', path: '/main-dashboard' },
   { id: 'dashboard', label: 'Surveillance Dashboard', description: 'Surveillance dashboard, distribution map, and events', category: 'Surveillance & Monitoring', path: '/main-dashboard' },
   { id: 'lite_dashboard', label: 'Lite Dashboard', description: 'Public Guest situational awareness and regional outbreak summary', category: 'Surveillance & Monitoring', path: '/lite-dashboard' },
-  { id: 'asean_countries', label: 'ASEAN Countries', description: 'Surveillance and cross-border threat monitoring across the 11 ASEAN member states', category: 'Surveillance & Monitoring', path: '/asean-countries' },
-  { id: 'prototype_asean_dashboard', label: 'Prototype ASEAN Dashboard', description: 'Prototype ASEAN disease surveillance with weekly, monthly, and yearly filters', category: 'Surveillance & Monitoring', path: '/prototype-asean-dashboard' },
-  { id: 'asean_3', label: 'ASEAN +3', description: 'Expanded regional surveillance covering 11 ASEAN states plus China, Japan, and South Korea', category: 'Surveillance & Monitoring', path: '/asean-3' },
-  { id: 'outside_asean', label: 'Outside ASEAN', description: 'Global disease surveillance, international outbreaks, and non-ASEAN threat horizons', category: 'Surveillance & Monitoring', path: '/outside-asean' },
   { id: 'analysis_dashboard', label: 'Analysis Dashboard', description: 'Consolidated URL and document NLP extraction intelligence, accuracy metrics, and text-mining triage', category: 'Surveillance & Monitoring', path: '/analysis-dashboard' },
   { id: 'web_services_dashboard', label: 'Web Services Dashboard', description: 'Internal microservices mesh health, external environmental geoproxies, and interoperability API catalog', category: 'Surveillance & Monitoring', path: '/web-services-dashboard' },
   { id: 'crawling_dashboard', label: 'Crawling Dashboard', description: 'Web ingestion, scraper operations, and collection pipeline intelligence', category: 'Surveillance & Monitoring', path: '/crawling-dashboard' },
@@ -50,7 +46,6 @@ export const SYSTEM_MODULES: SystemModule[] = [
   { id: 'console_settings', label: 'Settings & Audit', description: 'Application branding and activity audit history', category: 'System Management', path: '/console/settings' },
   { id: 'configuration_modul', label: 'Configuration Modul', description: 'Configure navigation groups, modules, and sub-modules for sidebar', category: 'System Management', path: '/console/configuration-modul' },
   { id: 'user_log_activity', label: 'User Log Activity', description: 'User audit trails, system access logs, and security activity history', category: 'System Management', path: '/console/user-log-activity' },
-  { id: 'abvc_platform', label: 'ABVC Platform', description: 'Developer tutorial, live schema specifications, and integration reference for the Data Crawling API', category: 'System Management', path: '/abvc-platform' },
 ]
 
 export interface ActiveSubModule {

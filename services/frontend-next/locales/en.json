@@ -54,9 +54,9 @@
     "failed": "Failed"
   },
   "header": {
-    "title": "ASEAN Real-time AI Surveillance Data",
-    "subtitle": "Real-time multilingual data monitoring",
-    "kemenkes": "ASEAN Surveillance Centre",
+    "title": "SKDR INDONESIA",
+    "subtitle": "Sistem Kewaspadaan Dini dan Respons",
+    "kemenkes": "Ministry of Health of the Republic of Indonesia",
     "dashboard": "DASHBOARD",
     "home": "HOME",
     "mainDashboard": "DASHBOARD",
@@ -143,8 +143,8 @@
     "noSignal": "No current signal"
   },
   "dashboard": {
-    "pageTitle": "ASEAN Real-time Surveillance Dashboard",
-    "pageSubtitle": "Real-time epidemiological surveillance, outbreak signals, and case trends across ASEAN member states.",
+    "pageTitle": "SKDR Indonesia Dashboard",
+    "pageSubtitle": "Real-time epidemiological surveillance, outbreak signals, and case trends across Indonesia.",
     "lastUpdate": "Last Updated",
     "stats": {
       "activeCases": "Monitored Cases",
@@ -210,7 +210,6 @@
     "filterTitle": "Surveillance Filter",
     "filterSub": "All panels follow the active filter",
     "country": "Country",
-    "allAsean": "All ASEAN Countries",
     "year": "Year",
     "thisYear": " (This Year)",
     "resetFilter": "Reset Filter",
@@ -230,7 +229,6 @@
     "ewsFootnote": "Top 20 latest signals prioritized by detected time and NLP confidence.",
     "spatialTitle": "Surveillance Signal Map",
     "spatialDesc": "This map shows the geographic distribution of reported cases, deaths, and signal status across Southeast Asia.",
-    "regionAseanLocations": "Region: ASEAN • {count} mapped locations",
     "regionGlobalLocations": "Region: Global • {count} mapped locations",
     "aiSummaryTitle": "AI Situation Summary",
     "aiSummarySub": "Generated locally • updated with each snapshot",
@@ -283,7 +281,7 @@
       "signalsMatrix": "Signal Distribution by Region",
       "locationsTitle": "Mapped Locations",
       "locationsMeaning": "Unique locations with a detected monitored signal and valid map coordinates.",
-      "locationsCalculation": "Distinct place names across the 11 ASEAN jurisdictions on dashboard-valid events that already have coordinates (event geocode or gazetteer match). Missing locations remain unmapped and are never given a dummy pin.",
+      "locationsCalculation": "Distinct place names across Indonesia on dashboard-valid events that already have coordinates (event geocode or gazetteer match). Missing locations remain unmapped and are never given a dummy pin.",
       "locationsMatrix": "Mapped Locations by Region",
       "activeSignalsTitle": "Active Surveillance Signals",
       "activeSignalsMeaning": "Locations where monitoring rules currently indicate elevated signal conditions.",
@@ -306,7 +304,7 @@
     "title": "Real-time Data Collection Performance",
     "description": "Tracks collection performance, source activity, processing speed, and data freshness.",
     "ibsTitle": "IBS Indicator-Based Surveillance",
-    "ibsDescription": "Diseases and surveillance findings extracted from official IBS sources across ASEAN member states.",
+    "ibsDescription": "Diseases and surveillance findings extracted from official IBS sources across Indonesia.",
     "ibsSources": "IBS sources",
     "ibsRuns": "Runs",
     "ibsPages": "Pages found",
@@ -376,7 +374,6 @@
     "ibsDiseasesDetected": "Diseases Extracted",
     "ibsTotalCases": "Total Cases Captured",
     "ibsTotalDeaths": "Recorded Fatalities",
-    "ibsAseanCoverage": "ASEAN Coverage",
     "ibsTotalObservations": "Surveillance Records",
     "ibsActiveSources": "Official Sources",
     "ibsChartDiseases": "Diseases Extracted by IBS Crawlers",
@@ -419,7 +416,7 @@
     "spatialControlsSub": "Spatial Features & Map Layer Controls",
     "baseMap": "Basemap",
     "adminBoundaries": "Administrative Boundaries",
-    "adminBoundariesSub": "ASEAN GeoJSON boundary layer",
+    "adminBoundariesSub": "Indonesia GeoJSON boundary layer",
     "outbreakMarkers": "Signal Markers",
     "outbreakMarkersSub": "Detected signal locations",
     "casesChoropleth": "Case Density Map",
@@ -457,8 +454,8 @@
     "signal": "Signal",
     "signals": "Signals",
     "healthTopics": "Health Topics",
-    "mappedLocationsRegion": "{count} Mapped Locations • ASEAN Region",
-    "monitoredRegion": "Monitored Region • ASEAN Region"
+    "mappedLocationsRegion": "{count} Mapped Locations • Indonesia",
+    "monitoredRegion": "Monitored Region • Indonesia"
   },
   "tv": {
     "liveUpdate": "LIVE UPDATE",
@@ -468,9 +465,8 @@
     "regionDistribution": "Regional Distribution",
     "focusRegion": "Focus Region ?",
     "outbreakSummary": "Detected {cases} cases and {deaths} deaths. Outbreak threshold: {threshold} cases.",
-    "title": "ASEAN DISEASE OUTBREAK DASHBOARD",
-    "subtitle": "Showing all 11 ASEAN jurisdictions. Events outside ASEAN are hidden on this view.",
-    "surveillanceAsean": "Surveillance: ASEAN ({count} LOCATIONS)",
+    "title": "SKDR INDONESIA DASHBOARD",
+    "subtitle": "Showing all of Indonesia.",
     "mapSettings": "Map Settings",
     "showKpi": "SHOW KPI SUMMARY",
     "hideKpi": "HIDE KPI SUMMARY",
@@ -485,15 +481,15 @@
     "sourceCollector": "Source: Collector NLP Disease Surveillance AI",
     "inLocation": "in",
     "tickerAlert": "{severity}: {disease} in {location} • {cases} {casesUnit}",
-    "liveCrawlingFeedTitle": "LIVE ASEAN CRAWLING WEB & SOCIAL MEDIA",
-    "liveCrawlingStatus": "Real-time ASEAN Surveillance Active",
+    "liveCrawlingFeedTitle": "LIVE SKDR MONITORING",
+    "liveCrawlingStatus": "Real-time Surveillance Active",
     "liveCrawlingWaiting": "Backend connected; waiting for new crawl",
     "collectorReconnecting": "Connecting...",
     "collectorActive": "Collector Active",
     "crawlingFeedCount": "{count} signals buffered",
     "crawledSource": "Open original source",
     "waitingCrawlingSignals": "Waiting for incoming crawling signals...",
-    "monitoringDiseaseSources": "Monitoring ASEAN regional disease outbreak sources",
+    "monitoringDiseaseSources": "Monitoring disease report sources in Indonesia",
     "collapseFeed": "Collapse crawling feed",
     "expandFeed": "Expand crawling feed",
     "controls": "TV Controls"
@@ -567,7 +563,7 @@
     "UNKNOWN": "Unknown Disease"
   },
   "footer": {
-    "copyright": "© 2026 ASEAN Biological Threats Surveillance Centre. All rights reserved."
+    "copyright": "© 2026 Kementerian Kesehatan Republik Indonesia. All rights reserved."
   },
   "pages": {
     "login": {
@@ -929,7 +925,7 @@
       "populationTitle": "Population Denominators",
       "populationSub": "WorldPop metadata + GPWv4 2020 density overlay",
       "weatherTitle": "Capital Weather",
-      "weatherSub": "Open-Meteo current conditions at ASEAN capitals",
+      "weatherSub": "Open-Meteo current conditions at provincial capitals",
       "airTitle": "Capital Air Quality",
       "airSub": "Open-Meteo / CAMS AQI, PM2.5, PM10",
       "viirsTitle": "VIIRS True Color",
@@ -1081,7 +1077,7 @@
       "back_to_dashboard": "Back to Dashboard",
       "go_back": "Go Back",
       "appName": "SKDR INDONESIA",
-      "appTagline": "Early Warning and Response System — Case Reporting Dashboard",
+      "appTagline": "Sistem Kewaspadaan Dini dan Respons",
       "console": "SYSTEM MANAGEMENT CONSOLE",
       "consoleSub": "Centralized System Management, Branding & Configuration Portal",
       "dashboardLink": "Dashboard ↗",

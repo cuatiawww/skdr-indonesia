@@ -13,7 +13,7 @@ export async function GET(
   try {
     const res = await fetch(tileUrl, {
       headers: {
-        'User-Agent': 'ASEAN-Disease-Surveillance-Portal/1.0 (health-surveillance@kemkes.go.id)',
+        'User-Agent': 'SKDR-Indonesia/1.0 (health-surveillance@kemkes.go.id)',
       },
     })
 
