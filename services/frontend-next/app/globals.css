@@ -1,0 +1,341 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Keep the reports matrix typography consistent with the main dashboard.
+   The page still uses utility classes such as font-sans/font-mono for layout
+   semantics, but both resolve to the application Roboto family here. */
+.reports-page .font-sans,
+.reports-page .font-mono {
+  font-family: var(--font-roboto), sans-serif;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee 38s linear infinite;
+}
+@keyframes windStream {
+  from {
+    transform: translateX(-20%) skewY(-3deg);
+  }
+  to {
+    transform: translateX(35%) skewY(3deg);
+  }
+}
+.wind-stream {
+  animation: windStream 5s linear infinite;
+  box-shadow: 0 0 5px rgba(0, 96, 169, 0.75);
+}
+.wind-stream-delay {
+  animation: windStream 7s linear infinite reverse;
+  box-shadow: 0 0 5px rgba(180, 155, 88, 0.65);
+}
+
+@keyframes feedItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-feed-in {
+  animation: feedItemIn 420ms ease-out both;
+}
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #0284c7;
+  box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.35);
+  animation: livePulse 2.4s ease-out infinite;
+}
+@keyframes livePulse {
+  0%, 65%, 100% {
+    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.25);
+  }
+  30% {
+    box-shadow: 0 0 0 4px rgba(2, 132, 199, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-feed-in,
+  .live-dot {
+    animation: none;
+  }
+}
+
+.regional-news-track {
+  animation: regionalNewsTicker 36s linear infinite;
+}
+
+.regional-news-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes regionalNewsTicker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .regional-news-track {
+    animation: none;
+  }
+}
+
+  .sitrep-prose p { margin: 0.35rem 0; }
+  .sitrep-prose ul { list-style: disc; padding-left: 1.25rem; }
+  .sitrep-prose ol { list-style: decimal; padding-left: 1.25rem; }
+  .sitrep-prose h2, .sitrep-prose h3 { font-weight: 800; margin: 0.5rem 0; }
+  .ProseMirror p.is-editor-empty:first-child::before {
+    color: #94a3b8;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
+@media print {
+  /* Suppress all browser scrollbars completely on print/PDF */
+  *,
+  *::before,
+  *::after {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  header.site-header,
+  header.no-print,
+  .no-print,
+  .print\:hidden,
+  aside,
+  header nav,
+  footer,
+  .toaster,
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  .print-area,
+  .sitrep-document {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Eliminate scrollize / scrollable containers across the entire document */
+  .sitrep-document,
+  .print-area,
+  .sitrep-document *,
+  .print-area * {
+    max-height: none !important;
+  }
+
+  .sitrep-document .overflow-x-auto,
+  .sitrep-document .overflow-y-auto,
+  .sitrep-document .overflow-auto,
+  .sitrep-document .overflow-hidden,
+  .print-area .overflow-x-auto,
+  .print-area .overflow-y-auto,
+  .print-area .overflow-auto,
+  .print-area .overflow-hidden,
+  .sitrep-table-wrap,
+  .sitrep-card,
+  .sitrep-chapter,
+  .custom-scrollbar {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Disable sticky headers/columns in print to prevent displacement */
+  .sitrep-document .sticky,
+  .print-area .sticky,
+  .sitrep-document [class*="sticky"],
+  .print-area [class*="sticky"] {
+    position: static !important;
+  }
+
+  /* Guarantee tables fit width without clipping */
+  .sitrep-document table,
+  .print-area table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+  }
+
+  .page-break,
+  .sitrep-page-start,
+  .sitrep-chapter,
+  #map,
+  [data-pdf-break="before"] {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  #cover.sitrep-page-start:first-child,
+  .sitrep-document > .sitrep-page-start:first-child,
+  .sitrep-document > header.sitrep-masthead:first-child {
+    break-before: auto !important;
+    page-break-before: auto !important;
+  }
+
+  /* Whole cards, maps, figures, and chart surfaces stay intact.
+     A block that would straddle a page boundary starts on the next page. */
+  .break-inside-avoid,
+  .sitrep-keep,
+  .sitrep-major,
+  .sitrep-choropleth,
+  .sitrep-masthead,
+  .sitrep-document figure,
+  .sitrep-document img,
+  .sitrep-document svg,
+  .sitrep-document canvas,
+  .sitrep-document .recharts-wrapper,
+  .sitrep-document .recharts-surface,
+  .sitrep-document thead,
+  .sitrep-document tr,
+  .sitrep-document th,
+  .sitrep-document td {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .sitrep-document > [data-pdf-page]:not(.sitrep-chapter):not(.sitrep-table-page),
+  .sitrep-card:not(.sitrep-chapter):not(.sitrep-table-page) {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Disease chapters paginate between subsections, never through one. */
+  .sitrep-chapter {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .sitrep-chapter > * {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Long tables may break between rows only; header repeats on the next page. */
+  .sitrep-table-page,
+  .sitrep-table-wrap,
+  .sitrep-chapter > .sitrep-table-wrap,
+  .sitrep-chapter > [id$="-table"] {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .sitrep-document table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .sitrep-document thead {
+    display: table-header-group !important;
+  }
+
+  .sitrep-document tfoot {
+    display: table-footer-group !important;
+  }
+
+  .sitrep-document h1,
+  .sitrep-document h2,
+  .sitrep-document h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .sitrep-document p,
+  .sitrep-document li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .sitrep-card,
+  .sitrep-print-page,
+  .sitrep-masthead,
+  .sitrep-choropleth {
+    padding: 22px 24px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .sitrep-choropleth ul {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .sitrep-choropleth svg {
+    max-height: 118mm;
+    width: 100%;
+  }
+
+  .sitrep-document {
+    counter-reset: sitrep-page;
+  }
+
+  .sitrep-print-page {
+    counter-increment: sitrep-page;
+    position: relative;
+  }
+
+  .sitrep-print-page::after {
+    content: counter(sitrep-page);
+    position: absolute;
+    right: 16px;
+    bottom: 8px;
+    font-size: 10px;
+    color: #64748b;
+  }
+
+  .sitrep-document svg {
+    max-width: 100%;
+  }
+  .sitrep-document a[href]::after {
+    content: none !important;
+  }
+
+  .sitrep-document button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: inherit !important;
+  }
+}
