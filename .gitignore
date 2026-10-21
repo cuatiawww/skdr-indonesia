@@ -3,3 +3,9 @@ node_modules/
 .next/
 target/
 *.log
+
+# uploads & backups (never commit)
+uploads/
+backups/
+*.dump
+*.sql.gz
