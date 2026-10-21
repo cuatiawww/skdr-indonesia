@@ -27,12 +27,22 @@ def clean(s):
 
 
 def split_options(v):
+    """Options from the sheet cell: one per line, else comma-separated; a single 'A / B / C' cell is split on '/'.
+    Normalised only cosmetically: list numbering ('1. '), trailing commas, '(+ free text)' and the capital first letter."""
     v = str(v or '').strip()
     if '\n' in v:
         parts = [clean(p) for p in v.split('\n')]
     else:
         parts = [clean(p) for p in v.split(',')]
-    return [p for p in parts if p]
+    parts = [p for p in parts if p]
+    if len(parts) == 1 and re.search(r'\s/|/\s', parts[0]):
+        parts = [clean(p) for p in re.split(r'\s*/\s*', parts[0]) if clean(p)]
+    out = []
+    for p in parts:
+        p = re.sub(r'^\d+\.\s+', '', p).rstrip(',').strip()
+        p = re.sub(r'\s*\(\+ free text\)$', '', p)
+        out.append(p[:1].upper() + p[1:])
+    return out
 
 
 TYPE_MAP = {'Dropdown': 'select', 'Multiple selection/Checklist': 'multiselect', 'Multiple selection/cheklist': 'multiselect',
@@ -61,7 +71,7 @@ def field(spec, row, key, label=None, type=None, options=None, **kw):
     req = clean(r.get('Field requirement status'))
     f['required'] = req.startswith('Required')
     text = ' '.join(clean(r.get(c)) for c in ('Conditional visibility', 'Validation Logic'))
-    if re.search(r'If "Lainnya", then add new field', text) and 'other' not in kw:
+    if re.search(r'If "?Lainnya"?, then add new field', text) and 'other' not in kw:
         kw['other'] = {'value': 'Lainnya', 'key': key + '_lainnya', 'label': 'Jika lainnya, sebutkan'}
     if kw.get('other') is False:
         kw.pop('other')

@@ -534,6 +534,34 @@ mod tests {
     }
 
     #[test]
+    fn rabies_classification_and_wound_category() {
+        let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../database/pe/rabies.v1.json");
+        let s: Value = serde_json::from_str(&std::fs::read_to_string(p).expect("rabies schema")).unwrap();
+        let e = Engine::new(&s, NaiveDate::from_ymd_opt(2026, 10, 21).unwrap());
+        let mut d = obj(json!({"digigit": "Ya", "tipe_luka": "Gigitan tidak tembus kulit", "jenis_hpr": "Anjing"}));
+        e.derive(&mut d, "PE-RAB-2026-000001");
+        assert_eq!(d["kategori_luka"], json!("Kategori 2"));
+        assert_eq!(d["no_pe"], json!("PE-RAB-2026-000001"));
+        assert_eq!(e.classify(&d).unwrap().0, "ghpr");
+        d.insert("jenis_hpr".into(), json!("Kelelawar"));
+        e.derive(&mut d, "x");
+        assert_eq!(d["kategori_luka"], json!("Kategori 3"));
+        d.insert("gejala_neurologis".into(), json!(["Hidrofobia (takut air)"]));
+        assert_eq!(e.classify(&d).unwrap().0, "klinis");
+        d.insert("lab_diperiksa".into(), json!("Ya"));
+        d.insert("lab_hasil".into(), json!("Positif"));
+        assert_eq!(e.classify(&d).unwrap().0, "konfirmasi");
+        let n = obj(json!({"digigit": "Tidak"}));
+        assert_eq!(e.classify(&n).unwrap().0, "tidak_memenuhi");
+        // GHPR without symptoms: onset/gejala not required; otherwise required
+        let (errs, warns) = e.validate(&obj(json!({"status_laporan": "Gigitan Hewan Penular Rabies", "digigit": "Tidak"})));
+        assert!(!errs.iter().any(|i| i.key == "tgl_mulai_sakit"));
+        assert!(warns.iter().any(|i| i.msg.contains("Status GHPR")));
+        let (errs, _) = e.validate(&obj(json!({"status_laporan": "Rabies Klinis"})));
+        assert!(errs.iter().any(|i| i.key == "tgl_mulai_sakit"));
+    }
+
+    #[test]
     fn lepto_validation_rules() {
         let s = schema();
         let e = Engine::new(&s, NaiveDate::from_ymd_opt(2026, 10, 21).unwrap());

@@ -1,0 +1,1845 @@
+{
+ "form_key": "rabies",
+ "disease_code": "RABIES",
+ "version": 1,
+ "no_pe_prefix": "PE-RAB",
+ "title": "Formulir Penyelidikan Epidemiologi (PE) Rabies/GHPR",
+ "source": "Tracker review SKDR, sheet \"Form PE Rabies - Spesifikasi\" (docs/pe-spec/rabies.json)",
+ "age_reference": [
+  "tgl_mulai_sakit",
+  "tgl_laporan"
+ ],
+ "steps": [
+  {
+   "id": "p1",
+   "title": "Identitas Laporan, Pelaporan, dan Pasien",
+   "sections": [
+    {
+     "id": "A",
+     "title": "A. Status Laporan",
+     "fields": [
+      {
+       "key": "status_laporan",
+       "label": "Status Laporan",
+       "type": "select",
+       "row": 4,
+       "options": [
+        "Gigitan Hewan Penular Rabies",
+        "Rabies Klinis",
+        "Rabies Konfirmasi"
+       ],
+       "required": true,
+       "col": "status_laporan",
+       "warn": [
+        {
+         "when": {
+          "all": [
+           {
+            "f": "status_laporan",
+            "eq": "Gigitan Hewan Penular Rabies"
+           },
+           {
+            "f": "digigit",
+            "eq": "Tidak"
+           }
+          ]
+         },
+         "msg": "Status GHPR tetapi \"Apakah pernah digigit/dijilat/luka akibat HPR?\" = Tidak. Periksa kembali."
+        },
+        {
+         "when": {
+          "all": [
+           {
+            "f": "status_laporan",
+            "eq": "Rabies Konfirmasi"
+           },
+           {
+            "f": "lab_diperiksa",
+            "filled": true
+           },
+           {
+            "not": {
+             "all": [
+              {
+               "f": "lab_diperiksa",
+               "eq": "Ya"
+              },
+              {
+               "f": "lab_hasil",
+               "eq": "Positif"
+              }
+             ]
+            }
+           }
+          ]
+         },
+         "msg": "Status Rabies Konfirmasi belum didukung hasil lab positif. Periksa kembali."
+        }
+       ]
+      },
+      {
+       "key": "rumor_terkait",
+       "label": "Apakah laporan berkaitan dengan rumor KLB/wabah atau kasus serupa lainnya?",
+       "type": "select",
+       "row": 5,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "tgl_rumor",
+       "label": "Tanggal Rumor",
+       "type": "date",
+       "row": 6,
+       "required": true,
+       "visible": {
+        "f": "rumor_terkait",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_pe"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_rumor"
+      },
+      {
+       "key": "lokasi_rumor",
+       "label": "Lokasi Rumor",
+       "type": "text",
+       "row": 7,
+       "required": true,
+       "visible": {
+        "f": "rumor_terkait",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "cluster_id",
+       "label": "Link dengan kasus/KLB serupa di SKDR",
+       "type": "cluster",
+       "row": 8,
+       "required": false,
+       "col": "cluster_id"
+      }
+     ]
+    },
+    {
+     "id": "B",
+     "title": "B. Identitas Pelapor",
+     "fields": [
+      {
+       "key": "no_pe",
+       "label": "No. PE",
+       "type": "auto",
+       "row": 9,
+       "required": true,
+       "derive": {
+        "fn": "no_pe"
+       }
+      },
+      {
+       "key": "tgl_laporan",
+       "label": "Tanggal Terima Laporan",
+       "type": "date",
+       "row": 10,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_rumor"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_laporan",
+       "hint": "Isi sesuai tanggal laporan diterima (tidak terisi otomatis)."
+      },
+      {
+       "key": "tgl_pe",
+       "label": "Tanggal PE",
+       "type": "date",
+       "row": 11,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_berobat"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_rumor"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_pe"
+      },
+      {
+       "key": "ebs_link",
+       "label": "Link No. EBS",
+       "type": "ebs",
+       "row": 12,
+       "required": true,
+       "col": "ebs_link"
+      },
+      {
+       "key": "petugas_nama",
+       "label": "Nama Petugas PE",
+       "type": "text",
+       "row": 13,
+       "required": true
+      },
+      {
+       "key": "petugas_telp",
+       "label": "Telp Petugas",
+       "type": "text",
+       "row": 14,
+       "required": true,
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      },
+      {
+       "key": "petugas_jabatan",
+       "label": "Jabatan Petugas",
+       "type": "select",
+       "row": 15,
+       "options": [
+        "Petugas Surveilans",
+        "Epidemiolog",
+        "Dokter",
+        "Perawat",
+        "Bidan",
+        "Admin",
+        "Sanitarian/Kesling",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "petugas_jabatan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    },
+    {
+     "id": "C",
+     "title": "C. Wilayah Unit Pelapor",
+     "fields": [
+      {
+       "key": "lapor_provinsi",
+       "label": "Provinsi",
+       "type": "province",
+       "row": 16,
+       "required": true,
+       "col": "province_id"
+      },
+      {
+       "key": "lapor_kabkota",
+       "label": "Kab/Kota",
+       "type": "kabkota",
+       "row": 17,
+       "required": true,
+       "depends": "lapor_provinsi",
+       "col": "kabkota_id"
+      },
+      {
+       "key": "lapor_kecamatan",
+       "label": "Kecamatan",
+       "type": "text",
+       "row": 18,
+       "required": true
+      },
+      {
+       "key": "unit_pelapor",
+       "label": "Unit Pelapor",
+       "type": "text",
+       "row": 19,
+       "required": true,
+       "hint": "Master sarana belum tersedia; isi nama faskes."
+      }
+     ]
+    },
+    {
+     "id": "D",
+     "title": "D. Identitas Pasien",
+     "fields": [
+      {
+       "key": "nama_pasien",
+       "label": "Nama Pasien",
+       "type": "text",
+       "row": 20,
+       "required": true,
+       "col": "patient_name"
+      },
+      {
+       "key": "nama_ortu",
+       "label": "Nama Orang Tua / KK",
+       "type": "text",
+       "row": 21,
+       "required": false
+      },
+      {
+       "key": "nik",
+       "label": "NIK",
+       "type": "text",
+       "row": 22,
+       "required": true,
+       "col": "nik",
+       "format": "digits",
+       "minLen": 16,
+       "maxLen": 16
+      },
+      {
+       "key": "jenis_kelamin",
+       "label": "Jenis Kelamin",
+       "type": "select",
+       "row": 23,
+       "options": [
+        "Laki-laki",
+        "Perempuan"
+       ],
+       "required": true,
+       "col": "sex"
+      },
+      {
+       "key": "tgl_lahir",
+       "label": "Tanggal Lahir",
+       "type": "date",
+       "row": 24,
+       "required": true,
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "today"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_digigit"
+        }
+       ]
+      },
+      {
+       "key": "umur_tahun",
+       "label": "Umur (Tahun)",
+       "type": "auto",
+       "row": 25,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "years"
+       },
+       "col": "age_years",
+       "hint": "Dihitung dari Tanggal Lahir sampai Tanggal Mulai Sakit (atau Tanggal Terima Laporan), disimpan statis."
+      },
+      {
+       "key": "umur_bulan",
+       "label": "Umur (Bulan)",
+       "type": "auto",
+       "row": 26,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "months"
+       }
+      },
+      {
+       "key": "umur_hari",
+       "label": "Umur (Hari)",
+       "type": "auto",
+       "row": 27,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "days"
+       }
+      },
+      {
+       "key": "alamat",
+       "label": "Alamat Domisili Pasien",
+       "type": "textarea",
+       "row": 28,
+       "required": true
+      },
+      {
+       "key": "dom_provinsi",
+       "label": "Provinsi Domisili Pasien",
+       "type": "province",
+       "row": 29,
+       "required": true
+      },
+      {
+       "key": "dom_kabkota",
+       "label": "Kab/Kota Domisili Pasien",
+       "type": "kabkota",
+       "row": 30,
+       "required": true,
+       "depends": "dom_provinsi"
+      },
+      {
+       "key": "dom_kecamatan",
+       "label": "Kecamatan Domisili Pasien",
+       "type": "text",
+       "row": 31,
+       "required": true
+      },
+      {
+       "key": "dom_kelurahan",
+       "label": "Kelurahan/Desa",
+       "type": "text",
+       "row": 32,
+       "required": true
+      },
+      {
+       "key": "telp_pasien",
+       "label": "Tlp/HP Pasien",
+       "type": "text",
+       "row": 33,
+       "required": false,
+       "format": "digits",
+       "minLen": 11,
+       "maxLen": 13
+      },
+      {
+       "key": "pekerjaan",
+       "label": "Pekerjaan pasien",
+       "type": "select",
+       "row": 34,
+       "options": [
+        "Belum/tidak bekerja",
+        "Petani",
+        "Peternak",
+        "Veterenarian",
+        "Karyawan/ pekerja swata",
+        "TNI/Polri",
+        "Ibu Rumah Tangga",
+        "Pelajar/mahasiswa",
+        "Pedagang",
+        "Nelayan",
+        "Buruh/tukang",
+        "Pekerja RS/Puskesmas/Klinik",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "pekerjaan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "alamat_kerja",
+       "label": "Alamat Tempat Kerja",
+       "type": "text",
+       "row": 35,
+       "required": false
+      },
+      {
+       "key": "kerabat_nama",
+       "label": "Nama Saudara Dekat yang Dapat Dihubungi",
+       "type": "text",
+       "row": 36,
+       "required": false
+      },
+      {
+       "key": "kerabat_telp",
+       "label": "No Telp Kontak Darurat",
+       "type": "text",
+       "row": 37,
+       "required": false,
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p2",
+   "title": "Skrining Gigitan",
+   "sections": [
+    {
+     "id": "E",
+     "title": "E. Informasi Gigihat/luka Akibat HPR",
+     "fields": [
+      {
+       "key": "digigit",
+       "label": "Apakah pernah digigit/dijilat/luka akibat HPR?",
+       "type": "select",
+       "row": 40,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "tgl_digigit",
+       "label": "Tanggal digigit/dijilat/luka akibat HPR",
+       "type": "date",
+       "row": 41,
+       "required": true,
+       "visible": {
+        "f": "digigit",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "tgl_pe"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "lokasi_gigitan",
+       "label": "Lokasi gigitan",
+       "type": "select",
+       "row": 42,
+       "options": [
+        "Kepala/wajah",
+        "Telinga",
+        "Leher",
+        "Tangan",
+        "Kaki",
+        "Badan/berut/dada",
+        "Bokong"
+       ],
+       "required": true,
+       "visible": {
+        "f": "digigit",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "tipe_luka",
+       "label": "Tipe luka gigitan",
+       "type": "select",
+       "row": 43,
+       "options": [
+        "Jilatan",
+        "Gigitan tembus kulit",
+        "Gigitan tidak tembus kulit",
+        "Cakaran tembus kulit",
+        "Cakaran tidak tembus kulit"
+       ],
+       "required": true,
+       "visible": {
+        "f": "digigit",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "kategori_luka",
+       "label": "Kategori luka",
+       "type": "auto",
+       "row": 44,
+       "options": [
+        "Kategori 1",
+        "Kategori 2",
+        "Kategori 3"
+       ],
+       "required": false,
+       "visible": {
+        "f": "digigit",
+        "eq": "Ya"
+       },
+       "derive": {
+        "fn": "first_match",
+        "cases": [
+         {
+          "when": {
+           "all": [
+            {
+             "f": "digigit",
+             "eq": "Ya"
+            },
+            {
+             "f": "jenis_hpr",
+             "eq": "Kelelawar"
+            }
+           ]
+          },
+          "value": "Kategori 3"
+         },
+         {
+          "when": {
+           "all": [
+            {
+             "f": "digigit",
+             "eq": "Ya"
+            },
+            {
+             "f": "tipe_luka",
+             "in": [
+              "Gigitan tembus kulit",
+              "Cakaran tembus kulit"
+             ]
+            }
+           ]
+          },
+          "value": "Kategori 3"
+         },
+         {
+          "when": {
+           "all": [
+            {
+             "f": "digigit",
+             "eq": "Ya"
+            },
+            {
+             "f": "tipe_luka",
+             "in": [
+              "Gigitan tidak tembus kulit",
+              "Cakaran tidak tembus kulit"
+             ]
+            }
+           ]
+          },
+          "value": "Kategori 2"
+         },
+         {
+          "when": {
+           "all": [
+            {
+             "f": "digigit",
+             "eq": "Ya"
+            },
+            {
+             "f": "tipe_luka",
+             "eq": "Jilatan"
+            }
+           ]
+          },
+          "value": "Kategori 1"
+         }
+        ]
+       },
+       "hint": "Diturunkan otomatis dari Tipe luka gigitan (kontak kelelawar = Kategori 3)."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p3",
+   "title": "Klinis Pasien",
+   "sections": [
+    {
+     "id": "F",
+     "title": "F. Informasi Klinis Pasien",
+     "fields": [
+      {
+       "key": "tgl_mulai_sakit",
+       "label": "Tanggal Mulai Sakit/Bergejala",
+       "type": "date",
+       "row": 47,
+       "required": false,
+       "requiredIf": {
+        "not": {
+         "f": "status_laporan",
+         "eq": "Gigitan Hewan Penular Rabies"
+        }
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_lahir"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_digigit"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "onset_date",
+       "hint": "Wajib kecuali Status Laporan = GHPR tanpa gejala."
+      },
+      {
+       "key": "gejala_prodromal",
+       "label": "Gejala Prodromal",
+       "type": "multiselect",
+       "row": 48,
+       "options": [
+        "Demam",
+        "Lemas",
+        "Kesemutan",
+        "Rasa menusuk atau sensasi terbakar (paraesthesia)",
+        "Nyeri tekan sekitar luka"
+       ],
+       "required": false,
+       "requiredIf": {
+        "not": {
+         "f": "status_laporan",
+         "eq": "Gigitan Hewan Penular Rabies"
+        }
+       },
+       "minSelect": 1
+      },
+      {
+       "key": "gejala_neurologis",
+       "label": "Gejala Neurologis Akut",
+       "type": "multiselect",
+       "row": 49,
+       "options": [
+        "Cemas, bingung, gelisah, dan halusinasi",
+        "Fasikulasi",
+        "Produksi air liur berlebihan (hipersalivasi)",
+        "Air mata berlebihan",
+        "Hidrofobia (takut air)",
+        "Aerofobia (takut udara)",
+        "Fotofobia (takut cahaya)",
+        "Kelemahan motorik",
+        "Paralisis otot pernapasan"
+       ],
+       "required": false,
+       "requiredIf": {
+        "not": {
+         "f": "status_laporan",
+         "eq": "Gigitan Hewan Penular Rabies"
+        }
+       },
+       "minSelect": 1
+      },
+      {
+       "key": "tgl_berobat",
+       "label": "Tanggal berobat",
+       "type": "date",
+       "row": 50,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_digigit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "first_visit_date"
+      },
+      {
+       "key": "rawat_inap",
+       "label": "Apakah dirawat inap?",
+       "type": "select",
+       "row": 51,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "ri_faskes",
+       "label": "Nama RS/Puskesmas/Klinik",
+       "type": "text",
+       "row": 52,
+       "required": false,
+       "visible": {
+        "f": "rawat_inap",
+        "eq": "Ya"
+       },
+       "hint": "Master fasilitas belum tersedia; isi nama RS/Puskesmas/Klinik."
+      },
+      {
+       "key": "ri_masuk",
+       "label": "Tanggal masuk rawat inap",
+       "type": "date",
+       "row": 53,
+       "required": false,
+       "visible": {
+        "f": "rawat_inap",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "ri_keluar",
+       "label": "Tanggal keluar rawat inap",
+       "type": "date",
+       "row": 54,
+       "required": false,
+       "visible": {
+        "f": "rawat_inap",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "ri_masuk"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "diagnosis_awal",
+       "label": "Diagnosis awal",
+       "type": "select",
+       "row": 55,
+       "options": [
+        "Rabies konfirmasi",
+        "Rabies klinis",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "diagnosis_awal_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "lab_diperiksa",
+       "label": "Apakah diperiksa lab?",
+       "type": "select",
+       "row": 56,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "lab_nama",
+       "label": "Nama Laboratorium",
+       "type": "text",
+       "row": 57,
+       "required": false,
+       "visible": {
+        "f": "lab_diperiksa",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "lab_jenis",
+       "label": "Jenis pemeriksaan laboratorium",
+       "type": "select",
+       "row": 58,
+       "options": [
+        "Fluorescent Antibody Technique (FAT)",
+        "Polymerase Chain Reaction (PCR)"
+       ],
+       "required": false,
+       "visible": {
+        "f": "lab_diperiksa",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "lab_spesimen",
+       "label": "Jenis spesimen",
+       "type": "select",
+       "row": 59,
+       "options": [
+        "Folikel rambut",
+        "Hapusan/preparat sentuh kornea mata",
+        "Air liur (saliva)",
+        "Swab bawah lidah",
+        "Biopsi kulit",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "f": "lab_diperiksa",
+        "eq": "Ya"
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "lab_spesimen_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       },
+       "optionsIf": [
+        {
+         "when": {
+          "f": "lab_jenis",
+          "eq": "Fluorescent Antibody Technique (FAT)"
+         },
+         "options": [
+          "Folikel rambut",
+          "Hapusan/preparat sentuh kornea mata",
+          "Lainnya"
+         ]
+        },
+        {
+         "when": {
+          "f": "lab_jenis",
+          "eq": "Polymerase Chain Reaction (PCR)"
+         },
+         "options": [
+          "Air liur (saliva)",
+          "Swab bawah lidah",
+          "Biopsi kulit",
+          "Lainnya"
+         ]
+        }
+       ]
+      },
+      {
+       "key": "lab_tgl_ambil",
+       "label": "Tanggal ambil spesimen",
+       "type": "date",
+       "row": 60,
+       "required": false,
+       "visible": {
+        "f": "lab_diperiksa",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "lab_tgl_kirim"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "lab_tgl_kirim",
+       "label": "Tanggal kirim spesimen",
+       "type": "date",
+       "row": 61,
+       "required": false,
+       "visible": {
+        "f": "lab_diperiksa",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "lab_tgl_ambil"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "lab_hasil",
+       "label": "Hasil pemeriksaan lab",
+       "type": "select",
+       "row": 62,
+       "options": [
+        "Positif",
+        "Negatif"
+       ],
+       "required": false,
+       "visible": {
+        "f": "lab_diperiksa",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "diagnosis_akhir",
+       "label": "Diagnosis akhir",
+       "type": "select",
+       "row": 63,
+       "options": [
+        "Rabies konfirmasi",
+        "Rabies klinis",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "diagnosis_akhir_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "rawat_luka",
+       "label": "Cara Rawat Luka Pertama",
+       "type": "select",
+       "row": 64,
+       "options": [
+        "Dibiarkan saja",
+        "Dicuci dengan air mengalir",
+        "Dicuci dengan air mengalir dan sabun",
+        "Dibalut saja",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "rawat_luka_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "cuci_kapan",
+       "label": "Kapan cuci luka dilakukan?",
+       "type": "select",
+       "row": 65,
+       "options": [
+        "< 12 jam setelah digigit HPR",
+        "> 12 jam setelah digigit HPR",
+        "Tidak tahu"
+       ],
+       "required": false,
+       "visible": {
+        "f": "rawat_luka",
+        "eq": "Dicuci dengan air mengalir dan sabun"
+       }
+      },
+      {
+       "key": "cuci_lama",
+       "label": "Berapa lama cuci luka dilakukan?",
+       "type": "select",
+       "row": 66,
+       "options": [
+        "< 15 menit",
+        "> 15 menit",
+        "Tidak tahu"
+       ],
+       "required": false,
+       "visible": {
+        "f": "rawat_luka",
+        "eq": "Dicuci dengan air mengalir dan sabun"
+       }
+      },
+      {
+       "key": "antiseptik",
+       "label": "Apakah luka diberikan Antiseptik?",
+       "type": "select",
+       "row": 67,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": false
+      },
+      {
+       "key": "antiseptik_kapan",
+       "label": "Kapan diberikan antiseptik?",
+       "type": "select",
+       "row": 68,
+       "options": [
+        "Langsung setelah digigit",
+        "Langsung setelah mencuci luka",
+        "Setelah mencuci dan mengeringkan luka dengan tisu/handuk/medium tidak steril lainnya",
+        "Setelah mencuci dan mengeringkan luka dengan kasa steril",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "f": "antiseptik",
+        "eq": "Ya"
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "antiseptik_kapan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "var",
+       "label": "Apakah diberikan VAR?",
+       "type": "select",
+       "row": 69,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": false,
+       "visible": {
+        "f": "digigit",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "var_kali",
+       "label": "Berapa kali diberikan VAR",
+       "type": "select",
+       "row": 70,
+       "options": [
+        "1 kali",
+        "2 kali",
+        "3 kali",
+        "4 kali"
+       ],
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "digigit",
+          "eq": "Ya"
+         },
+         {
+          "f": "var",
+          "eq": "Ya"
+         }
+        ]
+       }
+      },
+      {
+       "key": "var_tgl",
+       "label": "Tanggal pemberian VAR",
+       "type": "date",
+       "row": 71,
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "digigit",
+          "eq": "Ya"
+         },
+         {
+          "f": "var",
+          "eq": "Ya"
+         }
+        ]
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_digigit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "var_alasan",
+       "label": "Alasan tidak VAR",
+       "type": "text",
+       "row": 72,
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "digigit",
+          "eq": "Ya"
+         },
+         {
+          "f": "var",
+          "eq": "Tidak"
+         }
+        ]
+       }
+      },
+      {
+       "key": "sar",
+       "label": "Apakah diberikan SAR?",
+       "type": "select",
+       "row": 73,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": false,
+       "visible": {
+        "f": "digigit",
+        "eq": "Ya"
+       },
+       "warn": [
+        {
+         "when": {
+          "all": [
+           {
+            "f": "sar",
+            "eq": "Ya"
+           },
+           {
+            "f": "var",
+            "eq": "Tidak"
+           }
+          ]
+         },
+         "msg": "SAR diberikan tetapi VAR tidak diberikan (SAR selalu diberikan bersama VAR). Periksa kembali."
+        }
+       ]
+      },
+      {
+       "key": "sar_tgl",
+       "label": "Tanggal permbeian SAR",
+       "type": "date",
+       "row": 74,
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "digigit",
+          "eq": "Ya"
+         },
+         {
+          "f": "sar",
+          "eq": "Ya"
+         }
+        ]
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_digigit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "sar_alasan",
+       "label": "Alasan tidak diberikan SAR",
+       "type": "select",
+       "row": 75,
+       "options": [
+        "SAR tidak tersedia",
+        "Pasien menolak",
+        "Tidak ada indikasi",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "digigit",
+          "eq": "Ya"
+         },
+         {
+          "f": "sar",
+          "eq": "Tidak"
+         }
+        ]
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "sar_alasan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "ket_klinis",
+       "label": "Keterangan klinis lainnya",
+       "type": "textarea",
+       "row": 76,
+       "required": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p4",
+   "title": "Informasi HPR dan Riwayat Kontak",
+   "sections": [
+    {
+     "id": "G",
+     "title": "G. Informasi HPR",
+     "fields": [
+      {
+       "key": "jenis_hpr",
+       "label": "Jenis HPR",
+       "type": "select",
+       "row": 79,
+       "options": [
+        "Anjing",
+        "Kucing",
+        "Monyet/Kera",
+        "Kelelawar",
+        "Musang",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "jenis_hpr_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "kategori_hpr",
+       "label": "Kategori HPR",
+       "type": "select",
+       "row": 80,
+       "options": [
+        "Liar",
+        "Peliharaan",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "pemilik_nama",
+       "label": "Nama pemilik HPR",
+       "type": "text",
+       "row": 81,
+       "required": false,
+       "visible": {
+        "f": "kategori_hpr",
+        "eq": "Peliharaan"
+       }
+      },
+      {
+       "key": "pemilik_alamat",
+       "label": "Alamat pemilik HPR",
+       "type": "text",
+       "row": 82,
+       "required": false,
+       "visible": {
+        "f": "kategori_hpr",
+        "eq": "Peliharaan"
+       }
+      },
+      {
+       "key": "pemilik_hp",
+       "label": "No. HP/kontak pemilik HPR",
+       "type": "text",
+       "row": 83,
+       "required": false,
+       "visible": {
+        "f": "kategori_hpr",
+        "eq": "Peliharaan"
+       },
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      },
+      {
+       "key": "hpr_vaksin",
+       "label": "Riwayat vaksinasi HPR",
+       "type": "select",
+       "row": 84,
+       "options": [
+        "Pernah vaksin (minimal 1x)",
+        "Rutin vaksin setiap tahun",
+        "Tidak pernah vaksin",
+        "Tidak tahu",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "hpr_vaksin_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "hpr_vaksin_tgl",
+       "label": "Tanggal vaksin HPR terakhir",
+       "type": "date",
+       "row": 85,
+       "required": false,
+       "visible": {
+        "f": "hpr_vaksin",
+        "in": [
+         "Pernah vaksin (minimal 1x)",
+         "Rutin vaksin setiap tahun"
+        ]
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "hpr_kondisi",
+       "label": "Kondisi HPR setelah menggigit",
+       "type": "select",
+       "row": 86,
+       "options": [
+        "Lari",
+        "Diobservasi",
+        "Mati dibunuh",
+        "Mati sakit",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "hpr_kondisi_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "hpr_tgl_mati",
+       "label": "Tanggal HPR mati",
+       "type": "date",
+       "row": 87,
+       "required": false,
+       "visible": {
+        "f": "hpr_kondisi",
+        "in": [
+         "Mati dibunuh",
+         "Mati sakit"
+        ]
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_digigit"
+        },
+        {
+         "op": "<=",
+         "ref": "hpr_tgl_sampel"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "hpr_lab",
+       "label": "Jika dibunuh/mati, apakah diperiksa lab?",
+       "type": "select",
+       "row": 88,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": false,
+       "visible": {
+        "f": "hpr_kondisi",
+        "in": [
+         "Mati dibunuh",
+         "Mati sakit"
+        ]
+       }
+      },
+      {
+       "key": "hpr_sediaan",
+       "label": "Sediaan yang diambil",
+       "type": "select",
+       "row": 89,
+       "options": [
+        "Otak hewan tersangka",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "hpr_kondisi",
+          "in": [
+           "Mati dibunuh",
+           "Mati sakit"
+          ]
+         },
+         {
+          "f": "hpr_lab",
+          "eq": "Ya"
+         }
+        ]
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "hpr_sediaan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "hpr_tgl_sampel",
+       "label": "Tanggal pengambilan sampel",
+       "type": "date",
+       "row": 90,
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "hpr_kondisi",
+          "in": [
+           "Mati dibunuh",
+           "Mati sakit"
+          ]
+         },
+         {
+          "f": "hpr_lab",
+          "eq": "Ya"
+         }
+        ]
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "hpr_tgl_mati"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "hpr_hasil",
+       "label": "Hasil pemeriksaan",
+       "type": "select",
+       "row": 91,
+       "options": [
+        "Positif rabies",
+        "Negatif rabies",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "all": [
+         {
+          "f": "hpr_kondisi",
+          "in": [
+           "Mati dibunuh",
+           "Mati sakit"
+          ]
+         },
+         {
+          "f": "hpr_lab",
+          "eq": "Ya"
+         }
+        ]
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "hpr_hasil_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    },
+    {
+     "id": "F2",
+     "title": "F. Riwayat Kontak",
+     "fields": [
+      {
+       "key": "banyak_digigit",
+       "label": "Apakah di rumah/sekitar rumah banyak orang yang digigit oleh hewan yang sama?",
+       "type": "select",
+       "row": 92,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "orang_digigit",
+       "type": "table",
+       "label": "Orang digigit HPR yang sama",
+       "visible": {
+        "f": "banyak_digigit",
+        "eq": "Ya"
+       },
+       "minRows": 1,
+       "required": false,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama orang digigit HPR yang sama",
+         "type": "text",
+         "row": 93,
+         "required": false
+        },
+        {
+         "key": "tgl_digigit",
+         "label": "Tanggal digigit",
+         "type": "date",
+         "row": 94,
+         "required": false,
+         "rules": [
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "key": "satu_hewan",
+       "label": "Apakah hanya ada 1 hewan yang menggigit orang di lokasi kejadian?",
+       "type": "select",
+       "row": 95,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "jumlah_hewan",
+       "label": "Bila lebih dari satum berapa jumlah hewan yang menggigit?",
+       "type": "select",
+       "row": 96,
+       "options": [
+        "2",
+        "3",
+        "4",
+        "5",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "f": "satu_hewan",
+        "eq": "Tidak"
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "jumlah_hewan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "hpr_lain_sebulan",
+       "label": "Apakah dalam satu bulan terakhir terdapat kasus HPR yang mati/menggigit?",
+       "type": "select",
+       "row": 97,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p5",
+   "title": "Kondisi akhir pasien dan Keterangan Lainnya",
+   "sections": [
+    {
+     "id": "H",
+     "title": "H. Kondisi akhir pasien dan Keterangan Lainnya",
+     "fields": [
+      {
+       "key": "kondisi_akhir",
+       "label": "Bagaimana kondisi akhir pasien?",
+       "type": "select",
+       "row": 101,
+       "options": [
+        "Sembuh",
+        "Meninggal",
+        "Tidak Diketahui"
+       ],
+       "required": true,
+       "col": "outcome"
+      },
+      {
+       "key": "tgl_meninggal",
+       "label": "Tanggal meninggal",
+       "type": "date",
+       "row": 102,
+       "required": true,
+       "visible": {
+        "f": "kondisi_akhir",
+        "eq": "Meninggal"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_lahir"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "death_date"
+      },
+      {
+       "key": "keterangan_lain",
+       "label": "Keterangan lainnya mengenai PE/kasus",
+       "type": "textarea",
+       "row": 103,
+       "required": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p6",
+   "title": "Tim Penyelidikan Epidemiologi",
+   "sections": [
+    {
+     "id": "L",
+     "title": "G. Tim Penyelidikan Epidemiologi",
+     "fields": [
+      {
+       "key": "tim_pe",
+       "type": "table",
+       "label": "Anggota tim PE yang terlibat dalam penyelidikan",
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama",
+         "type": "text",
+         "row": 106,
+         "required": true
+        },
+        {
+         "key": "instansi",
+         "label": "Instansi/kantor",
+         "type": "text",
+         "row": 107,
+         "required": true
+        },
+        {
+         "key": "jabatan",
+         "label": "Jabatan",
+         "type": "text",
+         "row": 108,
+         "required": true
+        },
+        {
+         "key": "hp",
+         "label": "No. HP/kontak",
+         "type": "text",
+         "row": 109,
+         "required": true,
+         "format": "digits",
+         "minLen": 10,
+         "maxLen": 13
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "classification": {
+  "needs": [
+   {
+    "f": "digigit",
+    "filled": true
+   }
+  ],
+  "rules": [
+   {
+    "code": "konfirmasi",
+    "label": "Rabies Konfirmasi",
+    "when": {
+     "all": [
+      {
+       "f": "lab_diperiksa",
+       "eq": "Ya"
+      },
+      {
+       "f": "lab_hasil",
+       "eq": "Positif"
+      }
+     ]
+    },
+    "basis": "Hasil pemeriksaan lab pasien (FAT/PCR) positif."
+   },
+   {
+    "code": "klinis",
+    "label": "Rabies Klinis",
+    "when": {
+     "all": [
+      {
+       "f": "digigit",
+       "eq": "Ya"
+      },
+      {
+       "f": "gejala_neurologis",
+       "hasAny": [
+        "Cemas, bingung, gelisah, dan halusinasi",
+        "Fasikulasi",
+        "Produksi air liur berlebihan (hipersalivasi)",
+        "Air mata berlebihan",
+        "Hidrofobia (takut air)",
+        "Aerofobia (takut udara)",
+        "Fotofobia (takut cahaya)",
+        "Kelemahan motorik",
+        "Paralisis otot pernapasan"
+       ]
+      }
+     ]
+    },
+    "basis": "Riwayat gigitan/jilatan/luka HPR + gejala neurologis akut rabies."
+   },
+   {
+    "code": "ghpr",
+    "label": "Gigitan Hewan Penular Rabies",
+    "when": {
+     "f": "digigit",
+     "eq": "Ya"
+    },
+    "basis": "Riwayat digigit/dijilat/luka akibat HPR tanpa gejala neurologis rabies."
+   }
+  ],
+  "fallback": {
+   "code": "tidak_memenuhi",
+   "label": "Tidak memenuhi definisi kasus"
+  },
+  "manual_field": "status_laporan",
+  "manual_map": {
+   "Gigitan Hewan Penular Rabies": "ghpr",
+   "Rabies Klinis": "klinis",
+   "Rabies Konfirmasi": "konfirmasi"
+  }
+ },
+ "finish_message": "Terima kasih, laporan PE anda telah tersimpan di SKDR"
+}

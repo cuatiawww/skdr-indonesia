@@ -30,5 +30,7 @@ export const CLASS_STYLE: Record<string, string> = {
   konfirmasi: 'border-red-200/60 bg-red-50 text-red-700',
   probable: 'border-orange-200/60 bg-orange-50 text-orange-700',
   suspek: 'border-amber-200/60 bg-amber-50 text-amber-700',
+  klinis: 'border-orange-200/60 bg-orange-50 text-orange-700',
+  ghpr: 'border-amber-200/60 bg-amber-50 text-amber-700',
   tidak_memenuhi: 'border-slate-200 bg-slate-50 text-slate-500',
 }

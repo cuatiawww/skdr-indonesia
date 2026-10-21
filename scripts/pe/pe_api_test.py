@@ -32,7 +32,7 @@ kab = call('GET', f"/api/v1/master/kabkota?province_id={prov['id']}")[1]['data']
 other_kab = [k for k in call('GET', '/api/v1/master/kabkota')[1]['data'] if k['province_id'] != prov['id']][0]
 
 # 1. draft with only a few answers -> saved, many errors, report date NOT auto-filled
-st, c = call('POST', '/api/v1/pe/cases', {'form_key': FORM, 'data': {'nama_pasien': 'UJI PR006 Draf', 'lapor_provinsi': prov['id'], 'lapor_kabkota': other_kab['id']}})
+st, c = call('POST', '/api/v1/pe/cases', {'form_key': FORM, 'data': {'nama_pasien': f'UJI {FORM} Draf', 'lapor_provinsi': prov['id'], 'lapor_kabkota': other_kab['id']}})
 check('draft created', st == 201, st)
 cid, d = c['data']['id'], c['data']
 check('No. PE generated', d['no_pe'].startswith(schema['no_pe_prefix']), d.get('no_pe'))
@@ -77,7 +77,7 @@ def fill(fields, in_table=False):
         elif fl.get('format') == 'digits':
             out[k] = '1' * fl.get('minLen', 10)
         else:
-            out[k] = 'UJI PR006' if k != 'nama_pasien' else 'UJI PR006 Lengkap'
+            out[k] = 'UJI PR006' if k != 'nama_pasien' else f'UJI {FORM} Lengkap'
     return out
 
 
@@ -88,6 +88,8 @@ OVERRIDES = {
               'spesimen': 'Ya', 'lab': [{'jenis_spesimen': 'Darah utuh (whole blood)', 'jenis_pemeriksaan': 'PCR', 'hasil': 'Terdeteksi',
                                          'tgl_ambil': str(O + _dt.timedelta(days=1)), 'tgl_kirim': str(O + _dt.timedelta(days=1)), 'tgl_hasil': str(O + _dt.timedelta(days=2))}],
               'status_laporan': 'Suspek Leptospirosis'},
+    'rabies': {'digigit': 'Ya', 'tgl_digigit': str(O - _dt.timedelta(days=2)), 'tipe_luka': 'Gigitan tembus kulit', 'jenis_hpr': 'Anjing',
+               'gejala_neurologis': ['Hidrofobia (takut air)'], 'status_laporan': 'Rabies Klinis', 'var': 'Ya', 'sar': 'Tidak'},
 }
 data.update(OVERRIDES.get(FORM, {}))
 st, c = call('PUT', f'/api/v1/pe/cases/{cid}', {'data': data})
@@ -95,7 +97,9 @@ d = c.get('data', {})
 check('autosave update OK', st == 200, st)
 check('complete data has 0 errors', st == 200 and d['errors'] == [], json.dumps(d.get('errors', [])[:5], ensure_ascii=False))
 check('age stored (years)', d.get('data', {}).get('umur_tahun') is not None, d.get('data', {}).get('umur_tahun'))
-EXPECT = {'lepto': 'konfirmasi'}
+EXPECT = {'lepto': 'konfirmasi', 'rabies': 'klinis'}
+if FORM == 'rabies':
+    check('wound category derived (Kategori 3)', d.get('data', {}).get('kategori_luka') == 'Kategori 3', d.get('data', {}).get('kategori_luka'))
 check('classification computed', d.get('classification') == EXPECT.get(FORM, d.get('classification')), d.get('classification'))
 check('manual status vs system warning', FORM != 'lepto' or any('berbeda' in w['msg'] for w in d.get('warnings', [])))
 
@@ -115,22 +119,23 @@ for to, role in (('dikirim', 'petugas'), ('terverifikasi', 'verifikator')):
     check(f'-> {to}', st == 200 and r['data']['status'] == to, st)
 
 # 4. classification override with reason (audit)
-st, r = call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': 'suspek'})
+OV = {'rabies': 'ghpr'}.get(FORM, 'suspek')
+st, r = call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': OV})
 check('override without reason rejected', st == 400, st)
-st, r = call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': 'suspek', 'reason': 'Uji PR006'})
-check('override saved + logged', st == 200 and r['data']['classification_override'] == 'suspek'
+st, r = call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': OV, 'reason': 'Uji PR006'})
+check('override saved + logged', st == 200 and r['data']['classification_override'] == OV
       and any(e['event'] == 'koreksi_klasifikasi' for e in r['data']['events']), st)
 call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': None})
 st, r = call('POST', f'/api/v1/pe/cases/{cid}/status', {'to': 'final'}, role='verifikator')
 check('-> final', st == 200 and r['data']['status'] == 'final', st)
-st, r = call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': 'suspek', 'reason': 'x'})
+st, r = call('PUT', f'/api/v1/pe/cases/{cid}/classification', {'code': OV, 'reason': 'x'})
 check('final PE locked for override (409)', st == 409, st)
 events = [e['event'] for e in r.get('data', {}).get('events', [])] if st == 200 else [e['event'] for e in call('GET', f'/api/v1/pe/cases/{cid}')[1]['data']['events']]
 check('history has status events', events.count('status') >= 5, events)
 
 # 5. cluster with outbreak-level monitoring
 if schema.get('cluster_fields'):
-    st, cl = call('POST', '/api/v1/pe/clusters', {'form_key': FORM, 'name': 'UJI PR006 Klaster', 'province_id': prov['id'], 'kabkota_id': kab['id'], 'tgl_rumor': str(O)})
+    st, cl = call('POST', '/api/v1/pe/clusters', {'form_key': FORM, 'name': f'UJI {FORM} Klaster', 'province_id': prov['id'], 'kabkota_id': kab['id'], 'tgl_rumor': str(O)})
     check('cluster created', st == 201, st)
     clid = cl['data']['id']
     base = {k: cl['data'][k] for k in ('name', 'province_id', 'kabkota_id', 'tgl_rumor')}
@@ -141,7 +146,7 @@ if schema.get('cluster_fields'):
     good = {'periode_mulai': str(O), 'periode_akhir': str(O + _dt.timedelta(days=5)), 'n1': 100, 'n2': 20, 'n3': 30, 'n4': 5, 'n5': 4, 'n6': 1, 'n7': 4, 'n8': 1, 'n9': 3}
     st, r = call('PUT', f'/api/v1/pe/clusters/{clid}', {**base, 'monitoring': good})
     check('valid monitoring saved on cluster', st == 200 and r['data']['monitoring'].get('n1') == 100, st)
-    st, c2 = call('POST', '/api/v1/pe/cases', {'form_key': FORM, 'data': {'nama_pasien': 'UJI PR006 Klaster', 'cluster_id': clid, 'pe_klb': 'Ya'}})
+    st, c2 = call('POST', '/api/v1/pe/cases', {'form_key': FORM, 'data': {'nama_pasien': f'UJI {FORM} Klaster', 'cluster_id': clid, 'pe_klb': 'Ya'}})
     check('PE linked to cluster', st == 201 and c2['data']['cluster_id'] == clid, st)
     st, lst = call('GET', f'/api/v1/pe/clusters?form={FORM}')
     check('cluster lists linked PE count', any(x['id'] == clid and x['cases'] == 1 for x in lst['data']))
@@ -149,4 +154,6 @@ if schema.get('cluster_fields'):
 st, lst = call('GET', f'/api/v1/pe/cases?form={FORM}&search=UJI')
 check('list masks patient name', st == 200 and all('UJI' not in json.dumps(x) for x in lst['data']) and lst['total'] >= 1, st)
 check('list has no NIK', 'nik' not in json.dumps(lst['data']))
+st, c3 = call('POST', '/api/v1/pe/cases', {'form_key': FORM, 'data': {'nama_pasien': f'UJI {FORM} Draf', 'lapor_provinsi': prov['id']}})
+check('extra draft for UI review', st == 201, st)
 print('RESULT', 'PASS' if ok_all else 'FAIL')
