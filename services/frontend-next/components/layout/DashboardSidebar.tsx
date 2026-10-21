@@ -1,5 +1,6 @@
 'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -82,8 +83,8 @@ export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
   };
 
   const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
-  const appTitle = settings.app_name || "ASEAN REAL-TIME AI SURVEILLANCE DATA";
-  const appSubtitle = settings.app_tagline || "Real-time multilingual data monitoring";
+  const appTitle = settings.app_name || tr("skdr.layout.appName");
+  const appSubtitle = settings.app_tagline || tr("skdr.layout.appTagline");
 
   const resolveTargetUrl = (href?: string) => {
     if (!href || href === "#") return "#";
@@ -105,7 +106,7 @@ export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoSrc}
-              alt="Logo"
+              alt={tr("skdr.layout.logo")}
               className="h-auto w-full max-h-8 object-contain"
               onError={(e) => {
                 e.currentTarget.src = `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
@@ -138,7 +139,7 @@ export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
               {group.title || (group.titleKey ? t(group.titleKey) : "")}
             </div>
             {group.items.length === 0 ? (
-              <p className="px-3 py-1 text-xs text-slate-400 italic">No modules</p>
+              <p className="px-3 py-1 text-xs text-slate-400 italic">{tr("skdr.layout.no_modules")}</p>
             ) : (
               <ul className="space-y-1">
                 {group.items.map((item, itemIdx) => {
@@ -195,7 +196,7 @@ export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
                             type="button"
                             onClick={() => toggleExpand(itemKey)}
                             className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer"
-                            aria-label="Toggle sub-menu"
+                            aria-label={tr("skdr.layout.toggle_sub_menu")}
                           >
                             {isExpanded ? (
                               <ChevronDown className="h-3.5 w-3.5" />

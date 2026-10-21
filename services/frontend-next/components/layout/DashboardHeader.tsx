@@ -1,5 +1,6 @@
 'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import {
   ChevronDown,
   Home,
@@ -43,14 +44,14 @@ export default function DashboardHeader({
   const appTitle = isPrototype
     ? "ABVC DATA CRAWLING"
     : consoleMode
-    ? "SYSTEM MANAGEMENT CONSOLE"
-    : (settings.app_name || "ASEAN REAL-TIME AI SURVEILLANCE DATA");
+    ? tr("skdr.layout.console")
+    : (settings.app_name || tr("skdr.layout.appName"));
     
   const appSubtitle = isPrototype
     ? ""
     : consoleMode
-    ? "Centralized System Management, Branding & Configuration Portal"
-    : (settings.app_tagline || "Real-time multilingual data monitoring");
+    ? tr("skdr.layout.consoleSub")
+    : (settings.app_tagline || tr("skdr.layout.appTagline"));
 
   return (
     <header className="w-full border-b border-white/20 bg-[#102f78]">
@@ -76,7 +77,7 @@ export default function DashboardHeader({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoSrc}
-                alt="Logo"
+                alt={tr("skdr.layout.logo")}
                 className="h-auto max-h-[62px] w-[132px] shrink-0 object-contain md:w-[168px]"
                 onError={(e) => {
                   e.currentTarget.src = `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
@@ -114,7 +115,7 @@ export default function DashboardHeader({
                   }`}
                 >
                   <SettingsIcon className="h-4 w-4" />
-                  Settings
+                  {tr("skdr.layout.settings")}
                 </Link>
                 <Link
                   href="/console/configuration-modul"
@@ -125,7 +126,7 @@ export default function DashboardHeader({
                   }`}
                 >
                   <SlidersHorizontal className="h-4 w-4" />
-                  Modules
+                  {tr("skdr.layout.modules")}
                 </Link>
                 <Link
                   href="/console/users"
@@ -136,7 +137,7 @@ export default function DashboardHeader({
                   }`}
                 >
                   <UsersIcon className="h-4 w-4" />
-                  Users
+                  {tr("skdr.layout.users")}
                 </Link>
                 <Link
                   href="/reports/drafts"
@@ -147,14 +148,14 @@ export default function DashboardHeader({
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  Reports
+                  {tr("skdr.layout.reports")}
                 </Link>
                 <Link
                   href="/main-dashboard"
                   className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-[#0060A9]"
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  Dashboard ↗
+                  {tr("skdr.layout.dashboardLink")}
                 </Link>
               </div>
             ) : (

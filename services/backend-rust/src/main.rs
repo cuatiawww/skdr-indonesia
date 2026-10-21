@@ -43,10 +43,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(health))
         // settings + master data
         .route("/api/v1/console/settings", get(master::console_settings))
-        .route("/api/v1/master/regions", get(master::regions))
-        .route("/api/v1/master/countries", get(master::countries))
         .route("/api/v1/master/diseases", get(master::diseases))
-        .route("/api/v1/master/locations", get(master::locations))
+        .route("/api/v1/master/provinces", get(master::provinces))
+        .route("/api/v1/master/kabkota", get(master::kabkota))
         .route("/api/v1/disease-concepts", get(master::disease_concepts))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))

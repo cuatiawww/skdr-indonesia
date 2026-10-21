@@ -3,7 +3,7 @@
 import { Globe2, Mail, MessageCircle } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 
-const links=[['Instagram','https://www.instagram.com/kemenkes_ri'],['YouTube','https://www.youtube.com/KementerianKesehatanRI'],['WhatsApp','https://wa.me/628111500567'],['Email','mailto:kontak@kemkes.go.id'],['Website','https://kemkes.go.id']]
+const links=[['Instagram','https://www.instagram.com/kemenkes_ri'],['YouTube','https://www.youtube.com/KementerianKesehatanRI'],['WhatsApp','https://wa.me/628111500567'],['skdr.footer.email','mailto:kontak@kemkes.go.id'],['skdr.footer.website','https://kemkes.go.id']]
 
 export default function Footer(){
   const { t } = useTranslation();
@@ -16,13 +16,13 @@ export default function Footer(){
         </p>
         <nav>
           <ul className="flex items-center gap-1.5">
-            {links.map(([label,href],i)=>(
+            {links.map(([key,href],i)=>{ const label = key.startsWith('skdr.') ? t(key) : key; return (
               <li key={label}>
                 <a href={href} target={href.startsWith('http')?'_blank':undefined} rel="noopener noreferrer" aria-label={label} title={label} className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-blue-50/70 text-[#0060A9] transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-[#0060A9] hover:text-white">
                   {i===2?<MessageCircle className="h-4 w-4"/>:i===3?<Mail className="h-4 w-4"/>:<Globe2 className="h-4 w-4"/>}
                 </a>
               </li>
-            ))}
+            )})}
           </ul>
         </nav>
       </div>

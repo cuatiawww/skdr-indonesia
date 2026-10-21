@@ -30,6 +30,8 @@ const dictionaries: Record<Locale, any> = {
 };
 
 const STORAGE_KEY = "disease-app-locale";
+// SKDR: UI language comes from env (default Bahasa Indonesia).
+const DEFAULT_LOCALE: Locale = process.env.NEXT_PUBLIC_DEFAULT_LOCALE === "en" ? "en" : "id";
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
 
@@ -47,17 +49,26 @@ function getNestedValue(obj: any, path: string): any {
   return curr;
 }
 
+/** Non-hook lookup in the active (DEFAULT_LOCALE) dictionary, for helpers and module-level labels. */
+export function tr(path: string, params?: Record<string, string | number>): string {
+  let val = getNestedValue(dictionaries[DEFAULT_LOCALE], path);
+  if (val === undefined || val === null) val = getNestedValue(enDict, path);
+  if (val === undefined || val === null) return path;
+  let out = String(val);
+  if (params) for (const [k, v] of Object.entries(params)) out = out.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+  return out;
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     try {
-      // The product UI is English-only. Clear legacy Indonesian preferences
-      // so old browser sessions cannot reintroduce mixed-language labels.
-      setLocaleState("en");
-      localStorage.setItem(STORAGE_KEY, "en");
-      document.documentElement.lang = "en";
+      // SKDR UI is single-language (DEFAULT_LOCALE); stale stored preferences are overwritten.
+      setLocaleState(DEFAULT_LOCALE);
+      localStorage.setItem(STORAGE_KEY, DEFAULT_LOCALE);
+      document.documentElement.lang = DEFAULT_LOCALE;
     } catch {
       // ignore localStorage errors in private modes
     }
@@ -65,16 +76,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLocale = useCallback((_newLocale: Locale) => {
-    setLocaleState("en");
+    setLocaleState(DEFAULT_LOCALE);
     try {
-      localStorage.setItem(STORAGE_KEY, "en");
-      document.documentElement.lang = "en";
+      localStorage.setItem(STORAGE_KEY, DEFAULT_LOCALE);
+      document.documentElement.lang = DEFAULT_LOCALE;
     } catch {
       // ignore
     }
   }, []);
 
-  const toggleLocale = useCallback(() => setLocale("en"), [setLocale]);
+  const toggleLocale = useCallback(() => setLocale(DEFAULT_LOCALE), [setLocale]);
 
   const t = useCallback(
     (path: string, params?: Record<string, string | number>): string => {

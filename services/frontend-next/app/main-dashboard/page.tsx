@@ -1,5 +1,6 @@
 ﻿'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
@@ -47,11 +48,9 @@ import { fetchPublicDashboard, fetchKpiSnapshot, fetchCrawlingStats, fetchCrawlH
 import type { CrawlHistoryRow, CrawlHistorySummary } from "@/types";
 import { reviewEventRows } from "@/lib/multiFactDisplay.mjs";
 import CountryFlag from "@/components/CountryFlag";
-import { isAseanCountryName, isAseanDefaultScope, scopeDashboardLocations } from "@/lib/asean-scope";
 import { caseDateText, caseDateTitle, countText, signalDate, takeUniqueSignals } from "@/lib/signal-feed.mjs";
-import AseanScopeBanner from "@/components/AseanScopeBanner";
 import LivePipelineCard from "@/components/LivePipelineCard";
-import EpiFilterBar, { EpiFilterState } from "@/components/EpiFilterBar";
+import SkdrFilterBar, { type SkdrFilterState as EpiFilterState } from "@/components/SkdrFilterBar";
 import { getCurrentEpiWeek } from "@/lib/epi-week";
 import { growthCaption, GROWTH_FOOTNOTE } from "@/lib/growth.mjs";
 
@@ -79,7 +78,7 @@ const severityClass = {
   NORMAL: "bg-blue-100 text-[#0060A9]",
 };
 
-function cleanArticleContent(value?: string | null, fallback = "Source content is not available."): string {
+function cleanArticleContent(value?: string | null, fallback = tr("skdr.dash.noSourceContent")): string {
   if (!value) return fallback;
   return value
     .replace(
@@ -198,7 +197,7 @@ function normalizeMatrixToTarget(
 ): { label: string; value: number; sub?: string; sharePct: string }[] {
   if (!matrix || matrix.length === 0) {
     if (targetTotal > 0) {
-      return [{ label: "Total Monitored", value: targetTotal, sharePct: "100.0" }];
+      return [{ label: tr("skdr.dash.totalMonitored"), value: targetTotal, sharePct: "100.0" }];
     }
     return [];
   }
@@ -282,6 +281,7 @@ function CrawlingInfoModal({
     skdr_api: t("crawling.sourceLabels.skdr_api"),
     web: t("crawling.sourceLabels.web"),
     unknown: t("crawling.sourceLabels.unknown"),
+    form: t("crawling.sourceLabels.form"),
   };
 
   // Older backend deployments may return a partial crawling-stats payload.
@@ -604,7 +604,7 @@ function KpiInfoModal({
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
-            aria-label="Close"
+            aria-label={tr("skdr.dash.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -616,13 +616,13 @@ function KpiInfoModal({
           <div className={`rounded-2xl border ${theme.heroBorder} p-4 text-center shadow-xs`}>
             <div className={`inline-flex items-center gap-1.5 rounded-full ${theme.badge} px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider mb-1.5`}>
               <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Official value synchronized with KPI card</span>
+              <span>{tr("skdr.dash.officialValue")}</span>
             </div>
             <p className={`text-3xl sm:text-4xl font-black ${theme.heroText} tracking-tight`}>
               {formatNumber(kpiValue)}
             </p>
             <p className="text-xs font-bold text-slate-600 mt-1">
-              Total {label} in the current monitoring period
+              {tr("skdr.dash.totalInPeriod", { label })}
             </p>
           </div>
 
@@ -630,7 +630,7 @@ function KpiInfoModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1">
               <div className="text-slate-800 font-extrabold text-[11px] uppercase tracking-wider">
-                <span>What does it mean?</span>
+                <span>{tr("skdr.dash.whatMeans")}</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11.5px]">
                 {explanation.meaning}
@@ -638,7 +638,7 @@ function KpiInfoModal({
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1">
               <div className="text-slate-800 font-extrabold text-[11px] uppercase tracking-wider">
-                <span>How is it calculated?</span>
+                <span>{tr("skdr.dash.howCalc")}</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11.5px]">
                 {explanation.calculation}
@@ -654,7 +654,7 @@ function KpiInfoModal({
                   {matrixTitle}
                 </p>
                 <span className="text-[10px] font-bold text-slate-500">
-                  Total: {formatNumber(kpiValue)}
+                  {tr("skdr.dash.total")}: {formatNumber(kpiValue)}
                 </span>
               </div>
               <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
@@ -662,13 +662,13 @@ function KpiInfoModal({
                   <thead>
                     <tr className="bg-slate-50/90 text-left border-b border-slate-200/80">
                       <th className="px-3.5 py-2.5 font-bold text-slate-600 text-[10px] uppercase tracking-wider">
-                        Category / Region
+                        {tr("skdr.dash.category")}
                       </th>
                       <th className="px-2 py-2.5 font-bold text-slate-600 text-[10px] uppercase tracking-wider text-center">
-                        Share
+                        {tr("skdr.dash.share")}
                       </th>
                       <th className="px-3.5 py-2.5 font-bold text-slate-600 text-[10px] uppercase tracking-wider text-right">
-                        Count
+                        {tr("skdr.dash.count")}
                       </th>
                     </tr>
                   </thead>
@@ -703,7 +703,7 @@ function KpiInfoModal({
                   <tfoot>
                     <tr className={`font-black border-t ${theme.footBg}`}>
                       <td className="px-3.5 py-2.5 text-[11px] uppercase tracking-wider">
-                        Total Monitored
+                        {tr("skdr.dash.totalMonitored")}
                       </td>
                       <td className="px-2 py-2.5 text-center text-[10px]">100.0%</td>
                       <td className={`px-3.5 py-2.5 text-right text-sm font-black ${theme.heroText}`}>
@@ -715,7 +715,7 @@ function KpiInfoModal({
               </div>
               {normalizedRows.length > 10 && (
                 <p className="mt-1.5 text-[9.5px] text-slate-400 text-right">
-                  Showing the top 10 of {normalizedRows.length} entities
+                  {tr("skdr.dash.top10", { count: normalizedRows.length })}
                 </p>
               )}
             </div>
@@ -837,8 +837,8 @@ function Kpi({
           <button
             onClick={() => setModalOpen(true)}
             className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-blue-100 hover:text-[#0060A9] transition shadow-xs"
-            aria-label={`Info about ${label}`}
-            title={`View Details & Explanation for ${label}`}
+            aria-label={tr("skdr.dash.infoAbout", { label })}
+            title={tr("skdr.dash.viewDetailsFor", { label })}
           >
             <Info className="h-3.5 w-3.5" />
           </button>
@@ -910,7 +910,8 @@ export default function DashboardPage() {
   const currentEpi = getCurrentEpiWeek();
   const [filters, setFilters] = useState<EpiFilterState>({
     disease: "all",
-    country: "ASEAN",
+    provinceId: null,
+    kabkotaId: null,
     startYear: currentEpi.year || currentYear,
     startWeek: 1,
     endYear: currentEpi.year || currentYear,
@@ -925,8 +926,9 @@ export default function DashboardPage() {
       const eY = sp.get("endYear");
       const eW = sp.get("endWeek");
       const dis = sp.get("disease");
-      const ctry = sp.get("country");
-      if (sY || sW || eY || eW || dis || ctry) {
+      const prov = sp.get("province_id");
+      const kab = sp.get("kabkota_id");
+      if (sY || sW || eY || eW || dis || prov || kab) {
         setFilters((prev) => ({
           ...prev,
           startYear: sY ? Number(sY) : prev.startYear,
@@ -934,30 +936,13 @@ export default function DashboardPage() {
           endYear: eY ? Number(eY) : prev.endYear,
           endWeek: eW ? Number(eW) : prev.endWeek,
           disease: dis || prev.disease,
-          country: ctry || prev.country,
+          provinceId: prov ? Number(prov) : prev.provinceId,
+          kabkotaId: kab ? Number(kab) : prev.kabkotaId,
         }));
       }
     }
   }, []);
   const [data, setData] = useState<PublicDashboard | null>(null);
-  const [selected, setSelected] = useState<OutbreakLocation | null>(null);
-  const [signalArticle, setSignalArticle] = useState<CrawlHistoryRow | null>(null);
-  const [signalEvents, setSignalEvents] = useState<CrawlHistoryRow[]>([]);
-  const [signalReady, setSignalReady] = useState(false);
-  const openSignal = (row: OutbreakLocation | null) => {
-    const url = row?.detail?.url?.trim();
-    setSignalArticle(null);
-    setSignalEvents([]);
-    setSignalReady(!row || !url);
-    setSelected(row);
-  };
-  const [signalOrder, setSignalOrder] = useState<SignalOrder>("case");
-  const signalOrderLabel = (order: SignalOrder) =>
-    order === "published"
-      ? t("dashboard.ewsOrderPublished")
-      : order === "crawled"
-        ? t("dashboard.ewsOrderCrawled")
-        : t("dashboard.ewsOrderCase");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [crawlingStats, setCrawlingStats] = useState<CrawlingStats | null>(null);
@@ -967,51 +952,14 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    const url = selected?.detail?.url?.trim();
-    if (!selected) return;
-    if (!url) {
-      setSignalArticle(null);
-      setSignalEvents([]);
-      setSignalReady(true);
-      return;
-    }
-    let active = true;
-    setSignalReady(false);
-    setSignalArticle(null);
-    setSignalEvents([]);
-    fetchCrawlHistoryRows({ q: url, per_page: 1, quality: "all" })
-      .then(async (page) => {
-        const row = page.data?.[0];
-        if (!row?.id) return null;
-        return fetchCrawlHistoryRow(row.id, row.crawl_channel);
-      })
-      .then((full) => {
-        if (!active) return;
-        const events = reviewEventRows(full?.children?.length ? full.children : full ? [full] : []) as CrawlHistoryRow[];
-        setSignalArticle(full);
-        setSignalEvents(events);
-      })
-      .catch(() => {
-        if (!active) return;
-        setSignalArticle(null);
-        setSignalEvents([]);
-      })
-      .finally(() => {
-        if (active) setSignalReady(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [selected]);
-
   const refreshCrawlingStats = useCallback(async () => {
     const crawlData = await fetchCrawlingStats().catch(() => null);
     if (crawlData) setCrawlingStats(crawlData);
   }, []);
 
   const dashboardApiFilters = useCallback((active: EpiFilterState) => ({
-    country: active.country,
+    province_id: active.provinceId ?? undefined,
+    kabkota_id: active.kabkotaId ?? undefined,
     disease: active.disease,
     start_year: active.startYear,
     start_week: active.startWeek,
@@ -1070,36 +1018,13 @@ export default function DashboardPage() {
     }
   }, [data?.available_years, filters.endYear]);
 
-  const mapLocations = useMemo(
-    () => scopeDashboardLocations(data?.locations, filters.country),
-    [data?.locations, filters.country],
+  const mapLocations = useMemo(() => data?.locations ?? [], [data?.locations]);
+  // Indonesia only: one country row for the map choropleth.
+  const countryData = useMemo(
+    () => [{ name: "Indonesia", cases: data?.kpis.cases ?? 0, deaths: data?.kpis.deaths ?? 0 }],
+    [data?.kpis.cases, data?.kpis.deaths],
   );
-
-  const countryData = data?.by_country ?? [];
-  const mapScope =
-    filters.country === "global" ||
-    (!isAseanDefaultScope(filters.country) && !isAseanCountryName(filters.country))
-      ? "global"
-      : "asean";
-
-  const sortedAlerts = useMemo(() => {
-    const feed = data?.signal_feed?.length ? data.signal_feed : data?.alerts;
-    if (!feed?.length) return [];
-    const now = Date.now();
-    const newest = feed
-      // PR 123: an explicitly (manually) published event stays even when the model said not health-related.
-      .filter((a) => a.detail?.is_health_related !== false || a.detail?.publish_source === 'manual')
-      .map((a) => ({ alert: a, time: getAlertTimestamp(a, signalOrder) }))
-      .filter(({ time }) => time > 0 && time <= now)
-      .sort((a, b) => b.time - a.time || (b.alert.cases ?? 0) - (a.alert.cases ?? 0))
-      .map(({ alert }) => alert);
-    // One card per article and case count; PR 132: all of them, shown a page at a time.
-    return takeUniqueSignals(newest, Number.POSITIVE_INFINITY);
-  }, [data?.signal_feed, data?.alerts, signalOrder]);
-  const signalPageSize = data?.signal_feed_page_size ?? 20;
-  const [signalVisible, setSignalVisible] = useState(20);
-  useEffect(() => setSignalVisible(signalPageSize), [signalOrder, signalPageSize, data?.signal_feed]);
-  const visibleAlerts = useMemo(() => sortedAlerts.slice(0, signalVisible), [sortedAlerts, signalVisible]);
+  const provinceData = data?.by_province ?? [];
 
   // Dynamic Reviewed vs Unreviewed breakdown (Health-focused)
   const casesTotal = data?.kpis.cases ?? 0;
@@ -1178,7 +1103,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <EpiFilterBar
+      <SkdrFilterBar
         availableDiseases={data?.available_diseases}
         availableYears={data?.available_years}
         currentEpiWeek={data?.current_epi_week}
@@ -1214,20 +1139,20 @@ export default function DashboardPage() {
           icon={<Bug className="h-5 w-5" />}
           tone="blue"
           trend={data?.trends?.cases}
-          noun="cases"
-          shareLabel="reviewed"
-          footnote="Comparison = this month so far vs all of last month. Reviewed = confirmed by an analyst; Unreviewed = auto-extracted, awaiting review."
+          noun={tr("skdr.dash.nounCases")}
+          shareLabel={tr("skdr.dash.shareReviewed")}
+          footnote={tr("skdr.dash.casesFootnote")}
           currentMonth={data?.trends?.current_month}
           previousMonth={data?.trends?.previous_month}
           subCards={[
             {
-              label: "Reviewed",
+              label: tr("skdr.dash.reviewed"),
               value: casesReviewed ?? "-",
-              hint: "Confirmed by an analyst",
+              hint: tr("skdr.dash.confirmedHint"),
               tone: "emerald",
             },
             {
-              label: "Unreviewed",
+              label: tr("skdr.dash.unreviewed"),
               value: casesUnreviewed ?? "-",
               tone: "amber",
             },
@@ -1239,7 +1164,7 @@ export default function DashboardPage() {
               calculation: t("dashboard.kpiInfo.casesCalculation")
             },
             matrixTitle: t("dashboard.kpiInfo.casesMatrix"),
-            matrix: (data?.by_country ?? []).map((c) => ({
+            matrix: provinceData.filter((c) => c.cases > 0).map((c) => ({
               label: c.name,
               value: c.cases,
             })),
@@ -1251,19 +1176,19 @@ export default function DashboardPage() {
           icon={<Skull className="h-5 w-5" />}
           tone="red"
           trend={data?.trends?.deaths}
-          noun="deaths"
-          shareLabel="reviewed"
-          footnote="Deaths reported in detected articles. Reviewed = confirmed by an analyst; Unreviewed = awaiting review."
+          noun={tr("skdr.dash.nounDeaths")}
+          shareLabel={tr("skdr.dash.shareReviewed")}
+          footnote={tr("skdr.dash.deathsFootnote")}
           currentMonth={data?.trends?.current_month}
           previousMonth={data?.trends?.previous_month}
           subCards={[
             {
-              label: "Reviewed",
+              label: tr("skdr.dash.reviewed"),
               value: deathsReviewed ?? "-",
               tone: "emerald",
             },
             {
-              label: "Unreviewed",
+              label: tr("skdr.dash.unreviewed"),
               value: deathsUnreviewed ?? "-",
               tone: "amber",
             },
@@ -1277,8 +1202,9 @@ export default function DashboardPage() {
             matrixTitle: t("dashboard.kpiInfo.deathsMatrix"),
             matrix: mapLocations
               .reduce<{ label: string; value: number }[]>((acc, loc) => {
-                const existing = acc.find((x) => x.label === loc.country);
-                if (existing) { existing.value += loc.deaths; } else { acc.push({ label: loc.country, value: loc.deaths }); }
+                const key = loc.province || loc.location_name;
+                const existing = acc.find((x) => x.label === key);
+                if (existing) { existing.value += loc.deaths; } else { acc.push({ label: key, value: loc.deaths }); }
                 return acc;
               }, [])
               .filter((x) => x.value > 0)
@@ -1291,19 +1217,19 @@ export default function DashboardPage() {
           icon={<MapPin className="h-5 w-5" />}
           tone="blue"
           trend={data?.trends?.locations}
-          noun="new locations"
-          shareLabel="geocoded"
-          footnote="Geocoded = placed on the map with coordinates; Unmapped = place name found but not yet located."
+          noun={tr("skdr.dash.nounLocations")}
+          shareLabel={tr("skdr.dash.shareGeocoded")}
+          footnote={tr("skdr.dash.locFootnote")}
           currentMonth={data?.trends?.current_month}
           previousMonth={data?.trends?.previous_month}
           subCards={[
             {
-              label: "Geocoded",
+              label: tr("skdr.dash.geocoded"),
               value: locationsMapped,
               tone: "blue",
             },
             {
-              label: "Unmapped",
+              label: tr("skdr.dash.unmapped"),
               value: locationsUnmapped,
               tone: "amber",
             },
@@ -1317,8 +1243,9 @@ export default function DashboardPage() {
             matrixTitle: t("dashboard.kpiInfo.locationsMatrix"),
             matrix: mapLocations
               .reduce<{ label: string; value: number }[]>((acc, loc) => {
-                const existing = acc.find((x) => x.label === loc.country);
-                if (existing) { existing.value += 1; } else { acc.push({ label: loc.country, value: 1 }); }
+                const key = loc.province || loc.location_name;
+                const existing = acc.find((x) => x.label === key);
+                if (existing) { existing.value += 1; } else { acc.push({ label: key, value: 1 }); }
                 return acc;
               }, [])
               .filter((x) => x.value > 0)
@@ -1330,103 +1257,7 @@ export default function DashboardPage() {
 
 
       <section className="w-full bg-[#f8fafc] pb-5">
-        <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-[381px_minmax(0,1fr)] xl:items-stretch">
-          <section
-            className="flex overflow-hidden border border-[#cfe0f1] bg-gradient-to-b from-[#f0f6fc] to-[#e8f1fa] xl:h-[700px] 2xl:h-[760px] xl:w-[381px]"
-            style={{ borderRadius: "17px 17px 22px 17px" }}
-          >
-            <div className="flex w-full flex-col">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div>
-                  <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">
-                    {t("dashboard.ewsTitle")}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    {t("dashboard.ewsSubtitleBy", { mode: signalOrderLabel(signalOrder).toLowerCase() })}
-                  </p>
-                </div>
-                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-800">
-                  {sortedAlerts.length} Active
-                </span>
-              </div>
-              <div
-                role="radiogroup"
-                aria-label={t("dashboard.ewsOrderLabel")}
-                className="mx-3 mt-3 grid grid-cols-3 gap-1 rounded-xl border border-blue-200/80 bg-white/80 p-1"
-              >
-                {(["case", "published", "crawled"] as const).map((order) => (
-                  <button
-                    key={order}
-                    type="button"
-                    role="radio"
-                    aria-checked={signalOrder === order}
-                    onClick={() => setSignalOrder(order)}
-                    className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition ${
-                      signalOrder === order
-                        ? "bg-[#0060A9] text-white shadow-sm"
-                        : "text-slate-600 hover:bg-blue-50"
-                    }`}
-                  >
-                    {signalOrderLabel(order)}
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1 space-y-2 overflow-y-auto p-3">
-                {visibleAlerts.length ? (
-                  visibleAlerts.map((a, i) => (
-                    <button
-                      key={`${a.detail?.event_id || a.detail?.url || a.location_name}-${a.disease}-${i}`}
-                      type="button"
-                      onClick={() => openSignal(a)}
-                      className="group w-full rounded-xl border border-slate-100 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50/60"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-slate-900 truncate">
-                            {translateDisease(a.disease)}
-                          </p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {a.location_name}, {a.country}
-                            {a.detail?.source_name ? ` • ${a.detail.source_name}` : ""}
-                          </p>
-                        </div>
-                        <span
-                          className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-[#0060A9] border border-blue-200/80 transition group-hover:bg-[#0060A9] group-hover:text-white shrink-0"
-                        >
-                          <span>View Details</span>
-                          <ChevronRight className="h-3 w-3" />
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-slate-600">
-                        <b title={countText(a, "cases") === "-" ? "Not reported" : undefined}>{countText(a, "cases", (n: number) => formatNumber(n, numLocale))}</b> {t("dashboard.casesUnit")} •{" "}
-                        <b title={countText(a, "deaths") === "-" ? "Not reported" : undefined}>{countText(a, "deaths", (n: number) => formatNumber(n, numLocale))}</b> {t("dashboard.deathsUnit")} • {signalOrderLabel(signalOrder)}:{" "}
-                        {signalOrder === "case"
-                          ? <span title={caseDateTitle(a)}>{caseDateText(a)}</span>
-                          : formatPublishDate(getAlertDate(a, signalOrder), numLocale)}
-                      </p>
-                    </button>
-                  ))
-                ) : (
-                  <p className="p-8 text-center text-sm text-slate-400">
-                    {t("dashboard.noAlerts")}
-                  </p>
-                )}
-                {sortedAlerts.length > visibleAlerts.length && (
-                  <button
-                    type="button"
-                    onClick={() => setSignalVisible((n) => n + signalPageSize)}
-                    className="w-full rounded-xl border border-blue-200 bg-white py-2 text-xs font-bold text-[#0060A9] hover:bg-blue-50"
-                  >
-                    {t("dashboard.ewsLoadMore", { shown: visibleAlerts.length, total: sortedAlerts.length })}
-                  </button>
-                )}
-              </div>
-              <div className="border-t border-blue-200/70 bg-white/70 px-4 py-3 text-[10px] font-bold text-slate-500">
-                {t("dashboard.ewsFootnoteBy", { mode: signalOrderLabel(signalOrder).toLowerCase() })}
-              </div>
-            </div>
-          </section>
-
+        <div className="w-full">
           <article
             className="flex flex-col border border-[#cfe0f1] bg-white p-4 xl:h-[700px] 2xl:h-[760px]"
             style={{ borderRadius: "17px 17px 22px 17px" }}
@@ -1442,7 +1273,7 @@ export default function DashboardPage() {
                 <div className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#0060A9]">
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-[#0060A9]" />
                   <span className="truncate">
-                    {t(filters.country === "global" ? "dashboard.regionGlobalLocations" : "dashboard.regionAseanLocations", { count: data?.kpis.locations ?? 0 })}
+                    {t("skdr.mapScopeLocations", { scope: data?.filters?.scope || "Indonesia", count: data?.kpis.locations ?? 0 })}
                   </span>
                 </div>
               </div>
@@ -1451,343 +1282,16 @@ export default function DashboardPage() {
               <SpatialOutbreakMap
                 countries={countryData}
                 locations={mapLocations}
-                boundaryScope={mapScope}
-                initialCenter={mapScope === "global" ? [12, 18] : undefined}
-                initialZoom={mapScope === "global" ? 2 : undefined}
+                highlightCountry="Indonesia"
+                boundaryScope="indonesia"
+                initialCenter={[118, -2.5]}
+                initialZoom={5}
               />
             </div>
           </article>
         </div>
       </section>
 
-      {/* SKDR: NLP crawl/IBS performance, heatmap, trend and morbidity sections are not copied yet (no form-data endpoints). */}
-
-      {/* Temporarily hidden: Case Distribution by Health Topic and Country Distribution. */}
-      {false && (
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">
-            {t("dashboard.casesByDisease")}
-          </h2>
-          <div className="mt-4 h-72">
-            <ResponsiveContainer>
-              <BarChart
-                data={(data?.by_disease ?? []).slice(0, 8).map(d => ({
-                  ...d,
-                  name: translateDisease(d.name)
-                }))}
-                layout="vertical"
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={110}
-                  tick={{ fontSize: 10 }}
-                />
-                <Tooltip />
-                <Bar dataKey="cases" fill="#0060A9" radius={[0, 5, 5, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">
-            {t("dashboard.countryDistribution")}
-          </h2>
-          <div className="mt-4 h-72">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={countryData}
-                  dataKey="cases"
-                  nameKey="name"
-                  innerRadius={55}
-                  outerRadius={95}
-                  label={({ name }) => name}
-                >
-                  {countryData.map((_, i) => (
-                    <Cell key={i} fill={colors[i % colors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-      </div>
-      )}
-
-      {/* Temporarily hidden: Surveillance Summary by Location. */}
-      {false && (
-      <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">
-            {t("dashboard.summaryByLocation")}
-          </h2>
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <Clock3 className="h-3.5 w-3.5" />
-            {data ? new Date(data.updated_at).toLocaleString(numLocale) : "-"}
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">{t("dashboard.colLocation")}</th>
-                <th className="px-4 py-3">{t("dashboard.colDisease")}</th>
-                <th className="px-4 py-3 text-right">{t("dashboard.colCases")}</th>
-                <th className="px-4 py-3 text-right">{t("dashboard.colDeaths")}</th>
-                <th className="px-4 py-3 text-right">{t("dashboard.colConfidence")}</th>
-                <th className="px-4 py-3 text-center">{t("dashboard.colStatus")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mapLocations.slice(0, 20).map((r, i) => (
-                <tr
-                  key={i}
-                  onClick={() => openSignal(r)}
-                  className="cursor-pointer border-t border-slate-100 transition hover:bg-blue-50/50"
-                  title={t("dashboard.rowTooltip")}
-                >
-                  <td className="px-4 py-3 font-semibold">
-                    {r.location_name}
-                    <span className="block text-xs font-normal text-slate-400">
-                      {r.country}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{translateDisease(r.disease)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {formatNumber(r.cases ?? 0, numLocale)}
-                  </td>
-                  <td className="px-4 py-3 text-right">{r.deaths}</td>
-                  <td className="px-4 py-3 text-right">
-                    {r.confidence == null
-                      ? "-"
-                      : `${Math.round(r.confidence * 100)}%`}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-black ${
-                        r.severity ? severityClass[r.severity] : "bg-blue-100 text-[#0060A9]"
-                      }`}
-                    >
-                      {translateSeverity(r.severity)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      )}
-
-      {mounted && selected && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 p-4 sm:p-6 backdrop-blur-xs transition-all duration-300 animate-in fade-in"
-          onClick={() => openSignal(null)}
-        >
-          <section
-            onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
-          >
-            <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-              <div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="text-base font-bold text-slate-900">
-                    {t("dashboard.eventModal.badgeDetails")}
-                  </h2>
-                  {signalReady && (signalEvents.some((row) => row.needs_review) || signalArticle?.needs_review) ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
-                      <Clock3 className="h-3.5 w-3.5" /> Needs Review
-                    </span>
-                  ) : signalReady ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Reviewed
-                    </span>
-                  ) : (
-                    <span className="inline-block h-5 w-24 animate-pulse rounded-full bg-slate-200" />
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Read only. Each stored event is one row.
-                </p>
-              </div>
-              <button
-                onClick={() => openSignal(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                aria-label={t("dashboard.modalClose")}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </header>
-            <div className="min-w-0 flex-1 space-y-5 overflow-y-auto p-4 text-xs leading-relaxed text-slate-800 sm:p-6">
-              {!signalReady ? <SignalModalSkeleton /> : (
-                <>
-              <div className="w-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                <h3 className="break-words text-sm font-bold leading-snug text-slate-900">
-                  {signalArticle?.title || signalArticle?.article_title || "—"}
-                </h3>
-                {(signalArticle?.url || selected.detail?.url) ? (
-                  <a
-                    href={signalArticle?.url || selected.detail?.url || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex max-w-full items-center gap-1.5 font-semibold text-[#0060A9] hover:underline"
-                    title={signalArticle?.url || selected.detail?.url || ""}
-                  >
-                    <span className="truncate">{signalArticle?.url || selected.detail?.url}</span>
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                  </a>
-                ) : null}
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
-                    <CountryFlag countryName={signalEvents[0]?.country || selected.country} size={14} />
-                    <span>{signalEvents[0]?.country || selected.country || "—"}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
-                    <Radio className="h-3 w-3 text-slate-400" />
-                    <span>{signalArticle?.source_name || signalArticle?.source_type || selected.detail?.source_name || selected.detail?.source_type || "—"}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
-                    <CalendarDays className="h-3 w-3 text-slate-400" />
-                    <span>Published: {formatPublishDate(signalArticle?.published_at || signalArticle?.article_date || selected.detail?.published_at, numLocale)}</span>
-                  </span>
-                  {(signalArticle?.language || selected.detail?.language) ? (
-                    <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase text-slate-600">
-                      Lang: {signalArticle?.language || selected.detail?.language}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="w-full min-w-0 overflow-hidden rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/50 via-white to-sky-50/30 p-4">
-                <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-900">
-                  <Sparkles className="h-4 w-4 text-[#0060A9]" />
-                  <span>Article Summary</span>
-                </div>
-                <p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-700">
-                  {signalArticle?.summary
-                    ? signalArticle.summary
-                    : cleanArticleContent(signalArticle?.content, t("dashboard.noSourceContent"))}
-                </p>
-              </div>
-
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/90 px-5 py-3">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                      Surveillance events ({signalEvents.length} event{signalEvents.length === 1 ? "" : "s"})
-                    </h4>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      Display only. Correct an event from the data matrix.
-                    </p>
-                  </div>
-                  {selected.detail?.url ? (
-                    <Link
-                      href={`/crawl-history?q=${encodeURIComponent(selected.detail.url)}`}
-                      className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[#0060A9] hover:underline"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      {t("dashboard.eventModal.openMatrix")}
-                    </Link>
-                  ) : null}
-                </div>
-                <div className="w-full overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase text-slate-600">
-                        <th className="w-10 px-3.5 py-2.5 text-center">#</th>
-                        <th className="w-44 px-3.5 py-2.5">Disease</th>
-                        <th className="w-40 px-3.5 py-2.5">Country</th>
-                        <th className="w-28 px-3.5 py-2.5">Region</th>
-                        <th className="w-44 px-3.5 py-2.5">Province & City</th>
-                        <th className="w-24 px-3.5 py-2.5 text-right">Cases</th>
-                        <th className="w-24 px-3.5 py-2.5 text-right">Deaths</th>
-                        <th className="w-32 px-3.5 py-2.5">Date Case</th>
-                        <th className="px-3.5 py-2.5">Evidence Excerpt</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {signalEvents.length === 0 ? (
-                        <tr>
-                          <td colSpan={9} className="px-4 py-6 text-center text-[11px] text-slate-500">No stored event for this article.</td>
-                        </tr>
-                      ) : signalEvents.map((evt, idx) => {
-                        const place = evt.city || evt.province_city_case || evt.location_name || "—"
-                        const provinceName = evt.province && evt.province !== place ? evt.province : ""
-                        const evidenceVal = evt.evidence || evt.snippet || ""
-                        const deathsVal = Number(evt.deaths ?? 0)
-                        return (
-                          <tr key={evt.id || idx} className={idx % 2 === 1 ? "bg-slate-50/40" : "bg-white"}>
-                            <td className="px-3 py-3 text-center font-mono font-bold text-slate-500">{idx + 1}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex items-start gap-1.5">
-                                <Bug className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#0060A9]" />
-                                <span className="block font-bold leading-tight text-slate-900">{translateDisease(evt.disease) || "—"}</span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="flex min-w-0 items-center gap-1.5">
-                                <CountryFlag countryName={evt.country || ""} size={14} />
-                                <span className="truncate font-semibold text-slate-800">{evt.country || "—"}</span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3 text-[11px] font-semibold text-slate-600">{evt.region || evt.surveillance_scope || "—"}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex items-start gap-1.5">
-                                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
-                                <div className="text-[11px]">
-                                  <span className="block font-bold text-slate-900">{place}</span>
-                                  {provinceName ? <span className="block text-[10px] text-slate-500">Province: {provinceName}</span> : null}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3 text-right font-mono text-xs font-extrabold text-emerald-700">{Number(evt.cases ?? 0).toLocaleString(numLocale)}</td>
-                            <td className={`px-3 py-3 text-right font-mono text-xs font-bold ${deathsVal > 0 ? "font-extrabold text-rose-700" : "text-slate-500"}`}>{deathsVal.toLocaleString(numLocale)}</td>
-                            <td className="px-3 py-3 font-mono text-[11px] text-slate-600">{(evt.date_case || "—").slice(0, 10)}</td>
-                            <td className="px-3.5 py-3">
-                              <span className="block max-w-sm truncate text-[11px] italic text-slate-600" title={evidenceVal}>
-                                {evidenceVal ? `"${evidenceVal}"` : "—"}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    {t("dashboard.eventModal.originalContent")}
-                  </p>
-                  {(signalArticle?.url || selected.detail?.url) ? (
-                    <a
-                      href={signalArticle?.url || selected.detail?.url || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-bold text-[#0060A9] hover:underline"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" /> {t("dashboard.eventModal.openSource")}
-                    </a>
-                  ) : null}
-                </div>
-                <p className="mt-3 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-6 text-slate-600">
-                  {cleanArticleContent(signalArticle?.content || signalArticle?.summary, t("dashboard.noSourceContent"))}
-                </p>
-              </article>
-                </>
-              )}
-            </div>
-          </section>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

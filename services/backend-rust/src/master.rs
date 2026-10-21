@@ -9,114 +9,85 @@ fn page(data: Vec<Value>) -> Json<Value> {
     Json(json!({ "success": true, "data": data, "total": n, "page": 1, "per_page": n.max(1), "total_pages": 1 }))
 }
 
-/// Same shape as NLP `GET /api/v1/disease-concepts` (used by the epi filter bar).
+const DISEASE_COLS: &str = "id, code, name, canonical_name, english_name, category, is_zoonotic, aliases_id, is_active";
+
+fn disease_json(r: &tokio_postgres::Row) -> Value {
+    json!({
+        "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2),
+        "canonical_name": r.get::<_, Option<String>>(3), "english_name": r.get::<_, Option<String>>(4),
+        "category": r.get::<_, Option<String>>(5), "is_zoonotic": r.get::<_, bool>(6), "aliases_id": r.get::<_, Value>(7),
+    })
+}
+
+/// Same shape as NLP `GET /api/v1/disease-concepts`; canonical_name carries the Indonesian display name used across the UI.
 pub async fn disease_concepts(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
     let rows = c
-        .query("SELECT id, code, name, is_active FROM master_diseases ORDER BY name", &[])
+        .query(&format!("SELECT {DISEASE_COLS} FROM master_diseases WHERE is_active ORDER BY name"), &[])
         .await
         .map_err(internal)?;
     Ok(page(rows
         .iter()
-        .map(|r| json!({
-            "id": r.get::<_, i32>(0).to_string(), "disease_id": r.get::<_, String>(1), "canonical_name": r.get::<_, String>(2),
-            "is_active": r.get::<_, bool>(3), "is_public": true, "category": null, "alias_count": 0,
-        }))
+        .map(|r| {
+            let aliases: Value = r.get(7);
+            json!({
+                "id": r.get::<_, i32>(0).to_string(), "disease_id": r.get::<_, String>(1), "canonical_name": r.get::<_, String>(2),
+                "english_name": r.get::<_, Option<String>>(4), "category": r.get::<_, Option<String>>(5),
+                "is_active": r.get::<_, bool>(8), "is_public": true, "alias_count": aliases.as_array().map(|a| a.len()).unwrap_or(0),
+            })
+        })
         .collect()))
 }
 
 pub async fn diseases(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
     let rows = c
-        .query("SELECT id, code, name FROM master_diseases WHERE is_active ORDER BY name", &[])
+        .query(&format!("SELECT {DISEASE_COLS} FROM master_diseases WHERE is_active ORDER BY name"), &[])
+        .await
+        .map_err(internal)?;
+    Ok(page(rows.iter().map(disease_json).collect()))
+}
+
+/// Provinces (38).
+pub async fn provinces(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let rows = c
+        .query("SELECT id, code, name, latitude, longitude FROM master_locations WHERE is_active ORDER BY name", &[])
         .await
         .map_err(internal)?;
     Ok(page(rows
         .iter()
-        .map(|r| json!({ "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2) }))
+        .map(|r| json!({
+            "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2),
+            "latitude": r.get::<_, Option<f64>>(3), "longitude": r.get::<_, Option<f64>>(4),
+        }))
         .collect()))
 }
 
 #[derive(Deserialize)]
-pub struct LocQuery {
-    country_iso2: Option<String>,
+pub struct KabQuery {
+    province_id: Option<i32>,
 }
 
-pub async fn locations(State(s): State<AppState>, Query(q): Query<LocQuery>) -> Result<Json<Value>, ApiError> {
+/// Kabupaten/kota (514), optionally for one province.
+pub async fn kabkota(State(s): State<AppState>, Query(q): Query<KabQuery>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
-    let iso = q.country_iso2.map(|s| s.trim().to_uppercase()).filter(|s| !s.is_empty());
     let rows = c
         .query(
-            "SELECT id, code, name, level, country_iso2, latitude, longitude FROM master_locations
-             WHERE is_active AND ($1::text IS NULL OR country_iso2 = $1) ORDER BY name",
-            &[&iso],
+            "SELECT k.id, k.code, k.kemendagri_code, k.name, k.kind, k.province_id, p.name, k.latitude, k.longitude
+             FROM master_kabkota k JOIN master_locations p ON p.id = k.province_id
+             WHERE k.is_active AND ($1::int IS NULL OR k.province_id = $1) ORDER BY k.name",
+            &[&q.province_id],
         )
         .await
         .map_err(internal)?;
     Ok(page(rows
         .iter()
         .map(|r| json!({
-            "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2), "level": r.get::<_, String>(3),
-            "country_iso2": r.get::<_, String>(4), "latitude": r.get::<_, Option<f64>>(5), "longitude": r.get::<_, Option<f64>>(6),
+            "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "kemendagri_code": r.get::<_, String>(2),
+            "name": r.get::<_, String>(3), "kind": r.get::<_, String>(4), "province_id": r.get::<_, i32>(5),
+            "province_name": r.get::<_, String>(6), "latitude": r.get::<_, f64>(7), "longitude": r.get::<_, f64>(8),
         }))
-        .collect()))
-}
-
-#[derive(Deserialize)]
-pub struct CountryQuery {
-    q: Option<String>,
-    region_id: Option<String>,
-}
-
-pub async fn countries(State(s): State<AppState>, Query(q): Query<CountryQuery>) -> Result<Json<Value>, ApiError> {
-    let c = s.pool.get().await.map_err(internal)?;
-    let search = q.q.map(|s| format!("%{}%", s.trim().to_lowercase())).filter(|s| s != "%%");
-    let region = q.region_id.and_then(|s| uuid::Uuid::parse_str(s.trim()).ok());
-    let rows = c
-        .query(
-            "SELECT c.id::text, c.iso2, c.iso3, c.name, c.flag_code, c.home_region, c.display_order, c.is_active, c.created_at::text,
-                    COALESCE((SELECT json_agg(json_build_object('id', r.id, 'code', r.code, 'name', r.name) ORDER BY r.display_order)
-                              FROM master_country_regions cr JOIN master_regions r ON r.id = cr.region_id WHERE cr.country_id = c.id), '[]'::json)
-             FROM master_countries c
-             WHERE c.is_active AND ($1::text IS NULL OR lower(c.name) LIKE $1 OR lower(c.iso2) LIKE $1 OR lower(c.iso3) LIKE $1)
-               AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM master_country_regions x WHERE x.country_id = c.id AND x.region_id = $2))
-             ORDER BY c.display_order, c.name",
-            &[&search, &region],
-        )
-        .await
-        .map_err(internal)?;
-    Ok(page(rows
-        .iter()
-        .map(|r| json!({
-            "id": r.get::<_, String>(0), "iso2": r.get::<_, String>(1), "iso3": r.get::<_, String>(2), "name": r.get::<_, String>(3),
-            "flag_code": r.get::<_, Option<String>>(4), "home_region": r.get::<_, Option<String>>(5), "display_order": r.get::<_, i32>(6),
-            "is_active": r.get::<_, bool>(7), "created_at": r.get::<_, String>(8), "updated_at": r.get::<_, String>(8),
-            "regions": r.get::<_, Value>(9), "aliases": [], "alias_count": 0, "primary_language": null,
-        }))
-        .collect()))
-}
-
-pub async fn regions(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
-    let c = s.pool.get().await.map_err(internal)?;
-    let rows = c
-        .query(
-            "SELECT r.id::text, r.code, r.name, r.display_order, r.is_active,
-                    COALESCE((SELECT json_agg(json_build_object('id', c.id, 'iso2', c.iso2, 'iso3', c.iso3, 'name', c.name, 'flag_code', c.flag_code)
-                                       ORDER BY c.display_order, c.name)
-                              FROM master_country_regions cr JOIN master_countries c ON c.id = cr.country_id WHERE cr.region_id = r.id), '[]'::json)
-             FROM master_regions r WHERE r.is_active ORDER BY r.display_order",
-            &[],
-        )
-        .await
-        .map_err(internal)?;
-    Ok(page(rows
-        .iter()
-        .map(|r| {
-            let countries: Value = r.get(5);
-            let n = countries.as_array().map(|a| a.len()).unwrap_or(0);
-            json!({ "id": r.get::<_, String>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2),
-                    "display_order": r.get::<_, i32>(3), "is_active": r.get::<_, bool>(4), "countries": countries, "country_count": n, "member_count": n })
-        })
         .collect()))
 }
 

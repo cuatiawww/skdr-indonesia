@@ -4,6 +4,7 @@ import localFont from "next/font/local"
 import "./globals.css"
 import LayoutContent from "@/components/layout/LayoutContent"
 import { LanguageProvider } from "@/lib/i18n/LanguageContext"
+import idDict from '@/locales/id.json'
 
 // Use locally-bundled font files so Docker build works without internet access.
 // Files were downloaded from Google Fonts (Roboto v51, Latin subset).
@@ -19,9 +20,10 @@ const roboto = localFont({
   display: 'swap',
 })
 
+// SKDR: metadata text from the language file (default locale id).
 export const metadata: Metadata = {
-  title: "ASEAN Real-time AI Surveillance Data",
-  description: "Real-time multilingual surveillance data dashboard",
+  title: idDict.skdr.meta.title,
+  description: idDict.skdr.meta.description,
 }
 
 export default function RootLayout({
@@ -30,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="id" suppressHydrationWarning>
       <body className={`${roboto.variable} font-roboto antialiased`} suppressHydrationWarning>
         <SettingsProvider><LanguageProvider>
           <LayoutContent>{children}</LayoutContent>

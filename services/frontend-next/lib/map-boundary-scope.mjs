@@ -30,6 +30,7 @@ export function sameCountry(left, right) {
 export function countryInScope(country, scope) {
   if (!country || country.is_active === false) return false;
   if (scope === "global") return true;
+  if (scope === "indonesia") return country.iso3 === "IDN";
   const codes = new Set((country.regions || []).map((region) => region.code));
   const home = country.home_region || "";
   if (scope === "asean") return codes.has("ASEAN") || home === "ASEAN";

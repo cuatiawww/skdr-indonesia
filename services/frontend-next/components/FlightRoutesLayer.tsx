@@ -6,6 +6,7 @@
 // Airports within the DB-configured radius of a recent outbreak get a red ring, and their routes
 // are drawn red. That is an indication only, not a computed importation risk.
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type Map from "ol/Map";
 import Feature from "ol/Feature";
@@ -203,7 +204,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
     }
     if (!layer) return;
     const ac = new AbortController();
-    statusRef.current?.({ state: "loading", message: "Loading airports and routes…" });
+    statusRef.current?.({ state: "loading", message: tr("skdr.flights.loading_airports_and_routes") });
     setError(null);
     fetchFlightAirports(region || undefined, { signal: ac.signal })
       .then((res) => {
@@ -386,8 +387,8 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
               <span className="mt-0.5 inline-block h-3 w-3 shrink-0 rounded-full border-[2.5px]" style={{ borderColor: OUTBREAK_RED }} />
               <span>
                 Within {radius ?? "–"} km of a recent outbreak{data ? ` (${data.near_outbreak_count})` : ""}.
-                <span className="text-slate-500"> Indication only, not a confirmed importation risk.</span>
-                <span className="mt-1 block text-slate-500" title="Simulated aircraft: visual only, not live flight data">▲ Simulated aircraft: visual only, not live flight data.</span>
+                <span className="text-slate-500"> {tr("skdr.flights.indication_only_not_a_confirmed_importat")}</span>
+                <span className="mt-1 block text-slate-500" title={tr("skdr.flights.simulated_aircraft_visual_only_not_live_")}>{tr("skdr.flights.simulated_aircraft_visual_only_not_live_")}</span>
               </span>
             </div>
           </div>
@@ -396,7 +397,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
 
           {!routes && !error && (
             <div className="text-slate-500">
-              {data ? `${data.total} airports. ` : "Loading… "}Click an airport to show its non-stop routes.
+              {data ? tr("skdr.flights.nAirports", { count: data.total }) : tr("skdr.flights.loading")}{" "}{tr("skdr.flights.clickHint")}
             </div>
           )}
 
@@ -420,7 +421,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
                 </div>
                 <button
                   type="button"
-                  aria-label="Clear selected airport"
+                  aria-label={tr("skdr.flights.clear_selected_airport")}
                   onClick={() => setSelectedIata(null)}
                   className="rounded p-0.5 text-slate-500 hover:bg-slate-100"
                 >
@@ -430,7 +431,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search destinations"
+                placeholder={tr("skdr.flights.search_destinations")}
                 className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-[#0060A9]"
               />
               <ul className="divide-y divide-slate-100">

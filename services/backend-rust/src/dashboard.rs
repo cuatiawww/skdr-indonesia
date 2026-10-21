@@ -10,8 +10,8 @@ use crate::{internal, ApiError, AppState};
 
 #[derive(Deserialize, Default, Clone)]
 pub struct DashQuery {
-    pub country: Option<String>,
-    pub scope: Option<String>,
+    pub province_id: Option<i32>,
+    pub kabkota_id: Option<i32>,
     pub disease: Option<String>,
     pub start_year: Option<i32>,
     pub start_week: Option<i32>,
@@ -39,18 +39,19 @@ pub fn current_mmwr(today: NaiveDate) -> (i32, i32) {
 pub struct Resolved {
     start: Option<NaiveDate>,
     end: Option<NaiveDate>,
-    iso2: Option<Vec<String>>,
+    province: Option<i32>,
+    kabkota: Option<i32>,
     disease: Option<String>,
     scope: String,
 }
 
 impl Resolved {
-    fn params(&self) -> [&(dyn ToSql + Sync); 4] {
-        [&self.start, &self.end, &self.iso2, &self.disease]
+    fn params(&self) -> [&(dyn ToSql + Sync); 5] {
+        [&self.start, &self.end, &self.province, &self.kabkota, &self.disease]
     }
-    fn params_no_dates(&self) -> [&(dyn ToSql + Sync); 4] {
+    fn params_no_dates(&self) -> [&(dyn ToSql + Sync); 5] {
         const NONE: Option<NaiveDate> = None;
-        [&NONE, &NONE, &self.iso2, &self.disease]
+        [&NONE, &NONE, &self.province, &self.kabkota, &self.disease]
     }
     fn filter_key(&self) -> String {
         format!(
@@ -63,15 +64,17 @@ impl Resolved {
     }
 }
 
-const LOC: &str = "COALESCE(NULLIF(r.location_name, ''), l.name, c.name, 'Unknown')";
+const COUNTRY: &str = "Indonesia";
+const LOC: &str = "COALESCE(NULLIF(r.location_name, ''), k.name, l.name, 'Tidak diketahui')";
 
 fn base() -> String {
     "FROM case_reports r
      JOIN master_diseases d ON d.id = r.disease_id
-     LEFT JOIN master_countries c ON c.id = r.country_id
      LEFT JOIN master_locations l ON l.id = r.location_id
+     LEFT JOIN master_kabkota k ON k.id = r.kabkota_id
      WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
-       AND ($3::text[] IS NULL OR c.iso2 = ANY($3)) AND ($4::text IS NULL OR d.name = $4)"
+       AND ($3::int IS NULL OR r.location_id = $3) AND ($4::int IS NULL OR r.kabkota_id = $4)
+       AND ($5::text IS NULL OR d.name = $5 OR d.code = $5)"
         .to_string()
 }
 
@@ -85,50 +88,15 @@ async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiError> {
         _ => None,
     };
     let disease = q.disease.clone().map(|d| d.trim().to_string()).filter(|d| !d.is_empty() && d.to_lowercase() != "all");
-
-    let raw = q.country.clone().unwrap_or_default().trim().to_string();
-    let lower = raw.to_lowercase();
-    let default_scope = lower.is_empty() || ["all", "asean", "asean11", "asean_11"].contains(&lower.as_str());
-    let token = if default_scope {
-        q.scope.clone().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).unwrap_or_else(|| "asean".into())
+    // Scope label: kab/kota name, else province name, else Indonesia.
+    let scope = if let Some(k) = q.kabkota_id {
+        c.query_opt("SELECT name FROM master_kabkota WHERE id = $1", &[&k]).await.map_err(internal)?.map(|r| r.get::<_, String>(0))
+    } else if let Some(p) = q.province_id {
+        c.query_opt("SELECT name FROM master_locations WHERE id = $1", &[&p]).await.map_err(internal)?.map(|r| r.get::<_, String>(0))
     } else {
-        lower.clone()
+        None
     };
-    let token = if token == "asean11" || token == "asean_11" { "asean".to_string() } else { token };
-    if token == "global" || token == "world" {
-        return Ok(Resolved { start, end, iso2: None, disease, scope: "global".into() });
-    }
-    let region = c
-        .query_opt(
-            "SELECT code FROM master_regions WHERE lower(code) = $1 OR lower(name) = $1 OR lower(replace(code, '_', '')) = $1",
-            &[&token],
-        )
-        .await
-        .map_err(internal)?;
-    if let Some(r) = region {
-        let code: String = r.get(0);
-        if code == "GLOBAL" {
-            return Ok(Resolved { start, end, iso2: None, disease, scope: "global".into() });
-        }
-        let rows = c
-            .query(
-                "SELECT c.iso2 FROM master_country_regions cr JOIN master_countries c ON c.id = cr.country_id
-                 JOIN master_regions r ON r.id = cr.region_id WHERE r.code = $1",
-                &[&code],
-            )
-            .await
-            .map_err(internal)?;
-        return Ok(Resolved { start, end, iso2: Some(rows.iter().map(|r| r.get(0)).collect()), disease, scope: code.to_lowercase() });
-    }
-    let names: Vec<String> = raw.split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
-    let rows = c
-        .query(
-            "SELECT iso2 FROM master_countries WHERE lower(name) = ANY($1) OR lower(iso2) = ANY($1) OR lower(iso3) = ANY($1)",
-            &[&names],
-        )
-        .await
-        .map_err(internal)?;
-    Ok(Resolved { start, end, iso2: Some(rows.iter().map(|r| r.get(0)).collect()), disease, scope: raw })
+    Ok(Resolved { start, end, province: q.province_id, kabkota: q.kabkota_id, disease, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
 }
 
 async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
@@ -137,14 +105,14 @@ async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
                 COALESCE(SUM(r.cases) FILTER (WHERE r.is_reviewed),0)::bigint,
                 COALESCE(SUM(r.deaths) FILTER (WHERE r.is_reviewed),0)::bigint,
                 COUNT(*) FILTER (WHERE r.is_reviewed)::bigint,
-                COUNT(DISTINCT COALESCE(c.name,'') || '|' || {LOC})::bigint,
-                COUNT(DISTINCT COALESCE(c.name,'') || '|' || {LOC}) FILTER (WHERE r.latitude IS NOT NULL AND r.longitude IS NOT NULL)::bigint
+                COUNT(DISTINCT {LOC})::bigint,
+                COUNT(DISTINCT {LOC}) FILTER (WHERE r.latitude IS NOT NULL AND r.longitude IS NOT NULL)::bigint
          {}",
         base()
     );
     let r = c.query_one(&sql, &f.params()).await.map_err(internal)?;
     let master: i64 = c
-        .query_one("SELECT COUNT(*)::bigint FROM master_locations WHERE is_active", &[])
+        .query_one("SELECT COUNT(*)::bigint FROM master_kabkota WHERE is_active", &[])
         .await
         .map_err(internal)?
         .get(0);
@@ -177,12 +145,12 @@ fn outbreak(
         "latest_date": case_date, "published_date": created, "crawled_at": created,
         "geo_level": if lat.is_some() && lng.is_some() { "location" } else { "none" },
         "is_national": false, "source_type": "FORM", "is_official": false,
-        "sources": [{ "url": null, "source_name": "Case Report Form", "source_type": "form", "published_at": created }],
+        "sources": [{ "url": null, "source_name": "Formulir Laporan Kasus", "source_type": "form", "published_at": created }],
         "detail": detail.as_object().map(|o| {
             let mut o = o.clone();
             o.insert("needs_review".into(), json!(!reviewed));
             o.insert("is_health_related".into(), json!(true));
-            o.insert("source_name".into(), json!("Case Report Form"));
+            o.insert("source_name".into(), json!("Formulir Laporan Kasus"));
             o.insert("source_type".into(), json!("form"));
             Value::Object(o)
         }).unwrap_or(json!({})),
@@ -196,12 +164,12 @@ fn iso(col: &str) -> String {
 
 async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-        "SELECT COALESCE(c.name,''), {LOC}, MAX(l.name), d.name,
+        "SELECT '{COUNTRY}', {LOC}, MAX(l.name), d.name,
                 (array_agg(r.latitude ORDER BY r.created_at DESC) FILTER (WHERE r.latitude IS NOT NULL))[1],
                 (array_agg(r.longitude ORDER BY r.created_at DESC) FILTER (WHERE r.longitude IS NOT NULL))[1],
                 SUM(r.cases)::bigint, SUM(r.deaths)::bigint, COUNT(*)::bigint, MAX(r.report_date)::text,
                 {}, BOOL_AND(r.is_reviewed)
-         {} GROUP BY 1, 2, 4 ORDER BY 7 DESC LIMIT 250",
+         {} GROUP BY 2, 4 ORDER BY 7 DESC LIMIT 250",
         iso("MAX(r.created_at)"),
         base()
     );
@@ -220,7 +188,7 @@ async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
 
 async fn signal_feed(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-        "SELECT r.id::text, COALESCE(c.name,''), {LOC}, l.name, d.name, r.latitude, r.longitude, r.cases, r.deaths,
+        "SELECT r.id::text, '{COUNTRY}', {LOC}, l.name, d.name, r.latitude, r.longitude, r.cases, r.deaths,
                 r.report_date::text, {}, r.is_reviewed, r.notes
          {} ORDER BY r.report_date DESC, r.created_at DESC LIMIT 200",
         iso("r.created_at"),
@@ -259,19 +227,17 @@ async fn grouped(c: &Object, f: &Resolved, col: &str) -> Result<Vec<Value>, ApiE
         .collect())
 }
 
-async fn by_country(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
-    let mut rows = grouped(c, f, "COALESCE(c.name, 'Unknown')").await?;
-    if let Some(iso2) = &f.iso2 {
-        // Like NLP: every country in scope is listed, with 0 when it has no reports.
-        let names = c
-            .query("SELECT name FROM master_countries WHERE iso2 = ANY($1) ORDER BY display_order, name", &[iso2])
-            .await
-            .map_err(internal)?;
-        for n in names {
-            let name: String = n.get(0);
-            if !rows.iter().any(|r| r["name"] == json!(name)) {
-                rows.push(json!({ "name": name, "cases": 0, "deaths": 0, "events": 0 }));
-            }
+async fn by_province(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
+    let mut rows = grouped(c, f, "COALESCE(l.name, 'Tidak diketahui')").await?;
+    // Every province is listed, with 0 when it has no reports (all 38 unless filtered to one province).
+    let names = c
+        .query("SELECT name FROM master_locations WHERE is_active AND ($1::int IS NULL OR id = $1) ORDER BY name", &[&f.province])
+        .await
+        .map_err(internal)?;
+    for n in names {
+        let name: String = n.get(0);
+        if !rows.iter().any(|r| r["name"] == json!(name)) {
+            rows.push(json!({ "name": name, "cases": 0, "deaths": 0, "events": 0 }));
         }
     }
     Ok(rows)
@@ -323,7 +289,7 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
             "available_years": years, "available_diseases": diseases,
             "current_epi_week": ew, "current_epi_year": ey,
             "filters": {
-                "country": f.scope, "scope": f.scope, "disease": f.disease, "source": null,
+                "country": COUNTRY, "scope": f.scope, "province_id": q.province_id, "kabkota_id": q.kabkota_id, "disease": f.disease, "source": null,
                 "start_date": f.start.map(|d| d.to_string()), "end_date": f.end.map(|d| d.to_string()),
                 "start_year": q.start_year, "start_week": q.start_week, "end_year": q.end_year, "end_week": q.end_week, "year": q.end_year,
             },
@@ -334,7 +300,7 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
             "locations": locations(&c, &f).await?,
             "map_locations_limit": 250,
             "by_disease": grouped(&c, &f, "d.name").await?,
-            "by_country": by_country(&c, &f).await?,
+            "by_province": by_province(&c, &f).await?,
             "ai_summary": { "text": "", "provider": "unavailable", "cached": false, "mode": "disabled" },
             "trends": trends(&c, &f).await?,
             "weekly_trend": [],
@@ -390,7 +356,7 @@ pub async fn crawling_stats(State(s): State<AppState>) -> Result<Json<Value>, Ap
         .await
         .map_err(internal)?;
     let year = chrono::Local::now().year();
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
     let perf: Vec<Value> = (1..=12)
         .map(|m| {
             let n = monthly.iter().find(|r| r.get::<_, i32>(0) == m).map(|r| r.get::<_, i64>(1)).unwrap_or(0);

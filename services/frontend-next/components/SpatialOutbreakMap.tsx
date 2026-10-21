@@ -1,5 +1,6 @@
 'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import { Layers, MapPin, Settings, Wind, X, Plane, Flame, Users, Globe, Sun, CloudRain, CloudSun, Droplets, Bird } from "lucide-react";
 import type { NasaGibsLayers, ExternalIntelLayers, MapLayerStatus } from "@/types";
 import { useEffect, useState } from "react";
@@ -39,7 +40,7 @@ export default function SpatialOutbreakMap({
   initialCenter?: [number, number];
   initialZoom?: number;
   onSelectCountry?: (country: string) => void;
-  boundaryScope?: "asean" | "asean3" | "global";
+  boundaryScope?: "asean" | "asean3" | "global" | "indonesia";
   prototypeMode?: boolean;
   ebsOnly?: boolean;
   hideSpreadRoute?: boolean;
@@ -217,7 +218,7 @@ export default function SpatialOutbreakMap({
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto p-4">
               {!prototypeMode && (
-                <Group title="Map Layers">
+                <Group title={tr("skdr.map.mapLayers")}>
                   <Row
                     icon={<MapPin className="h-4 w-4" />}
                     title={t("map.outbreakMarkers")}
@@ -226,7 +227,7 @@ export default function SpatialOutbreakMap({
                     set={setMarkers}
                   />
                   <div className="ml-10 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Marker time range</p>
+                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{tr("skdr.map.markerRange")}</p>
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
                       {([7, 14, 30, 90] as const).map((days) => (
                         <button
@@ -235,7 +236,7 @@ export default function SpatialOutbreakMap({
                           onClick={() => setMarkerLookbackDays(days)}
                           className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition ${markerLookbackDays === days ? "border-[#0060A9] bg-blue-50 text-[#0060A9]" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200"}`}
                         >
-                          {days === 90 ? "3 Months" : `${days} Days`}
+                          {days === 90 ? tr("skdr.map.3months") : tr("skdr.map.days", { days })}
                         </button>
                       ))}
                     </div>
@@ -278,7 +279,7 @@ export default function SpatialOutbreakMap({
                       onClick={() => setBase(x)}
                       className={`rounded-xl border px-3 py-2 text-left text-[11px] font-bold capitalize ${base === x ? "border-[#0060A9] bg-blue-50 text-[#0060A9]" : "border-slate-100 bg-slate-50 text-slate-600"}`}
                     >
-                      {x}
+                      {tr(`skdr.map.base_${x}`)}
                     </button>
                   ))}
                 </div>
@@ -287,51 +288,51 @@ export default function SpatialOutbreakMap({
               {!prototypeMode && (
                 <>
                   {/* ── Surveillance & Vector Intelligence ── */}
-                  <Group title="Surveillance & Vector Intelligence">
+                  <Group title={tr("skdr.map.intelGroup")}>
                     <Row
                       icon={<Plane className="h-4 w-4 text-[#0060A9]" />}
-                      title="Flight Connection — Routes"
-                      sub="Airports by non-stop destinations; click an airport to draw its routes with simulated aircraft (OpenFlights 2014, ODbL)"
+                      title={tr("skdr.map.flightsTitle")}
+                      sub={tr("skdr.map.flightsSub")}
                       value={Boolean(intel.flightRoutes)}
                       set={(v) => setIntel((p) => ({ ...p, flightRoutes: v }))}
                       status={layerStatus.flightRoutes}
                     />
                     <Row
                       icon={<Flame className="h-4 w-4 text-rose-600" />}
-                      title="Active Fire Hotspots"
-                      sub="NASA FIRMS VIIRS 24h (public SE Asia CSV if no MAP_KEY)"
+                      title={tr("skdr.map.firesTitle")}
+                      sub={tr("skdr.map.firesSub")}
                       value={Boolean(intel.fires)}
                       set={(v) => setIntel((p) => ({ ...p, fires: v }))}
                       status={layerStatus.fires}
                     />
                     <Row
                       icon={<Bird className="h-4 w-4 text-teal-600" />}
-                      title="Wildlife / Bird Occurrences"
-                      sub="GBIF bird records — avian influenza (H5N1) early warning"
+                      title={tr("skdr.map.wildlifeTitle")}
+                      sub={tr("skdr.map.wildlifeSub")}
                       value={Boolean(intel.wildlife)}
                       set={(v) => setIntel((p) => ({ ...p, wildlife: v }))}
                       status={layerStatus.wildlife}
                     />
                     <Row
                       icon={<Users className="h-4 w-4 text-indigo-600" />}
-                      title="Population Denominators"
-                      sub="WorldPop metadata + GPWv4 2020 density overlay"
+                      title={tr("skdr.map.populationTitle")}
+                      sub={tr("skdr.map.populationSub")}
                       value={Boolean(intel.population)}
                       set={(v) => setIntel((p) => ({ ...p, population: v }))}
                       status={layerStatus.population}
                     />
                     <Row
                       icon={<CloudSun className="h-4 w-4 text-sky-600" />}
-                      title="Capital Weather"
-                      sub="Open-Meteo current conditions at ASEAN capitals"
+                      title={tr("skdr.map.weatherTitle")}
+                      sub={tr("skdr.map.weatherSub")}
                       value={Boolean(intel.weather)}
                       set={(v) => setIntel((p) => ({ ...p, weather: v }))}
                       status={layerStatus.weather}
                     />
                     <Row
                       icon={<Droplets className="h-4 w-4 text-emerald-700" />}
-                      title="Capital Air Quality"
-                      sub="Open-Meteo / CAMS AQI, PM2.5, PM10"
+                      title={tr("skdr.map.airTitle")}
+                      sub={tr("skdr.map.airSub")}
                       value={Boolean(intel.airQuality)}
                       set={(v) => setIntel((p) => ({ ...p, airQuality: v }))}
                       status={layerStatus.airQuality}
@@ -339,46 +340,46 @@ export default function SpatialOutbreakMap({
                   </Group>
 
                   {/* ── NASA GIBS Satellite Imagery ── */}
-                  <Group title="Satellite Earth Observation (NASA GIBS)">
+                  <Group title={tr("skdr.map.gibsGroup")}>
                     <Row
                       icon={<Globe className="h-4 w-4 text-blue-500" />}
-                      title="VIIRS True Color"
-                      sub="SNPP satellite imagery overlay"
+                      title={tr("skdr.map.viirsTitle")}
+                      sub={tr("skdr.map.viirsSub")}
                       value={Boolean(gibs.viirsTrueColor)}
                       set={(v) => setGibs((p) => ({ ...p, viirsTrueColor: v }))}
                     />
                     <Row
                       icon={<Globe className="h-4 w-4 text-teal-500" />}
-                      title="MODIS Terra True Color"
-                      sub="Daily Terra satellite true color overlay"
+                      title={tr("skdr.map.modisTitle")}
+                      sub={tr("skdr.map.modisSub")}
                       value={Boolean(gibs.modisTrueColor)}
                       set={(v) => setGibs((p) => ({ ...p, modisTrueColor: v }))}
                     />
                     <Row
                       icon={<CloudRain className="h-4 w-4 text-amber-500" />}
-                      title="Aerosol Index"
-                      sub="OMPS smoke/haze aerosol index overlay"
+                      title={tr("skdr.map.aerosolTitle")}
+                      sub={tr("skdr.map.aerosolSub")}
                       value={Boolean(gibs.aerosol)}
                       set={(v) => setGibs((p) => ({ ...p, aerosol: v }))}
                     />
                     <Row
                       icon={<Layers className="h-4 w-4 text-emerald-500" />}
-                      title="NDVI Vegetation Index"
-                      sub="MODIS 8-day vegetation greenness"
+                      title={tr("skdr.map.ndviTitle")}
+                      sub={tr("skdr.map.ndviSub")}
                       value={Boolean(gibs.ndvi)}
                       set={(v) => setGibs((p) => ({ ...p, ndvi: v }))}
                     />
                     <Row
                       icon={<Sun className="h-4 w-4 text-yellow-500" />}
-                      title="Nighttime Lights"
-                      sub="VIIRS Black Marble urban illumination"
+                      title={tr("skdr.map.nightTitle")}
+                      sub={tr("skdr.map.nightSub")}
                       value={Boolean(gibs.nightLights)}
                       set={(v) => setGibs((p) => ({ ...p, nightLights: v }))}
                     />
                     <Row
                       icon={<Flame className="h-4 w-4 text-orange-500" />}
-                      title="Land Surface Temp"
-                      sub="MODIS daytime thermal climate"
+                      title={tr("skdr.map.lstTitle")}
+                      sub={tr("skdr.map.lstSub")}
                       value={Boolean(gibs.landSurfaceTemp)}
                       set={(v) => setGibs((p) => ({ ...p, landSurfaceTemp: v }))}
                     />
@@ -399,7 +400,7 @@ export default function SpatialOutbreakMap({
                         key={k}
                         icon={<Layers className="h-4 w-4" />}
                         title={l}
-                        sub="Indonesia extent · gis.bnpb.go.id"
+                        sub={tr("skdr.map.bnpbSub")}
                         value={bnpb[k]}
                         set={(v) => setBnpb((p) => ({ ...p, [k]: v }))}
                       />
@@ -460,19 +461,19 @@ function Row({
     !value || !status || status.state === "idle"
       ? null
       : status.state === "loading"
-        ? status.message || "Loading…"
+        ? status.message || tr("skdr.map.stLoading")
         : status.state === "timeout"
-          ? status.message || "Timed out"
+          ? status.message || tr("skdr.map.stTimeout")
           : status.state === "auth"
-            ? status.message || "API key or authentication required"
+            ? status.message || tr("skdr.map.stAuth")
             : status.state === "unavailable"
-              ? status.message || "Service unavailable (503)"
+              ? status.message || tr("skdr.map.stUnavail")
               : status.state === "upstream" || status.state === "error"
-                ? status.message || "Upstream error"
+                ? status.message || tr("skdr.map.stUpstream")
                 : status.state === "cached"
-                  ? status.message || "Cached"
+                  ? status.message || tr("skdr.map.stCached")
                   : status.state === "empty"
-                    ? status.message || "No data"
+                    ? status.message || tr("skdr.map.stNoData")
                     : status.message;
   const statusClass =
     status?.state === "error" || status?.state === "upstream" || status?.state === "unavailable"

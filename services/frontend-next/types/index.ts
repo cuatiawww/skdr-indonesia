@@ -245,6 +245,9 @@ export type OutbreakLocation = {
 
 export type PublicDashboardFilters = {
   country?: string | null;
+  scope?: string | null;
+  province_id?: number | null;
+  kabkota_id?: number | null;
   year?: number;
   disease?: string | null;
   source?: string | null;
@@ -292,7 +295,8 @@ export type PublicDashboard = {
   signal_feed_page_size?: number;
   locations: OutbreakLocation[];
   by_disease: { name: string; cases: number; deaths: number; events: number }[];
-  by_country: { name: string; cases: number; deaths?: number }[];
+  by_country?: { name: string; cases: number; deaths?: number }[];
+  by_province?: { name: string; cases: number; deaths?: number; events?: number }[];
   ai_summary: { text: string; provider: string; cached: boolean };
   trends: {
     current_month: string;

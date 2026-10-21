@@ -4,6 +4,7 @@
 // Opens when a disease/outbreak point is clicked on AseanMap (flowDisease).
 // Uses only the outbreak locations already loaded by the map; no extra backend call.
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import { useEffect, useMemo, useRef } from "react";
 import { X, ExternalLink, Activity, Skull, MapPin, CalendarDays, Globe, Star } from "lucide-react";
 import { matchRelatedNews, rowMatchKeys } from "@/lib/related-news-highlight.mjs";
@@ -157,7 +158,7 @@ export function buildDiseaseDetail(disease: string, all: OutbreakLocation[], spi
 }
 
 function MiniRoute({ pts, links }: { pts: { name: string; date: string; lon: number; lat: number }[]; links: number[] }) {
-  if (pts.length === 0) return <p className="text-[11px] text-slate-400">No mapped coordinates.</p>;
+  if (pts.length === 0) return <p className="text-[11px] text-slate-400">{tr("skdr.detail.no_mapped_coordinates")}</p>;
   const W = 300, H = 150, pad = 14;
   const lons = pts.map((p) => p.lon), lats = pts.map((p) => p.lat);
   let minX = Math.min(...lons), maxX = Math.max(...lons), minY = Math.min(...lats), maxY = Math.max(...lats);
@@ -169,7 +170,7 @@ function MiniRoute({ pts, links }: { pts: { name: string; date: string; lon: num
   const y = (lat: number) => H - (oy + (lat - minY) * s);
   const last = pts.length - 1;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full rounded-xl border border-slate-100 bg-sky-50/60" role="img" aria-label="Spread route">
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full rounded-xl border border-slate-100 bg-sky-50/60" role="img" aria-label={tr("skdr.detail.spread_route")}>
       <defs>
         <marker id="ddp-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="#ea580c" />
@@ -216,20 +217,20 @@ export default function DiseaseDetailPanel({ open = true, disease, locations, di
   return (
     <>
     {/* Small screens: overlay drawer with backdrop. md+: docked, map is offset by the parent. */}
-    <button type="button" onClick={onClose} aria-label="Close disease detail" tabIndex={-1}
+    <button type="button" onClick={onClose} aria-label={tr("skdr.detail.close_disease_detail")} tabIndex={-1}
       className={`absolute inset-0 z-20 bg-black/10 transition-opacity duration-300 md:hidden ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} />
     <aside
       className={`absolute left-0 top-0 z-30 flex h-full w-[min(320px,85%)] flex-col border-r border-slate-200 bg-white/95 shadow-[8px_0_40px_rgba(0,0,0,.08)] backdrop-blur-md transition-transform duration-300 ease-out md:w-[320px] ${open ? "translate-x-0" : "pointer-events-none -translate-x-full"}`}
-      aria-label="Disease detail"
+      aria-label={tr("skdr.detail.disease_detail")}
       aria-hidden={!open}
       data-testid="disease-detail-panel"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-[#0060A9]" />
-          <span className="text-sm font-bold text-slate-800">Disease Detail</span>
+          <span className="text-sm font-bold text-slate-800">{tr("skdr.detail.disease_detail")}</span>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close disease detail"
+        <button type="button" onClick={onClose} aria-label={tr("skdr.detail.close_disease_detail")}
           className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
           <X className="h-4 w-4" />
         </button>
@@ -237,23 +238,23 @@ export default function DiseaseDetailPanel({ open = true, disease, locations, di
       <div className="flex-1 overflow-y-auto p-4">
         {/* 1. Identity */}
         <div>
-          <p className={h}>Disease</p>
+          <p className={h}>{tr("skdr.detail.disease")}</p>
           <h3 className="text-base font-black leading-tight text-slate-900">{displayName || disease}</h3>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
-          <div className="rounded-xl bg-emerald-50 p-2"><CalendarDays className="mb-0.5 h-3.5 w-3.5 text-emerald-600" /><p className="text-slate-500">First case</p><p className="font-black text-slate-900">{d.firstDate || "—"}</p></div>
-          <div className="rounded-xl bg-sky-50 p-2"><MapPin className="mb-0.5 h-3.5 w-3.5 text-sky-600" /><p className="text-slate-500">Affected locations</p><p className="font-black text-slate-900">{fmt(d.affectedLocations)}</p></div>
-          <div className="rounded-xl bg-orange-50 p-2"><Activity className="mb-0.5 h-3.5 w-3.5 text-orange-600" /><p className="text-slate-500">Cases</p><p className="font-black text-slate-900">{fmt(d.totalCases)}</p></div>
-          <div className="rounded-xl bg-rose-50 p-2"><Skull className="mb-0.5 h-3.5 w-3.5 text-rose-600" /><p className="text-slate-500">Deaths</p><p className="font-black text-slate-900">{fmt(d.totalDeaths)}</p></div>
+          <div className="rounded-xl bg-emerald-50 p-2"><CalendarDays className="mb-0.5 h-3.5 w-3.5 text-emerald-600" /><p className="text-slate-500">{tr("skdr.detail.first_case")}</p><p className="font-black text-slate-900">{d.firstDate || "—"}</p></div>
+          <div className="rounded-xl bg-sky-50 p-2"><MapPin className="mb-0.5 h-3.5 w-3.5 text-sky-600" /><p className="text-slate-500">{tr("skdr.detail.affected_locations")}</p><p className="font-black text-slate-900">{fmt(d.affectedLocations)}</p></div>
+          <div className="rounded-xl bg-orange-50 p-2"><Activity className="mb-0.5 h-3.5 w-3.5 text-orange-600" /><p className="text-slate-500">{tr("skdr.detail.cases")}</p><p className="font-black text-slate-900">{fmt(d.totalCases)}</p></div>
+          <div className="rounded-xl bg-rose-50 p-2"><Skull className="mb-0.5 h-3.5 w-3.5 text-rose-600" /><p className="text-slate-500">{tr("skdr.detail.deaths")}</p><p className="font-black text-slate-900">{fmt(d.totalDeaths)}</p></div>
         </div>
 
         {/* 2. Timeline */}
         <div className={section}>
           <p className={h}>Timeline</p>
-          <p className="text-[11px] font-bold text-slate-700">{d.firstDate ? `${d.firstDate} → ${d.lastDate}` : "No dated reports"}</p>
+          <p className="text-[11px] font-bold text-slate-700">{d.firstDate ? `${d.firstDate} → ${d.lastDate}` : tr("skdr.detail.no_dated_reports")}</p>
           {d.weeks.length > 0 && (
             <>
-              <div className="mt-2 flex h-16 items-end gap-[2px]" aria-label="Weekly cases (epi week)">
+              <div className="mt-2 flex h-16 items-end gap-[2px]" aria-label={tr("skdr.detail.weekly_cases_epi_week")}>
                 {d.weeks.map((w) => (
                   <div key={w.key} title={`${w.label}: ${fmt(w.cases)} cases, ${fmt(w.deaths)} deaths${w.spike ? " · spike" : ""}`}
                     className={`min-w-[3px] flex-1 rounded-t ${w.spike ? "bg-rose-500" : "bg-sky-400"}`}
@@ -273,12 +274,12 @@ export default function DiseaseDetailPanel({ open = true, disease, locations, di
         {/* 3. Mini spread map */}
         {!hideSpreadRoute && (
           <div className={section}>
-            <p className={h}>Spread route</p>
+            <p className={h}>{tr("skdr.detail.spread_route")}</p>
             <MiniRoute pts={d.pts} links={d.links} />
             {origin && (
               <p className="mt-1 text-[10px] text-slate-500">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#16a34a] align-middle" aria-hidden /> <span className="font-bold text-emerald-700">Index case:</span> {origin.name}{origin.date ? ` (${origin.date})` : ""}
-                {latest && d.pts.length > 1 && (<> → <span className="inline-block h-2 w-2 rounded-full bg-[#ea580c] align-middle" aria-hidden /> <span className="font-bold text-orange-700">Latest case location:</span> {latest.name}{latest.date ? ` (${latest.date})` : ""}</>)}
+                <span className="inline-block h-2 w-2 rounded-full bg-[#16a34a] align-middle" aria-hidden /> <span className="font-bold text-emerald-700">{tr("skdr.detail.index_case")}</span> {origin.name}{origin.date ? ` (${origin.date})` : ""}
+                {latest && d.pts.length > 1 && (<> → <span className="inline-block h-2 w-2 rounded-full bg-[#ea580c] align-middle" aria-hidden /> <span className="font-bold text-orange-700">{tr("skdr.detail.latest_case_location")}</span> {latest.name}{latest.date ? ` (${latest.date})` : ""}</>)}
               </p>
             )}
           </div>
@@ -286,9 +287,9 @@ export default function DiseaseDetailPanel({ open = true, disease, locations, di
 
         {/* 4. Countries */}
         <div className={section}>
-          <p className={h}>Affected countries</p>
+          <p className={h}>{tr("skdr.detail.affected_countries")}</p>
           <table className="w-full text-[11px]">
-            <thead><tr className="text-left text-[9px] uppercase text-slate-400"><th className="py-0.5">Country</th><th className="text-right">Cases</th><th className="text-right">Deaths</th><th className="text-right">Loc.</th></tr></thead>
+            <thead><tr className="text-left text-[9px] uppercase text-slate-400"><th className="py-0.5">{tr("skdr.detail.country")}</th><th className="text-right">{tr("skdr.detail.cases")}</th><th className="text-right">{tr("skdr.detail.deaths")}</th><th className="text-right">Loc.</th></tr></thead>
             <tbody>
               {d.countries.map((c) => (
                 <tr key={c.country} className="border-t border-slate-50">
@@ -308,19 +309,19 @@ export default function DiseaseDetailPanel({ open = true, disease, locations, di
           {highlighted.size > 0 && (
             <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold text-amber-700" data-testid="related-news-highlight-note">
               <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden />
-              {highlighted.size === 1 ? "1 article" : `${highlighted.size} articles`} for the selected point
+              {highlighted.size === 1 ? tr("skdr.detail.oneArticle") : tr("skdr.detail.nArticles", { count: highlighted.size })} {tr("skdr.detail.forPoint")}
               {highlightLocation?.location_name ? ` (${highlightLocation.location_name})` : ""}
             </p>
           )}
-          {d.articles.length === 0 ? <p className="text-[11px] text-slate-400">No source articles.</p> : (
+          {d.articles.length === 0 ? <p className="text-[11px] text-slate-400">{tr("skdr.detail.no_source_articles")}</p> : (
             <ul className="space-y-1.5">
               {newsItems.map(({ a, i, hit }) => (
                 <li key={a.url} ref={i === firstHit ? firstHitRef : undefined} data-highlighted={hit ? "true" : undefined}>
                   <a href={a.url} target="_blank" rel="noopener noreferrer"
                     className={`group flex items-start gap-1.5 rounded-lg p-1.5 ${hit ? "border border-amber-300 bg-amber-50 ring-1 ring-amber-200 hover:bg-amber-100" : "border border-transparent hover:bg-sky-50"}`}
-                    title={hit ? "Selected map point" : undefined}>
+                    title={hit ? tr("skdr.detail.selected_map_point") : undefined}>
                     {hit
-                      ? <Star className="mt-0.5 h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label="Selected map point" />
+                      ? <Star className="mt-0.5 h-3 w-3 shrink-0 fill-amber-400 text-amber-500" aria-label={tr("skdr.detail.selected_map_point")} />
                       : <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-sky-500" />}
                     <span className="min-w-0">
                       <span className={`block truncate text-[11px] font-bold group-hover:underline ${hit ? "text-amber-900" : "text-sky-800"}`}>{a.title}</span>

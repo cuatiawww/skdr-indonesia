@@ -1,5 +1,6 @@
 'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,6 +59,10 @@ import CountryFlag from "@/components/CountryFlag";
 import RelatedArticlesPanel from "@/components/RelatedArticlesPanel";
 
 import { ASEAN_GEOJSON } from "@/data/asean-countries";
+
+const INDONESIA_CATALOG = [
+  { id: "IDN", iso2: "ID", iso3: "IDN", name: "Indonesia", flag_code: "id", home_region: "INDONESIA", display_order: 1, is_active: true, regions: [], aliases: [] },
+] as unknown as MasterCountry[];
 import { PUBLIC_BASE_PATH } from "@/lib/public-path";
 
 export type HazardEvent = {
@@ -107,7 +112,7 @@ type Props = {
   onSelectCountry?: (country: string) => void;
   initialCenter?: [number, number];
   initialZoom?: number;
-  boundaryScope?: "asean" | "asean3" | "global";
+  boundaryScope?: "asean" | "asean3" | "global" | "indonesia";
   prototypeMode?: boolean;
   ebsOnly?: boolean;
   hideSpreadRoute?: boolean;
@@ -351,7 +356,7 @@ function regionName(properties: Record<string, unknown>): string {
     const value = properties[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }
-  return "Unknown region";
+  return tr("skdr.amap.unknown_region");
 }
 
 function normalizedCountry(value?: string | null): string {
@@ -373,32 +378,32 @@ function isWithinRecentWindowForDays(value: string | null | undefined, days: 7 |
 }
 
 function fieldOrNone(value: unknown): string {
-  if (value == null) return "No data";
-  if (typeof value === "string" && !value.trim()) return "No data";
-  if (typeof value === "number" && !Number.isFinite(value)) return "No data";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value == null) return tr("skdr.amap.no_data");
+  if (typeof value === "string" && !value.trim()) return tr("skdr.amap.no_data");
+  if (typeof value === "number" && !Number.isFinite(value)) return tr("skdr.amap.no_data");
+  if (typeof value === "boolean") return value ? tr("skdr.amap.yes") : tr("skdr.amap.no");
   return String(value);
 }
 
 function formatUnixSeconds(ts?: number | null): string {
-  if (ts == null || !Number.isFinite(ts)) return "No data";
+  if (ts == null || !Number.isFinite(ts)) return tr("skdr.amap.no_data");
   const ms = ts > 1e12 ? ts : ts * 1000;
   const date = new Date(ms);
-  return Number.isNaN(date.getTime()) ? "No data" : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? tr("skdr.amap.no_data") : date.toLocaleString();
 }
 
 function formatSpeedMs(ms?: number | null): string {
-  if (ms == null || !Number.isFinite(ms)) return "No data";
+  if (ms == null || !Number.isFinite(ms)) return tr("skdr.amap.no_data");
   return `${Math.round(ms)} m/s (${Math.round(ms * 3.6)} km/h)`;
 }
 
 function formatAltitudeM(m?: number | null): string {
-  if (m == null || !Number.isFinite(m)) return "No data";
+  if (m == null || !Number.isFinite(m)) return tr("skdr.amap.no_data");
   return `${Math.round(m).toLocaleString()} m`;
 }
 
 function formatHeading(deg?: number | null): string {
-  if (deg == null || !Number.isFinite(deg)) return "No data";
+  if (deg == null || !Number.isFinite(deg)) return tr("skdr.amap.no_data");
   return `${Math.round(deg)}°`;
 }
 
@@ -619,13 +624,14 @@ export default function AseanMap({
     const source = vectorRef.current?.getSource();
     if (!source) return;
     let cancelled = false;
-    setBoundaryStatus("Loading country boundaries…");
+    setBoundaryStatus(tr("skdr.amap.loading_country_boundaries"));
     if (boundaryScope !== "asean") source.clear();
 
     const run = async () => {
       let catalog: MasterCountry[] = [];
       try {
-        catalog = await fetchMasterCountries({ is_active: true, per_page: 200 });
+        // SKDR: Indonesia only (no country master API).
+        catalog = INDONESIA_CATALOG;
       } catch {
         catalog = [];
       }
@@ -1140,7 +1146,7 @@ export default function AseanMap({
         minZoom: 2,
         maxZoom: 16,
       }),
-      controls: defaultControls({ attribution: false }),
+      controls: defaultControls({ attribution: false, zoomOptions: { zoomInTipLabel: t("skdr.map.zoomIn"), zoomOutTipLabel: t("skdr.map.zoomOut") }, rotateOptions: { tipLabel: t("skdr.map.resetRotation") } }),
     });
 
     const clickKey = map.on("singleclick", (evt) => {
@@ -1252,7 +1258,7 @@ export default function AseanMap({
           eventCount: 0,
         };
         const regionCountry = String(feature.get("regionCountry") || "");
-        const unitName = String(feature.get("regionName") || "Region");
+        const unitName = String(feature.get("regionName") || tr("skdr.amap.region"));
         const clickedLevel = Number(feature.get("adminLevel") || 1);
         const nextLevel = nextAdminLevel(clickedLevel);
         const geometry = (feature as Feature<Geometry>).getGeometry();
@@ -1275,7 +1281,7 @@ export default function AseanMap({
           ]);
           setAdminDrill({ iso3, countryName: regionCountry, level: nextLevel });
         } else {
-          setAdminNote("Lowest admin boundary");
+          setAdminNote(tr("skdr.amap.lowest_admin_boundary"));
         }
         setSelected(null);
         setSelectedLocation(null);
@@ -1327,7 +1333,7 @@ export default function AseanMap({
       const locs = (curLocs && curLocs.length > 0)
         ? curLocs.filter((l) => sameCountry(l.country, name))
         : matchingOutbreaks.map((l) => ({
-            name: l.location_name || l.disease || "Monitored Location",
+            name: l.location_name || l.disease || tr("skdr.amap.monitored_location"),
             cases: l.cases || 1,
           }));
 
@@ -1420,9 +1426,9 @@ export default function AseanMap({
       let title = "";
       let subtitle = "";
       let lines: { label: string; value: string; note?: string }[] = [];
-      let empty = "No cross-border province pair for this unit.";
+      let empty = tr("skdr.amap.no_cross_border_province_pair_for_this_u");
       if (regionHit) {
-        const unit = String(regionHit.get("regionName") || "Region");
+        const unit = String(regionHit.get("regionName") || tr("skdr.amap.region"));
         const country = String(regionHit.get("regionCountry") || "");
         const level = Number(regionHit.get("adminLevel") || 1);
         const parent = level > 1
@@ -1439,18 +1445,18 @@ export default function AseanMap({
           value: row.regions.join(", "),
           note: row.notes[0],
         }));
-        if (level > 1 && parent) empty = `${parent} has no recorded province across the border.`;
+        if (level > 1 && parent) empty = tr("skdr.amap.noAcross", { parent });
       } else if (neighborHit) {
-        const country = String(neighborHit.get("borderName") || "Neighbor");
+        const country = String(neighborHit.get("borderName") || tr("skdr.amap.neighbor"));
         const touched = linksTouchingCountry(links, country);
         key = `neighbor:${country}`;
         title = country;
-        subtitle = "Land neighbor";
+        subtitle = tr("skdr.amap.land_neighbor");
         lines = touched.map((row) => ({
           label: row.region,
           value: row.targets.join(", "),
         }));
-        empty = "No home province in the matrix touches this country.";
+        empty = tr("skdr.amap.no_home_province_in_the_matrix_touches_t");
       }
       const [x, y] = evt.pixel;
       const box = el.current?.getBoundingClientRect();
@@ -1623,7 +1629,7 @@ export default function AseanMap({
     if (!src) return;
     const ac = new AbortController();
     let cancelled = false;
-    reportStatus("vectors", { state: "loading", message: "Loading iNaturalist observations…" });
+    reportStatus("vectors", { state: "loading", message: tr("skdr.amap.loading_inaturalist_observations") });
     fetchVectorSightings({ signal: ac.signal })
       .then((res) => {
         if (cancelled) return;
@@ -1663,7 +1669,7 @@ export default function AseanMap({
     if (!src) return;
     const ac = new AbortController();
     let cancelled = false;
-    reportStatus("wildlife", { state: "loading", message: "Loading GBIF bird occurrences…" });
+    reportStatus("wildlife", { state: "loading", message: tr("skdr.amap.loading_gbif_bird_occurrences") });
     fetchWildlifeOccurrences({ preset: "map" }, { signal: ac.signal })
       .then((payload) => {
         if (cancelled) return;
@@ -1687,10 +1693,10 @@ export default function AseanMap({
           });
         src.addFeatures(features);
         reportStatus("wildlife", features.length > 0
-          ? { state: "ok", message: `${features.length} bird occurrences · GBIF` }
+          ? { state: "ok", message: tr("skdr.amap.birdCount", { count: features.length }) }
           : payload?.error
             ? layerOutcome(0, payload?.source, payload.error, payload)
-            : { state: "empty", message: "No GBIF occurrences returned" });
+            : { state: "empty", message: tr("skdr.amap.no_gbif_occurrences_returned") });
       })
       .catch((err) => {
         if (cancelled || err?.name === "AbortError") return;
@@ -1721,7 +1727,7 @@ export default function AseanMap({
     if (!src) return;
     const ac = new AbortController();
     let cancelled = false;
-    reportStatus("fires", { state: "loading", message: "Loading NASA FIRMS hotspots…" });
+    reportStatus("fires", { state: "loading", message: tr("skdr.amap.loading_nasa_firms_hotspots") });
     fetchFireHotspots({ signal: ac.signal })
       .then((res) => {
         if (cancelled) return;
@@ -1758,12 +1764,12 @@ export default function AseanMap({
     const iso3 = iso3For(country) || COUNTRY_ISO3[country];
     if (!iso3) {
       setWorldPopMeta(null);
-      reportStatus("population", { state: "error", message: "No ISO3 code for this country" });
+      reportStatus("population", { state: "error", message: tr("skdr.amap.no_iso3_code_for_this_country") });
       return;
     }
     const ac = new AbortController();
     let cancelled = false;
-    reportStatus("population", { state: "loading", message: `Loading WorldPop metadata for ${iso3}…` });
+    reportStatus("population", { state: "loading", message: tr("skdr.amap.loadingWorldPop", { iso3 }) });
     fetchWorldPopMeta(iso3, { signal: ac.signal })
       .then((res) => {
         if (cancelled) return;
@@ -1807,10 +1813,10 @@ export default function AseanMap({
     const ac = new AbortController();
     let cancelled = false;
     if (intelLayers?.weather) {
-      reportStatus("weather", { state: "loading", message: "Loading capital weather…" });
+      reportStatus("weather", { state: "loading", message: tr("skdr.amap.loading_capital_weather") });
     }
     if (intelLayers?.airQuality) {
-      reportStatus("airQuality", { state: "loading", message: "Loading capital AQI…" });
+      reportStatus("airQuality", { state: "loading", message: tr("skdr.amap.loading_capital_aqi") });
     }
     fetchMapEnvironment({ signal: ac.signal })
       .then((res) => {
@@ -2276,9 +2282,9 @@ export default function AseanMap({
             return geometry ? geometryInside(geometry, parent) : false;
           });
           if (kept.length) features = kept;
-          else if (features.length >= 400) throw new Error("Admin subset is too large to draw");
+          else if (features.length >= 400) throw new Error(tr("skdr.amap.admin_subset_is_too_large_to_draw"));
         }
-        if (!features.length) throw new Error("No admin polygons");
+        if (!features.length) throw new Error(tr("skdr.amap.no_admin_polygons"));
 
         const locations = (latestPropsRef.current.outbreakLocations || []).filter(
           (item) => sameCountry(item.country, countryLabel)
@@ -2331,11 +2337,11 @@ export default function AseanMap({
             maxZoom: Math.min(8 + (parent ? level - 1 : level), 14),
           });
         }
-        setAdminNote(nextAdminLevel(level) ? null : "Lowest admin boundary");
+        setAdminNote(nextAdminLevel(level) ? null : tr("skdr.amap.lowest_admin_boundary"));
       } catch {
         if (cancelled) return;
         if (level > 1) {
-          setAdminNote("Lowest admin boundary for this unit");
+          setAdminNote(tr("skdr.amap.lowest_admin_boundary_for_this_unit"));
           drillParentRef.current = drillGeomRef.current[level - 2] || null;
           setAdminCrumbs((prev) => prev.filter((crumb) => crumb.level < level - 1));
           setAdminDrill((prev) => (prev && prev.level === level ? { ...prev, level: level - 1 } : prev));
@@ -2503,21 +2509,21 @@ export default function AseanMap({
             className="absolute top-4 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-full border border-orange-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-[0_8px_30px_rgba(234,88,12,0.2)]"
           >
             <span>
-              Spread of <span className="font-black text-slate-900">{flowDisease}</span>
-              {count > 0 ? ` · ${count} location${count === 1 ? "" : "s"} · ` : " · no mapped path"}
+              {tr("skdr.amap.spreadOf")} <span className="font-black text-slate-900">{flowDisease}</span>
+              {count > 0 ? ` · ${tr("skdr.amap.nLocations", { count })} · ` : ` · ${tr("skdr.amap.noPath")}`}
             </span>
             {count > 0 && (
               <>
-                <span className="inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-[#16a34a]" aria-hidden />Index case (earliest)</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-[#16a34a]" aria-hidden />{tr("skdr.amap.index_case_earliest")}</span>
                 <span aria-hidden>→</span>
-                <span className="inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-[#ea580c]" aria-hidden />Subsequent case locations (by case date)</span>
+                <span className="inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-[#ea580c]" aria-hidden />{tr("skdr.amap.subsequent_case_locations_by_case_date")}</span>
               </>
             )}
             <button
               type="button"
               onClick={() => setFlowDisease(null)}
               className="ml-1 rounded-full p-0.5 text-slate-400 hover:text-slate-700"
-              aria-label="Clear spread flow"
+              aria-label={tr("skdr.amap.clear_spread_flow")}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -2575,7 +2581,7 @@ export default function AseanMap({
             <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-[#0060A9]">
-                  {spreadPopup.isHub ? "Cross-border disease matrix" : "Land neighbour"}
+                  {spreadPopup.isHub ? tr("skdr.amap.cross_border_disease_matrix") : tr("skdr.amap.land_neighbour")}
                 </p>
                 <p className="text-sm font-black text-slate-900">{spreadPopup.country}</p>
               </div>
@@ -2583,7 +2589,7 @@ export default function AseanMap({
                 type="button"
                 onClick={() => setSpreadPopup(null)}
                 className="rounded p-0.5 text-slate-400 hover:text-slate-700"
-                aria-label="Close"
+                aria-label={tr("skdr.amap.close")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -2593,10 +2599,10 @@ export default function AseanMap({
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="text-left text-[9px] font-black uppercase tracking-wider text-slate-400">
-                      <th className="pb-1">Country</th>
-                      <th className="pb-1 text-right">Cases</th>
-                      <th className="pb-1 text-right">Deaths</th>
-                      <th className="pb-1 pl-2">Top disease</th>
+                      <th className="pb-1">{tr("skdr.amap.country")}</th>
+                      <th className="pb-1 text-right">{tr("skdr.amap.cases")}</th>
+                      <th className="pb-1 text-right">{tr("skdr.amap.deaths")}</th>
+                      <th className="pb-1 pl-2">{tr("skdr.amap.top_disease")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2617,15 +2623,15 @@ export default function AseanMap({
               ) : (() => {
                 const s = summarize(spreadPopup.country);
                 if (s.diseases.length === 0) {
-                  return <p className="text-[11px] font-medium text-slate-500">No recorded cases on the current map for this country.</p>;
+                  return <p className="text-[11px] font-medium text-slate-500">{tr("skdr.amap.no_recorded_cases_on_the_current_map_for")}</p>;
                 }
                 return (
                   <table className="w-full text-[11px]">
                     <thead>
                       <tr className="text-left text-[9px] font-black uppercase tracking-wider text-slate-400">
-                        <th className="pb-1">Disease</th>
-                        <th className="pb-1 text-right">Cases</th>
-                        <th className="pb-1 text-right">Deaths</th>
+                        <th className="pb-1">{tr("skdr.amap.disease")}</th>
+                        <th className="pb-1 text-right">{tr("skdr.amap.cases")}</th>
+                        <th className="pb-1 text-right">{tr("skdr.amap.deaths")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2641,8 +2647,7 @@ export default function AseanMap({
                 );
               })()}
               <p className="mt-2 border-t border-slate-100 pt-1.5 text-[9px] font-medium text-slate-400">
-                Counts from mapped outbreak events in view. Lines show land borders.
-              </p>
+                {tr("skdr.amap.counts_from_mapped_outbreak_events_in_vi")}</p>
             </div>
           </div>
         );
@@ -2668,7 +2673,7 @@ export default function AseanMap({
         <div className="absolute left-4 bottom-28 z-30 w-[min(320px,calc(100%-32px))] rounded-2xl border border-indigo-200 bg-white p-3 shadow-[0_12px_30px_rgba(0,96,169,0.18)]">
           <div className="flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-indigo-600" />
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-800">Population denominators</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-800">{tr("skdr.amap.population_denominators")}</p>
           </div>
           <p className="mt-1 text-[11px] font-bold text-slate-800">
             {fieldOrNone(worldPopMeta.country || worldPopMeta.iso3)} · {fieldOrNone(worldPopMeta.year)}
@@ -2679,14 +2684,13 @@ export default function AseanMap({
               : fieldOrNone(worldPopMeta.error)}
           </p>
           <p className="mt-1 text-[9px] font-semibold text-slate-400">
-            Density overlay: NASA SEDAC GPWv4 2020. WorldPop GeoTIFF is linked when the provider returns a file URL.
-          </p>
+            {tr("skdr.amap.density_overlay_nasa_sedac_gpwv4_2020_wo")}</p>
           {worldPopMeta.tif_url ? (
             <a href={worldPopMeta.tif_url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#0060A9] hover:underline">
-              Open GeoTIFF <ExternalLink className="h-3 w-3" />
+              {tr("skdr.amap.openGeotiff")} <ExternalLink className="h-3 w-3" />
             </a>
           ) : (
-            <p className="mt-1 text-[10px] font-semibold text-slate-400">GeoTIFF URL: No data</p>
+            <p className="mt-1 text-[10px] font-semibold text-slate-400">{tr("skdr.amap.geotiff_url_no_data")}</p>
           )}
         </div>
       )}
@@ -2702,13 +2706,13 @@ export default function AseanMap({
             type="button"
             onClick={resetView}
             className="absolute right-3.5 top-3.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-            aria-label="Close"
+            aria-label={tr("skdr.amap.close")}
           >
             <X className="h-4 w-4" />
           </button>
           <div className="pr-8">
             <p className="text-[10px] font-black uppercase tracking-wider text-[#0060A9]">
-              {selectedRegion.adminLevel === 1 ? "Province" : selectedRegion.adminLevel ? adminLevelCode(selectedRegion.adminLevel) : "Location"}
+              {selectedRegion.adminLevel === 1 ? tr("skdr.amap.province") : selectedRegion.adminLevel ? adminLevelCode(selectedRegion.adminLevel) : tr("skdr.amap.location")}
             </p>
             <h3 className="mt-1 truncate text-base font-black text-slate-900">
               {selectedRegion.name}
@@ -2739,21 +2743,20 @@ export default function AseanMap({
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 p-2 text-center">
-              <span className="text-[9px] font-bold text-[#0060A9] leading-tight block">Reported Cases in Article</span>
+              <span className="text-[9px] font-bold text-[#0060A9] leading-tight block">{tr("skdr.amap.reported_cases_in_article")}</span>
               <p className="mt-0.5 text-sm font-black text-[#0060A9]">
                 {selectedRegion.cases.toLocaleString()}
               </p>
             </div>
             <div className="rounded-xl border border-rose-200/80 bg-rose-50/70 p-2 text-center">
-              <span className="text-[9px] font-bold text-rose-700 leading-tight block">Reported Death in Article</span>
+              <span className="text-[9px] font-bold text-rose-700 leading-tight block">{tr("skdr.amap.reported_death_in_article")}</span>
               <p className="mt-0.5 text-sm font-black text-rose-700">
                 {selectedRegion.deaths.toLocaleString()}
               </p>
             </div>
           </div>
           <p className="mt-3 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-500">
-            Aggregated from processed NLP locations in this region.
-          </p>
+            {tr("skdr.amap.aggregated_from_processed_nlp_locations_")}</p>
           {(() => {
             const relationName = selectedRegion.adminLevel && selectedRegion.adminLevel > 1
               ? adminCrumbs.find((crumb) => crumb.level === 1)?.name || selectedRegion.name
@@ -2797,7 +2800,7 @@ export default function AseanMap({
             type="button"
             onClick={resetView}
             className="absolute right-3.5 top-3.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-            aria-label="Close"
+            aria-label={tr("skdr.amap.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -2805,8 +2808,7 @@ export default function AseanMap({
             <div className="flex items-center gap-1.5 flex-wrap">
               {(selectedLocation.source_type || "").toUpperCase() === "IBS" ? (
                 <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal-700 border border-teal-200">
-                  IBS (official)
-                </span>
+                  {tr("skdr.amap.ibs_official")}</span>
               ) : selectedLocation.detail?.source_type && (
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600 border border-slate-200">
                   {selectedLocation.detail.source_type}
@@ -2814,18 +2816,15 @@ export default function AseanMap({
               )}
               {(selectedLocation.is_national || selectedLocation.geo_level === "national") && (
                 <span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#0060A9] border border-[#0060A9]">
-                  National
-                </span>
+                  {tr("skdr.amap.national")}</span>
               )}
               {selectedLocation.geo_level === "province" && (
                 <span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600 border border-slate-300">
-                  Province
-                </span>
+                  {tr("skdr.amap.province")}</span>
               )}
               {selectedLocation.is_cumulative && (
                 <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 border border-amber-200">
-                  Cumulative
-                </span>
+                  {tr("skdr.amap.cumulative")}</span>
               )}
             </div>
 
@@ -2840,17 +2839,17 @@ export default function AseanMap({
             </p>
             <p className="mt-1 text-[10px] font-semibold text-slate-400">
               {(selectedLocation.source_type || "").toUpperCase() === "IBS"
-                ? `Official surveillance figure${selectedLocation.period_text ? ` · ${selectedLocation.period_text}` : ""}`
-                : "Aggregated NLP result for this location and disease"}
+                ? `${tr("skdr.amap.officialFigure")}${selectedLocation.period_text ? ` · ${selectedLocation.period_text}` : ""}`
+                : tr("skdr.amap.aggregated_nlp_result_for_this_location_")}
             </p>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 p-2 text-center">
-              <span className="text-[9px] font-bold text-[#0060A9] leading-tight block">Reported Cases in Article</span>
+              <span className="text-[9px] font-bold text-[#0060A9] leading-tight block">{tr("skdr.amap.reported_cases_in_article")}</span>
               <p className="mt-0.5 text-sm font-black text-[#0060A9]">{selectedLocation.cases.toLocaleString()}</p>
             </div>
             <div className="rounded-xl border border-rose-200/80 bg-rose-50/70 p-2 text-center">
-              <span className="text-[9px] font-bold text-rose-700 leading-tight block">Reported Death in Article</span>
+              <span className="text-[9px] font-bold text-rose-700 leading-tight block">{tr("skdr.amap.reported_death_in_article")}</span>
               <p className="mt-0.5 text-sm font-black text-rose-700">{selectedLocation.deaths.toLocaleString()}</p>
             </div>
           </div>
@@ -2862,9 +2861,9 @@ export default function AseanMap({
             <p className="mt-1 text-[9px] font-medium leading-relaxed text-slate-400">
               {(selectedLocation.source_type || "").toUpperCase() === "IBS"
                 ? selectedLocation.is_cumulative
-                  ? "Cumulative total reported by the source for the period above. Not added to the weekly dashboard totals."
-                  : "Weekly addition reported by the source for the epi week above."
-                : "Cases and deaths are aggregated from processed NLP reports. The source above is the latest representative article."}
+                  ? tr("skdr.amap.cumulative_total_reported_by_the_source_")
+                  : tr("skdr.amap.weekly_addition_reported_by_the_source_f")
+                : tr("skdr.amap.cases_and_deaths_are_aggregated_from_pro")}
             </p>
             {(selectedLocation.recent_event_count ?? 0) > 0 && (
               <p className="mt-1 text-[9px] font-semibold leading-relaxed text-[#0060A9]">
@@ -2873,7 +2872,7 @@ export default function AseanMap({
             )}
             {(selectedLocation.sources?.length ?? 0) > 0 && (
               <div className="mt-2 border-t border-slate-100 pt-2">
-                <p className="text-[9px] font-black uppercase tracking-wide text-slate-400">Related sources</p>
+                <p className="text-[9px] font-black uppercase tracking-wide text-slate-400">{tr("skdr.amap.related_sources")}</p>
                 <div className="mt-1 space-y-0.5">
                   {selectedLocation.sources?.slice(0, 3).map((source, index) => (
                     source.url ? (
@@ -2902,8 +2901,7 @@ export default function AseanMap({
                 rel="noreferrer"
                 className="mt-1 inline-flex font-bold text-[#0060A9] hover:underline"
               >
-                Open source article
-              </a>
+                {tr("skdr.amap.open_source_article")}</a>
             )}
           </div>
         </div>
@@ -2921,7 +2919,7 @@ export default function AseanMap({
             type="button"
             onClick={resetView}
             className="absolute top-3.5 right-3.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-            aria-label="Close"
+            aria-label={tr("skdr.amap.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -2949,7 +2947,7 @@ export default function AseanMap({
             <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 p-2 text-center">
               <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-[#0060A9]">
                 <Activity className="h-3 w-3" />
-                <span>Cases</span>
+                <span>{tr("skdr.amap.cases")}</span>
               </div>
               <p className="mt-0.5 text-sm font-black text-[#0060A9]">
                 {displayTotalCases > 9999
@@ -2962,7 +2960,7 @@ export default function AseanMap({
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-center">
               <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-slate-600">
                 <Skull className="h-3 w-3 text-slate-500" />
-                <span>Deaths</span>
+                <span>{tr("skdr.amap.deaths")}</span>
               </div>
               <p className="mt-0.5 text-sm font-black text-slate-800">
                 {totalDeaths.toLocaleString()}
@@ -3070,7 +3068,7 @@ export default function AseanMap({
             </span>
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] font-bold text-slate-400">
-                Choropleth
+                {t("skdr.map.choropleth")}
               </span>
               <button
                 type="button"
@@ -3098,13 +3096,11 @@ export default function AseanMap({
             {!isEbsOnly && (
               <span className="flex items-center gap-1">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: IBS_MARKER_COLOR }} />
-                IBS (official)
-              </span>
+                {tr("skdr.amap.ibs_official")}</span>
             )}
             <span className="flex items-center gap-1">
               <span className="h-3 w-3 rounded-full border-2 border-slate-500 bg-transparent" />
-              National (country centroid)
-            </span>
+              {tr("skdr.amap.national_country_centroid")}</span>
           </div>
 
           {/* Explicit Helper Note */}
@@ -3121,7 +3117,7 @@ export default function AseanMap({
           type="button"
           onClick={() => zoom(0.8)}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-base font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          aria-label="Zoom in"
+          aria-label={tr("skdr.amap.zoom_in")}
         >
           +
         </button>
@@ -3129,7 +3125,7 @@ export default function AseanMap({
           type="button"
           onClick={() => zoom(-0.8)}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-base font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          aria-label="Zoom out"
+          aria-label={tr("skdr.amap.zoom_out")}
         >
           -
         </button>
@@ -3137,7 +3133,7 @@ export default function AseanMap({
           type="button"
           onClick={resetView}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"
-          aria-label="Reset"
+          aria-label={tr("skdr.amap.reset")}
           title={t("map.resetView")}
         >
           <RotateCcw className="h-3.5 w-3.5" />
@@ -3162,7 +3158,7 @@ function IntelRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3 text-[11px]">
       <span className="shrink-0 font-semibold text-slate-500">{label}</span>
-      <span className={`text-right font-bold ${value === "No data" ? "text-slate-400" : "text-slate-800"}`}>{value}</span>
+      <span className={`text-right font-bold ${value === tr("skdr.amap.no_data") ? "text-slate-400" : "text-slate-800"}`}>{value}</span>
     </div>
   );
 }
@@ -3195,20 +3191,20 @@ function IntelPopup({
     <Globe className="h-4 w-4" />;
 
   const title =
-    selected.type === "live_flight" ? (selected.data.callsign || selected.data.icao24 || "Aircraft") :
-    selected.type === "vector_sighting" ? (selected.data.species || "Aedes sighting") :
-    selected.type === "fire_hotspot" ? "Active fire hotspot" :
-    selected.type === "hazard_event" ? (selected.data.title || selected.data.kind || "Hazard") :
-    selected.type === "wildlife" ? (selected.data.species || selected.data.scientificName || "Bird occurrence") :
+    selected.type === "live_flight" ? (selected.data.callsign || selected.data.icao24 || tr("skdr.amap.aircraft")) :
+    selected.type === "vector_sighting" ? (selected.data.species || tr("skdr.amap.aedes_sighting")) :
+    selected.type === "fire_hotspot" ? tr("skdr.amap.active_fire_hotspot") :
+    selected.type === "hazard_event" ? (selected.data.title || selected.data.kind || tr("skdr.amap.hazard")) :
+    selected.type === "wildlife" ? (selected.data.species || selected.data.scientificName || tr("skdr.amap.bird_occurrence")) :
     `${selected.data.capital}, ${selected.data.display_name}`;
 
   const kicker =
-    selected.type === "live_flight" ? "Live air traffic · OpenSky" :
-    selected.type === "vector_sighting" ? "Vector sighting · iNaturalist" :
-    selected.type === "fire_hotspot" ? "Thermal anomaly · NASA FIRMS" :
+    selected.type === "live_flight" ? tr("skdr.amap.live_air_traffic_opensky") :
+    selected.type === "vector_sighting" ? tr("skdr.amap.vector_sighting_inaturalist") :
+    selected.type === "fire_hotspot" ? tr("skdr.amap.thermal_anomaly_nasa_firms") :
     selected.type === "hazard_event" ? `${fieldOrNone(selected.data.source).toUpperCase()} ${fieldOrNone(selected.data.kind)}` :
-    selected.type === "wildlife" ? "Wildlife occurrence · GBIF" :
-    "Capital environment · Open-Meteo";
+    selected.type === "wildlife" ? tr("skdr.amap.wildlife_occurrence_gbif") :
+    tr("skdr.amap.capital_environment_open_meteo");
 
   return (
     <div
@@ -3219,7 +3215,7 @@ function IntelPopup({
         type="button"
         onClick={onClose}
         className="absolute right-3.5 top-3.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-        aria-label="Close"
+        aria-label={tr("skdr.amap.close")}
       >
         <X className="h-4 w-4" />
       </button>
@@ -3235,64 +3231,63 @@ function IntelPopup({
       <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3">
         {selected.type === "live_flight" && (
           <>
-            <IntelRow label="Callsign" value={fieldOrNone(selected.data.callsign)} />
-            <IntelRow label="ICAO24 hex" value={fieldOrNone(selected.data.icao24)} />
-            <IntelRow label="Origin country" value={fieldOrNone(selected.data.origin_country)} />
-            <IntelRow label="Altitude" value={formatAltitudeM(selected.data.altitude_m)} />
-            <IntelRow label="Ground speed" value={formatSpeedMs(selected.data.velocity_ms)} />
-            <IntelRow label="Heading" value={formatHeading(selected.data.heading)} />
-            <IntelRow label="On ground" value={fieldOrNone(selected.data.on_ground)} />
+            <IntelRow label={tr("skdr.amap.callsign")} value={fieldOrNone(selected.data.callsign)} />
+            <IntelRow label={tr("skdr.amap.icao24_hex")} value={fieldOrNone(selected.data.icao24)} />
+            <IntelRow label={tr("skdr.amap.origin_country")} value={fieldOrNone(selected.data.origin_country)} />
+            <IntelRow label={tr("skdr.amap.altitude")} value={formatAltitudeM(selected.data.altitude_m)} />
+            <IntelRow label={tr("skdr.amap.ground_speed")} value={formatSpeedMs(selected.data.velocity_ms)} />
+            <IntelRow label={tr("skdr.amap.heading")} value={formatHeading(selected.data.heading)} />
+            <IntelRow label={tr("skdr.amap.on_ground")} value={fieldOrNone(selected.data.on_ground)} />
             <IntelRow label="Squawk" value={fieldOrNone(selected.data.squawk)} />
-            <IntelRow label="Last contact" value={formatUnixSeconds(selected.data.last_contact)} />
-            <IntelRow label="Origin / destination" value="No data" />
+            <IntelRow label={tr("skdr.amap.last_contact")} value={formatUnixSeconds(selected.data.last_contact)} />
+            <IntelRow label={tr("skdr.amap.origin_destination")} value={tr("skdr.amap.no_data")} />
             <p className="pt-1 text-[9px] font-semibold leading-relaxed text-slate-400">
-              OpenSky state vectors do not include origin or destination airports. Missing fields are shown as No data.
-            </p>
+              {tr("skdr.amap.opensky_state_vectors_do_not_include_ori")}</p>
           </>
         )}
         {selected.type === "vector_sighting" && (
           <>
-            <IntelRow label="Species" value={fieldOrNone(selected.data.species)} />
-            <IntelRow label="Place" value={fieldOrNone(selected.data.place)} />
-            <IntelRow label="Observed" value={fieldOrNone(selected.data.observed_on)} />
+            <IntelRow label={tr("skdr.amap.species")} value={fieldOrNone(selected.data.species)} />
+            <IntelRow label={tr("skdr.amap.place")} value={fieldOrNone(selected.data.place)} />
+            <IntelRow label={tr("skdr.amap.observed")} value={fieldOrNone(selected.data.observed_on)} />
             {selected.data.photo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={selected.data.photo_url} alt="" className="mt-2 h-24 w-full rounded-xl object-cover" />
             ) : (
-              <IntelRow label="Photo" value="No data" />
+              <IntelRow label={tr("skdr.amap.photo")} value={tr("skdr.amap.no_data")} />
             )}
           </>
         )}
         {selected.type === "wildlife" && (
           <>
-            <IntelRow label="Species" value={fieldOrNone(selected.data.species)} />
-            <IntelRow label="Scientific name" value={fieldOrNone(selected.data.scientificName)} />
-            <IntelRow label="Country" value={fieldOrNone(selected.data.country)} />
-            <IntelRow label="Observed" value={fieldOrNone(selected.data.eventDate)} />
+            <IntelRow label={tr("skdr.amap.species")} value={fieldOrNone(selected.data.species)} />
+            <IntelRow label={tr("skdr.amap.scientific_name")} value={fieldOrNone(selected.data.scientificName)} />
+            <IntelRow label={tr("skdr.amap.country")} value={fieldOrNone(selected.data.country)} />
+            <IntelRow label={tr("skdr.amap.observed")} value={fieldOrNone(selected.data.eventDate)} />
           </>
         )}
         {selected.type === "fire_hotspot" && (
           <>
-            <IntelRow label="Brightness" value={fieldOrNone(selected.data.brightness)} />
-            <IntelRow label="Confidence" value={fieldOrNone(selected.data.confidence)} />
-            <IntelRow label="Acquired" value={fieldOrNone([selected.data.acq_date, selected.data.acq_time].filter(Boolean).join(" "))} />
-            <IntelRow label="Satellite" value={fieldOrNone(selected.data.satellite)} />
+            <IntelRow label={tr("skdr.amap.brightness")} value={fieldOrNone(selected.data.brightness)} />
+            <IntelRow label={tr("skdr.amap.confidence")} value={fieldOrNone(selected.data.confidence)} />
+            <IntelRow label={tr("skdr.amap.acquired")} value={fieldOrNone([selected.data.acq_date, selected.data.acq_time].filter(Boolean).join(" "))} />
+            <IntelRow label={tr("skdr.amap.satellite")} value={fieldOrNone(selected.data.satellite)} />
             <IntelRow label="FRP" value={fieldOrNone(selected.data.frp)} />
           </>
         )}
         {selected.type === "hazard_event" && (
           <>
-            <IntelRow label="Source" value={fieldOrNone(selected.data.source)} />
-            <IntelRow label="Kind" value={fieldOrNone(selected.data.kind)} />
-            <IntelRow label="Magnitude" value={fieldOrNone(selected.data.magnitude)} />
-            <IntelRow label="Alert" value={fieldOrNone(selected.data.alert_level)} />
-            <IntelRow label="When" value={typeof selected.data.when === "number" ? formatUnixSeconds(selected.data.when > 1e12 ? selected.data.when / 1000 : selected.data.when) : fieldOrNone(selected.data.when)} />
+            <IntelRow label={tr("skdr.amap.source")} value={fieldOrNone(selected.data.source)} />
+            <IntelRow label={tr("skdr.amap.kind")} value={fieldOrNone(selected.data.kind)} />
+            <IntelRow label={tr("skdr.amap.magnitude")} value={fieldOrNone(selected.data.magnitude)} />
+            <IntelRow label={tr("skdr.amap.alert")} value={fieldOrNone(selected.data.alert_level)} />
+            <IntelRow label={tr("skdr.amap.when")} value={typeof selected.data.when === "number" ? formatUnixSeconds(selected.data.when > 1e12 ? selected.data.when / 1000 : selected.data.when) : fieldOrNone(selected.data.when)} />
             {"url" in selected.data && (selected.data as { url?: string }).url ? (
               <a href={(selected.data as { url?: string }).url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0060A9] hover:underline">
-                Open source <ExternalLink className="h-3 w-3" />
+                {tr("skdr.amap.openSource")} <ExternalLink className="h-3 w-3" />
               </a>
             ) : (
-              <IntelRow label="Source URL" value="No data" />
+              <IntelRow label={tr("skdr.amap.source_url")} value={tr("skdr.amap.no_data")} />
             )}
           </>
         )}
@@ -3300,21 +3295,21 @@ function IntelPopup({
           <>
             {(showWeather || !showAir) && (
               <>
-                <IntelRow label="Temperature" value={selected.data.temperature_c == null ? "No data" : `${selected.data.temperature_c} °C`} />
-                <IntelRow label="Humidity" value={selected.data.relative_humidity_pct == null ? "No data" : `${selected.data.relative_humidity_pct}%`} />
-                <IntelRow label="Precipitation" value={selected.data.precipitation_mm == null ? "No data" : `${selected.data.precipitation_mm} mm`} />
-                <IntelRow label="Wind" value={selected.data.wind_speed_kmh == null ? "No data" : `${selected.data.wind_speed_kmh} km/h`} />
-                <IntelRow label="Weather observed" value={fieldOrNone(selected.data.weather_observed_at)} />
+                <IntelRow label={tr("skdr.amap.temperature")} value={selected.data.temperature_c == null ? tr("skdr.amap.no_data") : `${selected.data.temperature_c} °C`} />
+                <IntelRow label={tr("skdr.amap.humidity")} value={selected.data.relative_humidity_pct == null ? tr("skdr.amap.no_data") : `${selected.data.relative_humidity_pct}%`} />
+                <IntelRow label={tr("skdr.amap.precipitation")} value={selected.data.precipitation_mm == null ? tr("skdr.amap.no_data") : `${selected.data.precipitation_mm} mm`} />
+                <IntelRow label={tr("skdr.amap.wind")} value={selected.data.wind_speed_kmh == null ? tr("skdr.amap.no_data") : `${selected.data.wind_speed_kmh} km/h`} />
+                <IntelRow label={tr("skdr.amap.weather_observed")} value={fieldOrNone(selected.data.weather_observed_at)} />
               </>
             )}
             {(showAir || !showWeather) && (
               <>
-                <IntelRow label="European AQI" value={fieldOrNone(selected.data.european_aqi)} />
-                <IntelRow label="AQI band" value={fieldOrNone(selected.data.aqi_label)} />
-                <IntelRow label="PM2.5" value={selected.data.pm2_5 == null ? "No data" : `${selected.data.pm2_5} µg/m³`} />
-                <IntelRow label="PM10" value={selected.data.pm10 == null ? "No data" : `${selected.data.pm10} µg/m³`} />
-                <IntelRow label="SO2" value={selected.data.so2 == null ? "No data" : `${selected.data.so2} µg/m³`} />
-                <IntelRow label="Air observed" value={fieldOrNone(selected.data.air_observed_at)} />
+                <IntelRow label={tr("skdr.amap.european_aqi")} value={fieldOrNone(selected.data.european_aqi)} />
+                <IntelRow label={tr("skdr.amap.aqi_band")} value={fieldOrNone(selected.data.aqi_label)} />
+                <IntelRow label="PM2.5" value={selected.data.pm2_5 == null ? tr("skdr.amap.no_data") : `${selected.data.pm2_5} µg/m³`} />
+                <IntelRow label="PM10" value={selected.data.pm10 == null ? tr("skdr.amap.no_data") : `${selected.data.pm10} µg/m³`} />
+                <IntelRow label="SO2" value={selected.data.so2 == null ? tr("skdr.amap.no_data") : `${selected.data.so2} µg/m³`} />
+                <IntelRow label={tr("skdr.amap.air_observed")} value={fieldOrNone(selected.data.air_observed_at)} />
               </>
             )}
           </>

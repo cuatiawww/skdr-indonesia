@@ -1,5 +1,6 @@
 'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
@@ -57,12 +58,10 @@ export default function NotFound() {
             </div>
 
             <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">
-              Page Not Found
-            </h1>
+              {tr("skdr.layout.page_not_found")}</h1>
 
             <p className="mx-auto max-w-sm text-sm leading-relaxed text-slate-600">
-              The page you are looking for does not exist or has been moved.
-            </p>
+              {tr("skdr.layout.the_page_you_are_looking_for_does_not_ex")}</p>
           </div>
 
           {/* Action Buttons */}
@@ -72,7 +71,7 @@ export default function NotFound() {
               className="inline-flex items-center gap-2 rounded-xl bg-[#0060A9] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-[#004b85]"
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span>Back to Dashboard</span>
+              <span>{tr("skdr.layout.back_to_dashboard")}</span>
             </Link>
 
             <button
@@ -81,7 +80,7 @@ export default function NotFound() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>Go Back</span>
+              <span>{tr("skdr.layout.go_back")}</span>
             </button>
           </div>
         </div>

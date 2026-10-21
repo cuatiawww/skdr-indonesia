@@ -201,12 +201,12 @@ export function formatEpiRangeDescription(
 
   if (startYear === endYear) {
     if (startWeek === endWeek) {
-      return `Epi Week ${startWeek}, ${startYear} (${startRange.label})`;
+      return `${locale === "en" ? "Epi Week" : "Minggu Epi"} ${startWeek}, ${startYear} (${startRange.label})`;
     }
-    return `Epi Week ${startWeek} – Week ${endWeek}, ${startYear} (${startRange.startFormatted} — ${endRange.endFormatted})`;
+    return `${locale === "en" ? "Epi Week" : "Minggu Epi"} ${startWeek} – ${locale === "en" ? "Week" : "Minggu"} ${endWeek}, ${startYear} (${startRange.startFormatted} — ${endRange.endFormatted})`;
   }
 
-  return `Epi Week ${startWeek}, ${startYear} – Week ${endWeek}, ${endYear} (${startRange.startFormatted} — ${endRange.endFormatted})`;
+  return `${locale === "en" ? "Epi Week" : "Minggu Epi"} ${startWeek}, ${startYear} – ${locale === "en" ? "Week" : "Minggu"} ${endWeek}, ${endYear} (${startRange.startFormatted} — ${endRange.endFormatted})`;
 }
 
 // -------------------------------------------------------------

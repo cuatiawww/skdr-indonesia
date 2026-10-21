@@ -12,6 +12,7 @@
 // sparklines / hourly bars, just the numbers, under "Total Collected (All-Time)". Failed / stuck / duplicate /
 // archived / non-health / waiting / in-progress / queue alerts are handled by the system and
 // are not shown here; the API still returns them for admin pages.
+import { tr } from "@/lib/i18n/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchCrawlingStatsActivity,
@@ -92,7 +93,7 @@ function breakdownFrom(stats: CrawlingStats | null): StatusBreakdown | null {
 export function formatAge(minutes: number | null | undefined): string {
   if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) return "–";
   const m = Math.max(0, Math.round(minutes));
-  if (m < 60) return `${m} min`;
+  if (m < 60) return `${m} ${tr("skdr.time.min")}`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ${m % 60}m`;
   return `${Math.floor(h / 24)}d ${h % 24}h`;
@@ -108,16 +109,16 @@ export function formatClock(iso: string | null | undefined, zone: string | null 
   if (!zoneLabel) opts.timeZoneName = "short";
   let text: string;
   try {
-    text = new Intl.DateTimeFormat("en-GB", opts).format(date);
+    text = new Intl.DateTimeFormat("id-ID", opts).format(date);
   } catch {
-    text = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+    text = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
   }
   const ageDays = (Date.now() - date.getTime()) / 86_400_000;
   if (ageDays >= 1) {
     const dayOpts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
     if (zone) dayOpts.timeZone = zone;
     try {
-      text = `${new Intl.DateTimeFormat("en-GB", dayOpts).format(date)} ${text}`;
+      text = `${new Intl.DateTimeFormat("id-ID", dayOpts).format(date)} ${text}`;
     } catch {
       /* keep time only */
     }
@@ -179,14 +180,14 @@ export function SummaryTile({
       <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
       <AnimatedCount value={total} locale={locale} className={`mt-1 block truncate text-2xl font-black leading-none tracking-tight ${t.value}`} />
       <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px] font-semibold text-slate-500">
-        <span className={`rounded px-1.5 py-0.5 font-black ${t.chip}`} title={`Growth in the last ${longLabel} vs the total before it`}>
+        <span className={`rounded px-1.5 py-0.5 font-black ${t.chip}`} title={tr("skdr.pipeline.growthTitle", { window: longLabel })}>
           {formatRate(rate)} <span className="font-semibold">/ {longLabel}</span>
         </span>
       </div>
       <p className="mt-1 text-[10px] font-semibold text-slate-500">
-        <b className="text-slate-700">+{shortAdded === null ? "–" : fmt(shortAdded, locale)}</b> in {shortLabel}
+        <b className="text-slate-700">+{shortAdded === null ? "–" : fmt(shortAdded, locale)}</b> {tr("skdr.pipeline.in")} {shortLabel}
         <span className="text-slate-300"> · </span>
-        <b className="text-slate-700">+{longAdded === null ? "–" : fmt(longAdded, locale)}</b> in {longLabel}
+        <b className="text-slate-700">+{longAdded === null ? "–" : fmt(longAdded, locale)}</b> {tr("skdr.pipeline.in")} {longLabel}
       </p>
     </div>
   );
@@ -279,23 +280,23 @@ export default function LivePipelineCard({
   return (
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center justify-between gap-2 pr-7">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[#4f4f4f]">Total Collected (All-Time)</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#4f4f4f]">{tr("skdr.pipeline.title")}</p>
         <span
           className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide ${running ? "text-emerald-600" : "text-slate-400"}`}
-          title={lastRun?.records_found != null ? `Last run: ${lastRun.status ?? "–"}, ${lastRun.records_found} records found` : undefined}
+          title={lastRun?.records_found != null ? tr("skdr.pipeline.lastRunTitle", { status: lastRun.status ?? "–", count: lastRun.records_found }) : undefined}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${running ? "animate-pulse bg-emerald-500" : "bg-slate-300"}`} />
-          {running ? "Crawler running" : "Crawler idle"}
+          {running ? tr("skdr.pipeline.running") : tr("skdr.pipeline.idle")}
           {!running && lastRunAt ? (
-            <span className="font-semibold normal-case tracking-normal">· last run {formatClock(lastRunAt, zone, zoneLabel)}</span>
+            <span className="font-semibold normal-case tracking-normal">· {tr("skdr.pipeline.lastRun")} {formatClock(lastRunAt, zone, zoneLabel)}</span>
           ) : null}
         </span>
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <SummaryTile
-          label="Collected"
-          hint="All items collected by the crawlers (all-time)"
+          label={tr("skdr.pipeline.collected")}
+          hint={tr("skdr.pipeline.collectedHint")}
           total={total}
           shortAdded={activity ? activity.added_delta_window : null}
           longAdded={activity ? activity.added_long : null}
@@ -305,8 +306,8 @@ export default function LivePipelineCard({
           locale={locale}
         />
         <SummaryTile
-          label="Processed"
-          hint="Items that finished NLP (health and non-health)"
+          label={tr("skdr.pipeline.processed")}
+          hint={tr("skdr.pipeline.processedHint")}
           total={processedTotal}
           shortAdded={activity ? activity.processed_delta_window : null}
           longAdded={activity ? activity.processed_long : null}
@@ -316,8 +317,8 @@ export default function LivePipelineCard({
           locale={locale}
         />
         <SummaryTile
-          label="Health stored"
-          hint="Processed items classified as health-related"
+          label={tr("skdr.pipeline.health")}
+          hint={tr("skdr.pipeline.healthHint")}
           total={healthTotal}
           shortAdded={activity ? activity.health_delta_window : null}
           longAdded={activity ? activity.health_long : null}
@@ -329,17 +330,17 @@ export default function LivePipelineCard({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-semibold text-slate-400">
-        <span className="inline-flex items-center gap-1" title={`Refreshes every ${pollSeconds}s`}>
+        <span className="inline-flex items-center gap-1" title={tr("skdr.pipeline.refreshEvery", { seconds: pollSeconds })}>
           <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? "animate-pulse bg-emerald-500" : failed ? "bg-rose-500" : "bg-slate-300"}`} />
-          {failed ? "Live update failed, retrying" : ago === null ? "Connecting…" : `Live · updated ${ago}s ago`}
+          {failed ? tr("skdr.pipeline.failed") : ago === null ? tr("skdr.pipeline.connecting") : tr("skdr.pipeline.liveUpdated", { seconds: ago })}
         </span>
         {activity?.last_added_at ? (
-          <span title={`Newest collected item; batch = items within ${activity.batch_gap_minutes} min of it`}>
-            Last batch <b className="text-slate-600">{formatClock(activity.last_added_at, zone, zoneLabel)}</b>
+          <span title={tr("skdr.pipeline.batchTitle", { minutes: activity.batch_gap_minutes })}>
+            {tr("skdr.pipeline.lastBatch")} <b className="text-slate-600">{formatClock(activity.last_added_at, zone, zoneLabel)}</b>
             {activity.last_batch_size ? ` (+${fmt(activity.last_batch_size, locale)})` : ""}
           </span>
         ) : null}
-        {activity ? <span>Growth rate = items added in the window vs the total before it</span> : null}
+        {activity ? <span>{tr("skdr.pipeline.growthFoot")}</span> : null}
       </div>
     </div>
   );

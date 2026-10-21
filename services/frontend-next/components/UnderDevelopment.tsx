@@ -1,5 +1,6 @@
 'use client'
 
+import { tr } from "@/lib/i18n/LanguageContext";
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -36,8 +37,7 @@ export default function UnderDevelopment() {
             </h1>
 
             <p className="mx-auto max-w-sm text-sm leading-relaxed text-slate-600">
-              This page is currently under development. Please check back later.
-            </p>
+              {tr("skdr.layout.this_page_is_currently_under_development")}</p>
           </div>
 
           {/* Action Buttons */}
@@ -47,7 +47,7 @@ export default function UnderDevelopment() {
               className="inline-flex items-center gap-2 rounded-xl bg-[#0060A9] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-[#004b85]"
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span>Back to Dashboard</span>
+              <span>{tr("skdr.layout.back_to_dashboard")}</span>
             </Link>
 
             <button
@@ -56,7 +56,7 @@ export default function UnderDevelopment() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>Go Back</span>
+              <span>{tr("skdr.layout.go_back")}</span>
             </button>
           </div>
         </div>

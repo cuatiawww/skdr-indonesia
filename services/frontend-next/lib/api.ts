@@ -1309,6 +1309,8 @@ export const deleteLanguageModel = (id: string) =>
 export const fetchDashboardStats = () =>
   fetchFrom<DashboardStats>("/api/v1/events/stats");
 export interface PublicDashboardApiParams {
+  province_id?: number;
+  kabkota_id?: number;
   country?: string;
   scope?: string;
   year?: number;
@@ -1345,8 +1347,9 @@ export function withDefaultDashboardParams(
 function applyDashboardParams(filters?: PublicDashboardApiParams) {
   const merged = withDefaultDashboardParams(filters);
   const params = new URLSearchParams();
-  params.set("country", merged.country || "ASEAN");
-  if (merged.scope) params.set("scope", merged.scope);
+  // SKDR: Indonesia only; area filter = province + kab/kota (no country/region scope).
+  if (filters?.province_id) params.set("province_id", String(filters.province_id));
+  if (filters?.kabkota_id) params.set("kabkota_id", String(filters.kabkota_id));
   if (merged.year) params.set("year", String(merged.year));
   if (merged.source && merged.source !== "all") params.set("source", merged.source);
   if (merged.disease && merged.disease !== "all") params.set("disease", merged.disease);
