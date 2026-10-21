@@ -1,0 +1,992 @@
+{
+ "source": "tracker.xlsx sheet \"Form PE Antraks - Spesifikasi\"",
+ "rows": [
+  {
+   "row": 2,
+   "Section": "Judul Form: \nFormulir Penyelidikan Epidemiologi (PE) Antraks\nSistem Kewaspadaan Dini dan Respon (SKDR)"
+  },
+  {
+   "row": 3,
+   "Section": "Page 1: \nIdentitas"
+  },
+  {
+   "row": 4,
+   "Section": "A. Status Laporan",
+   "Field": "Status Laporan",
+   "Field type": "Dropdown",
+   "Variabel/field": "Suspek Antraks, Probabel Antraks, Konfirmasi Antraks",
+   "Status Variabel": "Sebagian ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No",
+   "Rekomendasi": "-Klasifikasi harus mengikuti definisi kasus juknis dan dihitung sistem; 'Konfirmasi' wajib ada lab positif.\n -Tambah 'Klasifikasi akhir kasus' setelah bagian lab."
+  },
+  {
+   "row": 5,
+   "Section": "A. Status Laporan",
+   "Subsection": "Cluster",
+   "Field": "Apakah laporan berkaitan dengan rumor KLB/wabah atau kasus serupa lainnya?",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ya, Tidak, Tidak tahu",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Ya\" then unhide \"Tanggal rumor\" and Lokasi Rumor",
+   "Rekomendasi": "Tanggal rumor = titik deteksi pada 7-1-7; 7-1-7 diukur per kejadian/klaster, bukan per PE."
+  },
+  {
+   "row": 6,
+   "Section": "A. Status Laporan",
+   "Subsection": "Cluster",
+   "Field": "Apakah laporan berkaitan dengan rumor KLB/wabah atau kasus serupa lainnya?",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal Rumor",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (jika dimunculkan)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nHanya munculkan jika \"berkaitan dengan rumor KLB/Wabah\" = \"Ya\""
+  },
+  {
+   "row": 7,
+   "Section": "A. Status Laporan",
+   "Subsection": "Cluster",
+   "Field": "Apakah laporan berkaitan dengan rumor KLB/wabah atau kasus serupa lainnya?",
+   "Field type": "Free text",
+   "Variabel/field": "Lokasi Rumor",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Required (jika dimunculkan)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nHanya munculkan jika berkaitan dengan rumor KLB/Wabah = \"Ya\""
+  },
+  {
+   "row": 8,
+   "Section": "A. Status Laporan",
+   "Subsection": "Cluster",
+   "Field": "Link dengan kasus/KLB serupa di SKDR",
+   "Field type": "Dropdown",
+   "Variabel/field": "Link to cluster (?)",
+   "Field requirement status": "Optional",
+   "Rekomendasi": "-Tautan klaster penting untuk attack rate dan 7-1-7 per kejadian.\n -Wajib dipilih bila 'berkaitan dengan rumor KLB' = Ya."
+  },
+  {
+   "row": 9,
+   "Section": "B. Identitas Pelapor",
+   "Field": "No PE",
+   "Field type": "Auto-generated",
+   "Variabel/field": "No. PE",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 10,
+   "Section": "B. Identitas Pelapor & Laporan",
+   "Field": "Tanggal Laporan",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal Terima Laporan",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "Tanggal Terima Laporan >= Tanggal rumor",
+   "Apply conditional visibility": "No",
+   "Hasil Review (Reconstra)": "-Format tanggal mm/dd/yyyy; tanggal bisa diisi melebihi hari ini.\n -Bila tanggal laporan terisi otomatis tanggal input, indikator notifikasi/respons 7-1-7 mengukur keterlambatan entri, bukan notifikasi.",
+   "Rekomendasi": "Jangan auto-fill (atau beri label 'ubah sesuai tanggal laporan diterima'); validasi ≥ Tgl Rumor dan ≤ hari ini."
+  },
+  {
+   "row": 11,
+   "Section": "B. Identitas Pelapor & Laporan",
+   "Field": "Tanggal PE",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal PE",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "- Auo-fill tgl laporan dengan tanggal hari ini. \n- Tgl PE tidak boleh lebih awal dari tanggal mulai sakit atau tgl mulai berobat atau tanggal rumor",
+   "Apply conditional visibility": "No",
+   "Hasil Review (Reconstra)": "-Tanggal PE terisi otomatis hari ini, padahal PE bisa dilakukan sebelum input; perlu formula selisih dengan tanggal mulai sakit/berobat/rumor.\n -Belum ada aturan Tgl PE ≥ Tgl Laporan, padahal Denominator indikator respons mensyaratkannya.",
+   "Rekomendasi": "-Selisih negatif harus ditolak di form, bukan dibuang diam-diam di dashboard.\n -Tambah aturan lintas field Tgl PE ≥ Tgl Laporan; batasi ≤ hari ini."
+  },
+  {
+   "row": 12,
+   "Section": "B. Identitas Pelapor & Laporan",
+   "Field": "Link No. EBS",
+   "Field type": "Dropdown",
+   "Variabel/field": "Link No. EBS",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No",
+   "Hasil Review (Reconstra)": "Link EBS wajib, padahal banyak PE berasal dari fasyankes tanpa sinyal EBS.",
+   "Rekomendasi": "Jadikan opsional atau tambah opsi 'Tidak berasal dari EBS'."
+  },
+  {
+   "row": 13,
+   "Section": "B. Identitas Pelapor & Laporan",
+   "Field": "Nama Petugas PE",
+   "Field type": "Free text",
+   "Variabel/field": "Nama Petugas PE",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 14,
+   "Section": "B. Identitas Pelapor & Laporan",
+   "Field": "Telp Petugas",
+   "Field type": "Free text",
+   "Variabel/field": "Telp Petugas",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 15,
+   "Section": "B. Identitas Pelapor & Laporan",
+   "Field": "Jabatan Petugas",
+   "Field type": "Dropdown",
+   "Variabel/field": "Petugas Surveilans, Epidemiolog, Dokter, Perawat, Bidan, Admin, Sanitarian/Kesling, Lainnya",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If Lainnya, then add new field, free text. Field heading \"Jika lainnya, sebutkan\""
+  },
+  {
+   "row": 16,
+   "Section": "C. Wilayah Unit Pelapor",
+   "Field": "Provinsi",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Provinsi",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 17,
+   "Section": "C. Wilayah Unit Pelapor",
+   "Field": "Kab/Kota",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Kab/Kota",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 18,
+   "Section": "C. Wilayah Unit Pelapor",
+   "Field": "Kecamatan",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Kecamatan",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 19,
+   "Section": "C. Wilayah Unit Pelapor",
+   "Field": "Unit Pelapor",
+   "Field type": "Dropdown",
+   "Variabel/field": "List faskes sesuai master sarana",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No"
+  },
+  {
+   "row": 20,
+   "Section": "D. Identitas Pasien",
+   "Field": "No. Epid",
+   "Field type": "Free text",
+   "Variabel/field": "No Epid",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "11 digits",
+   "Hasil Review (Reconstra)": "Hanya dicek 11 digit; '00000000000' lolos.",
+   "Rekomendasi": "Tolak digit seragam; idealnya No. Epid dibuat otomatis oleh sistem."
+  },
+  {
+   "row": 21,
+   "Section": "D. Identitas Pasien",
+   "Field": "Nama Pasien",
+   "Field type": "Free text",
+   "Variabel/field": "Nama Pasien",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 22,
+   "Section": "D. Identitas Pasien",
+   "Field": "Nama Orang Tua / KK",
+   "Field type": "Free text",
+   "Variabel/field": "Nama Orang Tua / KK",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 23,
+   "Section": "D. Identitas Pasien",
+   "Field": "NIK",
+   "Field type": "Free text",
+   "Variabel/field": "NIK",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "16 digits, numeric.",
+   "Hasil Review (Reconstra)": "-NIK berisi 0 sebanyak 16 digit masih bisa lanjut.\n -16 digit angka 0 masih lolos.",
+   "Rekomendasi": "-NIK adalah kunci deduplikasi kasus (satu orang = satu kasus); NIK fiktif membuat jumlah kasus berlebih.\n -Tolak digit seragam; cek 2 digit kode provinsi; cocokkan digit 7-12 dengan Tanggal Lahir (perempuan +40)."
+  },
+  {
+   "row": 24,
+   "Section": "D. Identitas Pasien",
+   "Field": "Jenis Kelamin",
+   "Field type": "Dropdown",
+   "Variabel/field": "Laki-laki, Perempuan",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 25,
+   "Section": "D. Identitas Pasien",
+   "Field": "Tanggal Lahir",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal Lahir",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Hasil Review (Reconstra)": "Belum ada aturan Tgl Lahir ≤ Tgl Mulai Sakit di sebagian form",
+   "Rekomendasi": "Validasi ≤ hari ini dan ≤ tanggal mulai sakit; peringatan bila umur > 100 tahun."
+  },
+  {
+   "row": 26,
+   "Section": "D. Identitas Pasien",
+   "Field": "Umur (Tahun)",
+   "Field type": "Auto-generated",
+   "Variabel/field": "Umur (Tahun)",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "Auto-calculate berdasarkan Tanggal Lahir dan today's date. Simpan sebagai static value"
+  },
+  {
+   "row": 27,
+   "Section": "D. Identitas Pasien",
+   "Field": "Umur (Bulan)",
+   "Field type": "Auto-generated",
+   "Variabel/field": "Umur (Bulan)",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "Auto-calculate berdasarkan Tanggal Lahir dan today's date. Simpan sebagai static value"
+  },
+  {
+   "row": 28,
+   "Section": "D. Identitas Pasien",
+   "Field": "Umur (Hari)",
+   "Field type": "Auto-generated",
+   "Variabel/field": "Umur (Hari)",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "Auto-calculate berdasarkan Tanggal Lahir dan today's date. Simpan sebagai static value"
+  },
+  {
+   "row": 29,
+   "Section": "D. Identitas Pasien",
+   "Field": "Alamat Domisili Pasien",
+   "Field type": "Free text",
+   "Variabel/field": "Alamat Domisili Pasien",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 30,
+   "Section": "D. Identitas Pasien",
+   "Field": "Provinsi Domisili Pasien",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Provinsi",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 31,
+   "Section": "D. Identitas Pasien",
+   "Field": "Kab/Kota Domisili Pasien",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Kab/Kota",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 32,
+   "Section": "D. Identitas Pasien",
+   "Field": "Kecamatan Domisili Pasien",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Kecamatan",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 33,
+   "Section": "D. Identitas Pasien",
+   "Field": "Kelurahan/Desa",
+   "Field type": "Dropdown",
+   "Variabel/field": "List Kelurahan/desa",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 34,
+   "Section": "D. Identitas Pasien",
+   "Field": "Tlp/HP Pasien",
+   "Field type": "Free text",
+   "Variabel/field": "Tlp/HP Pasien",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional",
+   "Validation Logic": "11-13 digits, numeric"
+  },
+  {
+   "row": 35,
+   "Section": "D. Identitas Pasien",
+   "Field": "Pekerjaan pasien",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Belum/tidak bekerja\n2. Peternak (sapi, kambing, domba, kuda, babi), \n3. Petugas pemotong hewan/Pekerja Rumah Pemotong Hewan (RPH), \n4. Petani/penggarap lahan, \n5. Pekerja Pengolah Kulit/Wool/Tulang, \n6. Pedagang di Pasar Hewan, \n7. Veterenarian\n8. Petugas Laboratorium\n9. Pekerja RS/Puskesmas/Klinik, \n10. Lainnya",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 36,
+   "Section": "D. Identitas Pasien",
+   "Field": "Alamat Tempat Kerja",
+   "Field type": "Free text",
+   "Variabel/field": "Alamat Tempat Kerja",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 37,
+   "Section": "D. Identitas Pasien",
+   "Field": "Nama Kerabat/Teman yang Dapat Dihubungi",
+   "Field type": "Free text",
+   "Variabel/field": "Nama Saudara Dekat yang Dapat Dihubungi",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 38,
+   "Section": "D. Identitas Pasien",
+   "Field": "Nomor Kontak Keluarga/Saudara/ Kerabat/Teman Pasien yang dapat dihubungi",
+   "Field type": "Free text",
+   "Variabel/field": "No Telp Kontak Darurat",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 39,
+   "Section": "End on page 1:\nAdd button: Next/halaman berikutnya (auto save), Simpan, Keluar (auto save)"
+  },
+  {
+   "row": 40,
+   "Section": "Page 2: Klinis Pasien"
+  },
+  {
+   "row": 41,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Tanggal Mulai Sakit/Bergejala",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal Mulai Sakit/Bergejala",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 42,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Keluhan Umum",
+   "Field type": "Multiple selection/Checklist",
+   "Variabel/field": "1. Demam\n2. Sakit Kepala\n3. Lemas\n4. Nyeri otot/mialgia\n5. Lainnya",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 43,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Keluhan Kelainan Kulit",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Keluhan Kelainan Kulit\" = \"Ya\" then, unhide \"Gejala Kelainan Kulit\" and \"Lokasi Kelainan Kulit\" tepat dibawahnya berurutan"
+  },
+  {
+   "row": 44,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Keluhan Kelainan Kulit",
+   "Field type": "Multiple selection/Checklist",
+   "Variabel/field": "1. Ruam disertai bintik merah\n2.Ruam disertai versikel\n3 Ruam disertai versikel hemoragik\n4. Rasa gatal\n5. Rasa sakit pada kelainan kulit\n6. Ruam disertai ulkus hemoragik\n7. Bengkak\n8. Escar\n9. Lainnya",
+   "Status Variabel": "Sudah ada di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes"
+  },
+  {
+   "row": 45,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Lokasi Kelainan Kulit",
+   "Field type": "Multiple selection/Checklist",
+   "Variabel/field": "1. Tangan kanan\n2. Tangan Kiri\n3. Lengan tangan kanan\n4. Lengan tangan kiri\n5. Kaki kanan\n6. Kaki kiri\n7. Tungkai kaki kanan\n8. Tungkai kaki kiri\n9. Bahu kanan\n10. Bahu kiri\n11. Leher\n12. Muka\n13. Telinga kanan\n14. Telinga kiri\n15. Lainnya",
+   "Status Variabel": "Sebagian ada di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes"
+  },
+  {
+   "row": 46,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Keluhan gangguan pencernaan",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "if \"Keluhan gangguan pencernaan \" = \"ya\" then unhide \"Gejala gangguan saluran cerna\" tepat dibawahnya"
+  },
+  {
+   "row": 47,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Gejala Gangguan Saluran Cerna",
+   "Field type": "Multiple selection/Checklist",
+   "Variabel/field": "1. Sakit perut hebat\n2. Konstipasi\n3. Mual\n4. Muntah\n5. Muntah darah\n6. Berak darah\n7. Anoreksia\n8. Lainnya",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 48,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Keluhan Gangguan Saluran Pernapasan",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Keluhan Gangguan Saluran Pernapasan\" = \"Ya\" then unhide \"Gejala Gangguan Saluran Pernapasan\""
+  },
+  {
+   "row": 49,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Gejala dan Tanda Sakit",
+   "Field": "Gejala Gangguan Saluran Pernapasan:",
+   "Field type": "Multiple selection/Checklist",
+   "Variabel/field": "1. Batuk tidak berdahak\n2. Batuk berdahak\n3. Sesak nafa\n4. Keluhan gangguan selaput otak\n5. Sakit kelapa hebat\n6. Kaku kuduk\n7. Lainnya",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly unhide if \"Keluhan Gangguan Saluran Pernapasan\" = \"Ya\""
+  },
+  {
+   "row": 50,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Tanggal berobat",
+   "Field": "Tanggal berobat",
+   "Field type": "Date",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "Tanggal berobat' >= 'Tanggal Mulai Sakit/Bergejala'"
+  },
+  {
+   "row": 51,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Rawat Inap",
+   "Field": "Apakah dirawat inap?",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ya, Tidak",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Ya\" then show \n1. Apakah dirawat inap?\n2. Nama RS/Puskesmas/Klinik\n3. Tanggal masuk rawat inap\n4. Tanggal keluar rawat inap"
+  },
+  {
+   "row": 52,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Rawat Inap",
+   "Field": "Nama RS/Puskesmas/Klinik",
+   "Field type": "Dropdown",
+   "Variabel/field": "List master facility",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: hide\nOnly show if \"Apakah dirawat inap?\" = \"Ya\""
+  },
+  {
+   "row": 53,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Rawat Inap",
+   "Field": "Tanggal masuk rawat inap",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal masuk rawat inap",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: hide\nOnly show if \"Apakah dirawat inap?\" = \"Ya\""
+  },
+  {
+   "row": 54,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Rawat Inap",
+   "Field": "Tanggal keluar rawat inap",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal masuk rawat inap",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: hide\nOnly show if \"Apakah dirawat inap?\" = \"Ya\"",
+   "Hasil Review (Reconstra)": "Tidak ada validasi Tgl Keluar ≥ Tgl Masuk ≥ Tgl Mulai Sakit.\n Kolom Variabel tertulis 'Tanggal masuk rawat inap' (salah salin)."
+  },
+  {
+   "row": 55,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Dianosis",
+   "Field": "Diagnosis awal",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Antraks Kulit (Cutaneous Anthrax)\n2. Antraks Saluran Cerna (Gastrointestinal Anthrax)\n3. Antraks Saluran Nafas (Inhalational Anthrax)\n4. Antraks Injeksi (Injection anthrax)\n5. Lainnya",
+   "Status Variabel": "Sebagian ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Lainnya\", then add new field, free text. Field heading \"Jika lainnya, sebutkan\""
+  },
+  {
+   "row": 56,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Apakah diperiksa lab?",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ya, tidak",
+   "Status Variabel": "Ada",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Ya\" then show:\n1. Nama Laboratorium\n2. Jenis pemeriksaan laboratorium\n3. Jenis spesimen\n4. Tanggal ambil spesimen\n5. Tanggal kirim spesimen\n6. Hasil pemeriksaan lab"
+  },
+  {
+   "row": 57,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Nama Laboratorium",
+   "Field type": "Dropdown",
+   "Variabel/field": "List nama lab",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly show if \"Apakah diperiksa lab?\" = \"ya\"",
+   "Tampilan": "Buat format tabel horizontal berulang (repeatable table): \n1. Semua kolom (Nama Lab, Jenis Pemeriksaan, Jenis Spesimen, Tanggal, dan Hasil) berjejer rapi ke samping dalam satu baris. Satu baris mewakili satu data pemeriksaan lengkap.\n2. Tombol hapus per baris: Di ujung kanan setiap baris data, langsung pasang ikon \"trash bin\" yang di bawahnya ada tulisan \"Hapus\"\n2. Di bagian bawah tabel, buat dua tombol utama yang diletakkan berjejer ke samping (side-by-side), yaitu tombol \"+ Tambah Pemeriksaan Lab\" untuk menambah baris baru, dan tombol \"[icon trash bin] Hapus Semua\"untuk mengosongkan tabel jika ada kesalahan input."
+  },
+  {
+   "row": 58,
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Jenis pemeriksaan laboratorium",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Elisa\n2. PCR\n3. Kultur",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly show if \"Apakah diperiksa lab?\" = \"ya\""
+  },
+  {
+   "row": 59,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Jenis spesimen",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Serum\n2. Swab Eskar\n3. Kulit\n4. Sputum\n5. Sebirospinal\n6. Sites",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly show if \"Apakah diperiksa lab?\" = \"ya\""
+  },
+  {
+   "row": 60,
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Tanggal ambil spesimen",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal ambil spesimen",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional",
+   "Validation Logic": "Tanggal ambil < = tanggal kirim",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly show if \"Apakah diperiksa lab?\" = \"ya\"",
+   "Hasil Review (Reconstra)": "Tgl ambil dicek ≥ Tgl Mulai Sakit"
+  },
+  {
+   "row": 61,
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Tanggal kirim spesimen",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal kirim spesimen",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional",
+   "Validation Logic": "Tanggal kirim > = tanggal ambil",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly show if \"Apakah diperiksa lab?\" = \"ya\""
+  },
+  {
+   "row": 62,
+   "Subsection": "Pemeriksaan Laboratorium",
+   "Field": "Hasil pemeriksaan lab",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Terdeteksi \n2. Tidak Terdeteksi\n3. Ditemukan Bakteri\n4. Tidak Ditemukan Bakteri\n5. Reaktif \n6. Non-Reaktif",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly show if \"Apakah diperiksa lab?\" = \"ya\"\n\nDropdown condition:\n1. If \"Jenis pemeriksaan laboratorium\" = \"PCR\" -> Munculkan: Terdeteksi / Tidak Terdeteksi\n2. If \"Jenis pemeriksaan laboratorium\" = \"Kultur\" -> Munculkan: Ditemukan Bakteri / Tidak Ditemukan Bakteri\n3. If \"Jenis pemeriksaan laboratorium\" = \"ELISA\" -> Munculkan: Reaktif / Non-Reaktif"
+  },
+  {
+   "row": 63,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Dianosis",
+   "Field": "Diagnosis akhir",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Antraks Kulit (Cutaneous Anthrax)\n2. Antraks Saluran Cerna (Gastrointestinal Anthrax)\n3. Antraks Saluran Nafas (Inhalational Anthrax)\n4. Antraks Injeksi (Injection anthrax)\n5. Lainnya",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Lainnya\", then add new field, free text. Field heading \"Jika lainnya, sebutkan\"",
+   "Hasil Review (Reconstra)": "Diagnosis akhir wajib saat PE padahal sering belum final; tambah 'Belum dapat ditentukan'"
+  },
+  {
+   "row": 64,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Tata Laksana Kasus",
+   "Field": "Apakah Diberikan Antibiotik",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ya, Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "if \"Apakah Diberikan Antibiotik\" = \"ya\" then unhide \"Jenis Antibiotik yang Diberikan\""
+  },
+  {
+   "row": 65,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Tata Laksana Kasus",
+   "Field": "Jenis Antibiotik yang Diberikan",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ciprofloxacin, Doxycycline, Amoxicillin/ jenis penisilin lainnya",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default visibility: always hide\nonly unhide if \"Apakah Diberikan Antibiotik\" = \"ya\"\n\nIf \"lainnya\", add free text field"
+  },
+  {
+   "row": 66,
+   "Section": "E. Informasi Klinis Pasien",
+   "Subsection": "Keterangan",
+   "Field": "Keterangan klinis lainnya",
+   "Field type": "Free text",
+   "Variabel/field": "Keterangan klinis lainnya",
+   "Field requirement status": "Optional",
+   "Validation Logic": "N/A",
+   "Apply conditional visibility": "No",
+   "Conditional visibility": "N/A"
+  },
+  {
+   "row": 67,
+   "Section": "End on page 2:\nAdd button: Next/halaman berikutnya (auto save), Simpan, Keluar (auto save)"
+  },
+  {
+   "row": 68,
+   "Section": "Page 3: Riwayat Pajanan dan Faktor Risiko"
+  },
+  {
+   "row": 69,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Hewan",
+   "Field": "Apakah ada hewan yang sakit/mati mendadak disekitar pasien?",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ya/ Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Hasil Review (Reconstra)": "perlu membedakan 'hewan sakit di sekitar' (paparan lingkungan) dan 'kontak langsung'."
+  },
+  {
+   "row": 70,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Hewan",
+   "Field": "Kontak dengan hewan yang sakit/mati mendadak",
+   "Field type": "Dropdown",
+   "Variabel/field": "Ya/Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Kontak dengan hewan yang sakit/mati mendadak\" = \"Ya\" then unhide:\n1. Tanggal kontak dengan faktor risiko\n2. Lokasi Kejadian\n3. Aktifitas kontak"
+  },
+  {
+   "row": 71,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Hewan",
+   "Field": "Tanggal kontak dengan faktor risiko",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal kontak dengan faktor risiko",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default visibility: Hide\nOnly unhide if \"Kontak dengan hewan yang sakit/mati mendadak\" = \"Ya\"",
+   "Rekomendasi": "harus ≤ Tgl Mulai Sakit.\n Wajib bila kontak = Ya; tambah tanggal awal & akhir."
+  },
+  {
+   "row": 72,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Hewan",
+   "Field": "Lokasi Kejadian",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Rumah\n2. Peternakan\n3. Pasar hewan\n4. Sawah/kebun\n5. Sungai/danau\n6. Hutan\n7. Tempat kerja\n8. Lainnya",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default visibility: Hide\nOnly unhide if \"Kontak dengan hewan yang sakit/mati mendadak\" = \"Ya\"",
+   "Rekomendasi": "Wajib bila kontak = Ya"
+  },
+  {
+   "row": 73,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Hewan",
+   "Field": "Aktifitas kontak",
+   "Field type": "Multiple selection/cheklist",
+   "Variabel/field": "1. Menyembelih/ memotong\n2. Mengolah\n3. Konsumsi\n4. Mengubur\n5. Lainnya",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Optional",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default visibility: Hide\nOnly unhide if \"Kontak dengan hewan yang sakit/mati mendadak\" = \"Ya\"",
+   "Rekomendasi": "Wajib bila kontak = Ya"
+  },
+  {
+   "row": 74,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Orang Penderita Antraks",
+   "Field": "Apakah ada saudara/kerabat/teman/tetangga yang memiliki gejala sama?",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Conditional visibility": "If \"Apakah ada saudara/kerabat/teman/tetangga yang memiliki gejala sama?\" = \"Ya\" then unhide: \n1. Nama\n2. Hubungan dengan pasien/penderita\n3. Tanggal kontak \n4. Status",
+   "Tampilan": "Buat format tabel horizontal berulang (repeatable table): \n1. Semua kolom (nama, hubungan dengan pasien/penderita, tanggal kontak, status) berjejer rapi ke samping dalam satu baris. Satu baris mewakili satu data pemeriksaan lengkap.\n2. Tombol hapus per baris: Di ujung kanan setiap baris data, langsung pasang ikon \"trash bin\" yang di bawahnya ada tulisan \"Hapus\"\n2. Di bagian bawah tabel, buat dua tombol utama yang diletakkan berjejer ke samping (side-by-side), yaitu tombol \"+ Tambah Pemeriksaan Lab\" untuk menambah baris baru, dan tombol \"[icon trash bin] Hapus Semua\"untuk mengosongkan tabel jika ada kesalahan input."
+  },
+  {
+   "row": 75,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Orang Penderita Antraks",
+   "Field": "Nama",
+   "Field type": "Free text",
+   "Variabel/field": "Nama",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 76,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Orang Penderita Antraks",
+   "Field": "Hubungan dengan pasien/penderita",
+   "Field type": "Free text",
+   "Variabel/field": "Hubungan dengan pasien/penderita",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 77,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Orang Penderita Antraks",
+   "Field": "Tanggal kontak",
+   "Field type": "Date",
+   "Variabel/field": "Tanggal kontak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 78,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Riwayat Kontak Dengan Orang Penderita Antraks",
+   "Field": "Status",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Suspek Antraks\n2. Probabel Antraks\n3. Konfirmasi Antraks\n4.Tidak tahu",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional"
+  },
+  {
+   "row": 79,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Perilaku)",
+   "Field": "Kontak dengan produk hewan (daging, kulit, tanduk, tulang)",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 80,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Perilaku)",
+   "Field": "Kontak dengan pupuk kandang",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 81,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Perilaku)",
+   "Field": "Mengolah tanah/bercocok tanam di daerah yang pernah ada kasus kematian hewan mendadak",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 82,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Perilaku)",
+   "Field": "Pernah menunjungi atau tinggal di daerah yang banyak kasus kematian hewan mendadak  (dalam 14 hari terakhir)",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Tambah di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Hasil Review (Reconstra)": "Jendela waktu tidak konsisten: judul '2 minggu sebelum sakit', pertanyaan '14 hari terakhir', form PE lapangan '7 hari'.",
+   "Rekomendasi": "Seragamkan dan nyatakan titik acuan (sebelum tanggal mulai sakit)."
+  },
+  {
+   "row": 83,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Lingkungan)",
+   "Field": "Apakah dilakukan pemeriksaan lingkungan",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Apakah dilakukan pemeriksaan lingkungan\" = \"Ya\" then unhide:\n1. Ada hewan piaraan di rumah (kambing/sapi/kuda/dll)\n2. Ada peternakan hewan di sekitar rumah\n3. Ada pasar hewan di sekitar rumah"
+  },
+  {
+   "row": 84,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Lingkungan)",
+   "Field": "Ada hewan piaraan di rumah (kambing/sapi/kuda/dll)",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly unhide if \"Apakah dilakukan pemeriksaan lingkungan\" = \"Ya\""
+  },
+  {
+   "row": 85,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Lingkungan)",
+   "Field": "Ada peternakan hewan di sekitar rumah",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly unhide if \"Apakah dilakukan pemeriksaan lingkungan\" = \"Ya\""
+  },
+  {
+   "row": 86,
+   "Section": "F. Riwayat Pajanan dan Faktor Risiko (2 Minggu sebelum sakit)",
+   "Subsection": "Faktor Risiko Lainnya (Lingkungan)",
+   "Field": "Ada pasar hewan di sekitar rumah",
+   "Field type": "Dropdown",
+   "Variabel/field": "1. Ya\n2. Tidak",
+   "Status Variabel": "Ada di SKDR",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default: Hide\nOnly unhide if \"Apakah dilakukan pemeriksaan lingkungan\" = \"Ya\""
+  },
+  {
+   "row": 87,
+   "Section": "End on page 3:\nAdd button: Next/halaman berikutnya (auto save), Simpan, Keluar (auto save)"
+  },
+  {
+   "row": 88,
+   "Section": "Page 4:  Kondisi akhir dan Keterangan Lainnya"
+  },
+  {
+   "row": 89,
+   "Section": "H. Kondisi akhir pasien dan Keterangan Lainnya",
+   "Subsection": "Kondisi akhir pasien",
+   "Field": "Bagaimana kondisi akhir pasien?",
+   "Field type": "Dropdown",
+   "Variabel/field": "Sembuh\nMeninggal\nTidak Diketahui",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "If \"Bagaimana kondisi akhir pasien?\" = \"ya\", then unhide \"Tanggal meninggal\""
+  },
+  {
+   "row": 90,
+   "Section": "H. Kondisi akhir pasien dan Keterangan Lainnya",
+   "Subsection": "Kondisi akhir pasien",
+   "Field": "Tanggal meninggal",
+   "Field type": "Date",
+   "Variabel/field": "Date",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Optional",
+   "Validation Logic": "Tanggal meninggal >= tanggal rumor >= tanggal laporan >= tanggal mulai bergejala >= tanggal ambil spesimen >= tanggal kirim spesimen",
+   "Apply conditional visibility": "Yes",
+   "Conditional visibility": "Default feasibility: Hide\nOnly show if \"Bagaimana kondisi akhir pasien?\" = \"ya\"",
+   "Hasil Review (Reconstra)": "Aturan 'Tgl meninggal ≥ tgl rumor ≥ tgl laporan ≥ ... ≥ tgl kirim spesimen' keliru: kematian sering memicu laporan, spesimen bisa post-mortem.",
+   "Rekomendasi": "Tgl Meninggal ≥ Tgl Mulai Sakit dan ≤ hari ini; wajib bila Meninggal"
+  },
+  {
+   "row": 91,
+   "Section": "H. Kondisi akhir pasien dan Keterangan Lainnya",
+   "Subsection": "Keterangan  Lainnya",
+   "Field": "Keterangan lainnya mengenai PE/kasus",
+   "Field type": "Free text",
+   "Variabel/field": "Silahkan tambah keterangan lain yang ingin disampaikan mengenai PE/kasus yang dilaporkan",
+   "Status Variabel": "Ada di SKDR"
+  },
+  {
+   "row": 92,
+   "Section": "End on page 4:\nAdd button: Next/halaman berikutnya (auto save), Simpan, Keluar (auto save)"
+  },
+  {
+   "row": 93,
+   "Section": "Page 5: Tim Penyelidikan Epidemiologi"
+  },
+  {
+   "row": 94,
+   "Section": "G. Tim Penyelidikan Epidemiologi",
+   "Subsection": "Anggota tim PE yang terlibat dalam penyelidikan",
+   "Field": "Nama",
+   "Field type": "Free text",
+   "Variabel/field": "Nama",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)",
+   "Tampilan": "Buat format tabel horizontal berulang (repeatable table): \n1. Semua kolom  berjejer rapi ke samping dalam satu baris. Satu baris mewakili satu data pemeriksaan lengkap.\n2. Tombol hapus per baris: Di ujung kanan setiap baris data, langsung pasang ikon \"trash bin\" yang di bawahnya ada tulisan \"Hapus\"\n2. Di bagian bawah tabel, buat dua tombol utama yang diletakkan berjejer ke samping (side-by-side), yaitu tombol \"+ Tambah\" untuk menambah baris baru, dan tombol \"[icon trash bin] Hapus Semua\"untuk mengosongkan tabel jika ada kesalahan input."
+  },
+  {
+   "row": 95,
+   "Section": "G. Tim Penyelidikan Epidemiologi",
+   "Subsection": "Anggota tim PE yang terlibat dalam penyelidikan",
+   "Field": "Instansi/kantor",
+   "Field type": "Free text",
+   "Variabel/field": "Instansi/kantor",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 96,
+   "Section": "G. Tim Penyelidikan Epidemiologi",
+   "Subsection": "Anggota tim PE yang terlibat dalam penyelidikan",
+   "Field": "Jabatan",
+   "Field type": "Free text",
+   "Variabel/field": "Jabatan",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 97,
+   "Section": "G. Tim Penyelidikan Epidemiologi",
+   "Subsection": "Anggota tim PE yang terlibat dalam penyelidikan",
+   "Field": "No. HP/kontak",
+   "Field type": "Free text",
+   "Variabel/field": "No. HP/kontak",
+   "Status Variabel": "Ada di SKDR",
+   "Field requirement status": "Required (nullable: false)"
+  },
+  {
+   "row": 98,
+   "Section": "End on page 5:\nAdd button: Simpan, Keluar (auto save)\nWhen successfull add message \"Terima kasih, laporan PE anda telah tersimpan di SKDR\""
+  }
+ ]
+}

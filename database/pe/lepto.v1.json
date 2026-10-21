@@ -1,0 +1,2429 @@
+{
+ "form_key": "lepto",
+ "disease_code": "LEPTOSPIROSIS",
+ "version": 1,
+ "no_pe_prefix": "PE-LEP",
+ "title": "Formulir Penyelidikan Epidemiologi (PE) Leptospirosis",
+ "source": "Tracker review SKDR, sheet \"Form PE Leptospirosis - Spesifi\" (docs/pe-spec/lepto.json)",
+ "age_reference": [
+  "tgl_mulai_sakit",
+  "tgl_laporan"
+ ],
+ "steps": [
+  {
+   "id": "p1",
+   "title": "Identitas Laporan, Pelaporan, dan Pasien",
+   "sections": [
+    {
+     "id": "A",
+     "title": "A. Status Laporan",
+     "fields": [
+      {
+       "key": "status_laporan",
+       "label": "Status Laporan",
+       "type": "select",
+       "row": 4,
+       "options": [
+        "Suspek Leptospirosis",
+        "Probable Leptospirosis",
+        "Konfirmasi Leptospirosis"
+       ],
+       "required": true,
+       "col": "status_laporan",
+       "warn": [
+        {
+         "when": {
+          "all": [
+           {
+            "f": "status_laporan",
+            "eq": "Konfirmasi Leptospirosis"
+           },
+           {
+            "not": {
+             "rows": "lab",
+             "any": {
+              "any": [
+               {
+                "all": [
+                 {
+                  "f": "jenis_pemeriksaan",
+                  "eq": "MAT (Microscopic Agglutination Test)"
+                 },
+                 {
+                  "f": "hasil",
+                  "eq": "Positif"
+                 }
+                ]
+               },
+               {
+                "all": [
+                 {
+                  "f": "jenis_pemeriksaan",
+                  "eq": "PCR"
+                 },
+                 {
+                  "f": "hasil",
+                  "eq": "Terdeteksi"
+                 }
+                ]
+               },
+               {
+                "all": [
+                 {
+                  "f": "jenis_pemeriksaan",
+                  "eq": "Kultur"
+                 },
+                 {
+                  "f": "hasil",
+                  "eq": "Tumbuh Leptospira"
+                 }
+                ]
+               }
+              ]
+             }
+            }
+           }
+          ]
+         },
+         "msg": "Status konfirmasi belum didukung hasil lab. Periksa kembali."
+        }
+       ]
+      },
+      {
+       "key": "rumor_terkait",
+       "label": "Apakah laporan berkaitan dengan rumor KLB/wabah atau kasus serupa lainnya?",
+       "type": "select",
+       "row": 5,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "tgl_rumor",
+       "label": "Tanggal Rumor",
+       "type": "date",
+       "row": 6,
+       "required": true,
+       "visible": {
+        "f": "rumor_terkait",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_rumor"
+      },
+      {
+       "key": "lokasi_rumor",
+       "label": "Lokasi Rumor",
+       "type": "text",
+       "row": 7,
+       "required": true,
+       "visible": {
+        "f": "rumor_terkait",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "cluster_id",
+       "label": "Link dengan kasus/KLB serupa di SKDR",
+       "type": "cluster",
+       "row": 8,
+       "required": false,
+       "col": "cluster_id"
+      }
+     ]
+    },
+    {
+     "id": "B",
+     "title": "B. Identitas Pelapor & Laporan",
+     "fields": [
+      {
+       "key": "no_pe",
+       "label": "No. PE",
+       "type": "auto",
+       "row": 9,
+       "required": true,
+       "derive": {
+        "fn": "no_pe"
+       }
+      },
+      {
+       "key": "tgl_laporan",
+       "label": "Tanggal Laporan",
+       "type": "date",
+       "row": 10,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_rumor"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_laporan",
+       "hint": "Isi sesuai tanggal laporan diterima (tidak terisi otomatis)."
+      },
+      {
+       "key": "tgl_pe",
+       "label": "Tanggal PE",
+       "type": "date",
+       "row": 11,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_pertama_berobat"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_rumor"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_pe"
+      },
+      {
+       "key": "ebs_link",
+       "label": "Link No. EBS",
+       "type": "ebs",
+       "row": 12,
+       "required": true,
+       "col": "ebs_link"
+      },
+      {
+       "key": "petugas_nama",
+       "label": "Nama Petugas PE",
+       "type": "text",
+       "row": 13,
+       "required": true
+      },
+      {
+       "key": "petugas_telp",
+       "label": "Telp Petugas",
+       "type": "text",
+       "row": 14,
+       "required": true,
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      },
+      {
+       "key": "petugas_jabatan",
+       "label": "Jabatan Petugas",
+       "type": "select",
+       "row": 15,
+       "options": [
+        "Petugas Surveilans",
+        "Epidemiolog",
+        "Dokter",
+        "Perawat",
+        "Bidan",
+        "Admin",
+        "Sanitarian/Kesling",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "petugas_jabatan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    },
+    {
+     "id": "C",
+     "title": "C. Wilayah Unit Pelapor",
+     "fields": [
+      {
+       "key": "lapor_provinsi",
+       "label": "Provinsi",
+       "type": "province",
+       "row": 16,
+       "required": true,
+       "col": "province_id"
+      },
+      {
+       "key": "lapor_kabkota",
+       "label": "Kab/Kota",
+       "type": "kabkota",
+       "row": 17,
+       "required": true,
+       "depends": "lapor_provinsi",
+       "col": "kabkota_id"
+      },
+      {
+       "key": "lapor_kecamatan",
+       "label": "Kecamatan",
+       "type": "text",
+       "row": 18,
+       "required": true
+      },
+      {
+       "key": "unit_pelapor",
+       "label": "Unit Pelapor",
+       "type": "text",
+       "row": 19,
+       "required": true,
+       "hint": "Master sarana belum tersedia; isi nama faskes."
+      }
+     ]
+    },
+    {
+     "id": "D",
+     "title": "D. Identitas Pasien",
+     "fields": [
+      {
+       "key": "no_epid",
+       "label": "No Epid",
+       "type": "text",
+       "row": 20,
+       "required": true,
+       "format": "digits",
+       "minLen": 11,
+       "maxLen": 11
+      },
+      {
+       "key": "nama_pasien",
+       "label": "Nama Pasien",
+       "type": "text",
+       "row": 21,
+       "required": true,
+       "col": "patient_name"
+      },
+      {
+       "key": "nama_ortu",
+       "label": "Nama Orang Tua / KK",
+       "type": "text",
+       "row": 22,
+       "required": false
+      },
+      {
+       "key": "nik",
+       "label": "NIK",
+       "type": "text",
+       "row": 23,
+       "required": true,
+       "col": "nik",
+       "format": "digits",
+       "minLen": 16,
+       "maxLen": 16
+      },
+      {
+       "key": "jenis_kelamin",
+       "label": "Jenis Kelamin",
+       "type": "select",
+       "row": 24,
+       "options": [
+        "Laki-laki",
+        "Perempuan"
+       ],
+       "required": true,
+       "col": "sex"
+      },
+      {
+       "key": "tgl_lahir",
+       "label": "Tanggal Lahir",
+       "type": "date",
+       "row": 25,
+       "required": true,
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "today"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_mulai_sakit"
+        }
+       ]
+      },
+      {
+       "key": "umur_tahun",
+       "label": "Umur (Tahun)",
+       "type": "auto",
+       "row": 26,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "years"
+       },
+       "col": "age_years",
+       "hint": "Dihitung dari Tanggal Lahir sampai Tanggal Mulai Sakit (atau Tanggal Laporan), disimpan statis."
+      },
+      {
+       "key": "umur_bulan",
+       "label": "Umur (Bulan)",
+       "type": "auto",
+       "row": 27,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "months"
+       }
+      },
+      {
+       "key": "umur_hari",
+       "label": "Umur (Hari)",
+       "type": "auto",
+       "row": 28,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "days"
+       }
+      },
+      {
+       "key": "alamat",
+       "label": "Alamat Domisili Pasien",
+       "type": "textarea",
+       "row": 29,
+       "required": true
+      },
+      {
+       "key": "dom_provinsi",
+       "label": "Provinsi Domisili Pasien",
+       "type": "province",
+       "row": 30,
+       "required": true
+      },
+      {
+       "key": "dom_kabkota",
+       "label": "Kab/Kota Domisili Pasien",
+       "type": "kabkota",
+       "row": 31,
+       "required": true,
+       "depends": "dom_provinsi"
+      },
+      {
+       "key": "dom_kecamatan",
+       "label": "Kecamatan Domisili Pasien",
+       "type": "text",
+       "row": 32,
+       "required": true
+      },
+      {
+       "key": "dom_kelurahan",
+       "label": "Kelurahan/Desa",
+       "type": "text",
+       "row": 33,
+       "required": true
+      },
+      {
+       "key": "telp_pasien",
+       "label": "Tlp/HP Pasien",
+       "type": "text",
+       "row": 34,
+       "required": false,
+       "format": "digits",
+       "minLen": 11,
+       "maxLen": 13
+      },
+      {
+       "key": "pekerjaan",
+       "label": "Pekerjaan pasien",
+       "type": "select",
+       "row": 35,
+       "options": [
+        "Belum/tidak bekerja",
+        "Petani/pekerja sawah/kebun",
+        "Peternak",
+        "Pekerja rumah potong hewan",
+        "Veterinarian (dokter hewan/paramedik veteriner)",
+        "Petugas laboratorium",
+        "Petugas kebersihan/sampah/sanitasi",
+        "Pekerja saluran air/selokan",
+        "Nelayan/pekerja tambak",
+        "Penambang",
+        "Buruh/pekerja konstruksi",
+        "TNI/Polri",
+        "Pekerja RS/Puskesmas/Klinik",
+        "Karyawan/pekerja swasta",
+        "Pedagang",
+        "Ibu rumah tangga",
+        "Pelajar/mahasiswa",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "pekerjaan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "alamat_kerja",
+       "label": "Alamat Tempat Kerja",
+       "type": "text",
+       "row": 36,
+       "required": false
+      },
+      {
+       "key": "kerabat_nama",
+       "label": "Nama Saudara Dekat yang Dapat Dihubungi",
+       "type": "text",
+       "row": 37,
+       "required": false
+      },
+      {
+       "key": "kerabat_telp",
+       "label": "No Telp Kontak Darurat",
+       "type": "text",
+       "row": 38,
+       "required": false,
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p2",
+   "title": "Klinis Pasien dan Pemeriksaan Laboratorium",
+   "sections": [
+    {
+     "id": "E",
+     "title": "E. Informasi Klinis Pasien",
+     "fields": [
+      {
+       "key": "tgl_mulai_sakit",
+       "label": "Tanggal mulai sakit (demam)",
+       "type": "date",
+       "row": 41,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_lahir"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "onset_date"
+      },
+      {
+       "key": "gejala_umum",
+       "label": "Gejala umum",
+       "type": "multiselect",
+       "row": 42,
+       "options": [
+        "Demam akut",
+        "Nyeri kepala",
+        "Mialgia (nyeri otot)",
+        "Nyeri betis",
+        "Malaise/lemah",
+        "Conjunctival suffusion (mata merah tanpa kotoran)",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "warn": [
+        {
+         "when": {
+          "all": [
+           {
+            "f": "gejala_umum",
+            "filled": true
+           },
+           {
+            "not": {
+             "f": "gejala_umum",
+             "has": "Demam akut"
+            }
+           }
+          ]
+         },
+         "msg": "Leptospirosis umumnya diawali demam akut. Periksa kembali."
+        }
+       ],
+       "other": {
+        "value": "Lainnya",
+        "key": "gejala_umum_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "tanda_berat",
+       "label": "Tanda berat/komplikasi",
+       "type": "multiselect",
+       "row": 43,
+       "options": [
+        "Jaundice/ikterik (kuning)",
+        "Batuk dengan darah",
+        "Batuk tanpa darah",
+        "Manifestasi perdarahan",
+        "Anuria/oliguria (tidak/sedikit kencing)",
+        "Aritmia jantung",
+        "Gagal ginjal",
+        "Tidak ada tanda berat",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "exclusive": "Tidak ada tanda berat",
+       "other": {
+        "value": "Lainnya",
+        "key": "tanda_berat_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "penunjang",
+       "label": "Apakah dilakukan pemeriksaan darah/urin rutin atau foto paru?",
+       "type": "select",
+       "row": 44,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "penunjang_tgl",
+       "label": "Tanggal pemeriksaan penunjang",
+       "type": "date",
+       "row": 45,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "leukosit",
+       "label": "Leukosit (sel/µL)",
+       "type": "number",
+       "row": 46,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 200000,
+       "decimals": 0
+      },
+      {
+       "key": "trombosit",
+       "label": "Trombosit terendah (sel/µL)",
+       "type": "number",
+       "row": 47,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 2000000,
+       "decimals": 0
+      },
+      {
+       "key": "bilirubin",
+       "label": "Bilirubin total (mg/dL)",
+       "type": "number",
+       "row": 48,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 60,
+       "decimals": 1
+      },
+      {
+       "key": "sgot",
+       "label": "SGOT tertinggi (U/L)",
+       "type": "number",
+       "row": 49,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 20000,
+       "decimals": 0
+      },
+      {
+       "key": "sgpt",
+       "label": "SGPT tertinggi (U/L)",
+       "type": "number",
+       "row": 50,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 20000,
+       "decimals": 0
+      },
+      {
+       "key": "kreatinin",
+       "label": "Kreatinin tertinggi (mg/dL)",
+       "type": "number",
+       "row": 51,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 30,
+       "decimals": 1
+      },
+      {
+       "key": "urinalisis",
+       "label": "Urinalisis",
+       "type": "select",
+       "row": 52,
+       "options": [
+        "Normal",
+        "Proteinuria",
+        "Hematuria",
+        "Proteinuria dan hematuria",
+        "Tidak dilakukan"
+       ],
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "foto_paru",
+       "label": "Foto paru",
+       "type": "select",
+       "row": 53,
+       "options": [
+        "Normal",
+        "Abnormal (infiltrat/perdarahan paru)",
+        "Tidak dilakukan"
+       ],
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "berobat",
+       "label": "Apakah pasien sudah berobat ke fasyankes?",
+       "type": "select",
+       "row": 54,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "riwayat_berobat",
+       "type": "table",
+       "label": "Riwayat Berobat",
+       "visible": {
+        "f": "berobat",
+        "eq": "Ya"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "fasyankes",
+         "label": "Nama fasyankes",
+         "type": "text",
+         "row": 55,
+         "required": true,
+         "hint": "Master fasilitas belum tersedia; isi nama fasyankes."
+        },
+        {
+         "key": "jenis_perawatan",
+         "label": "Jenis perawatan",
+         "type": "select",
+         "row": 56,
+         "options": [
+          "Rawat jalan",
+          "Rawat inap"
+         ],
+         "required": true
+        },
+        {
+         "key": "tgl_masuk",
+         "label": "Tanggal masuk/berobat",
+         "type": "date",
+         "row": 57,
+         "required": true,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_mulai_sakit"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "tgl_keluar",
+         "label": "Tanggal keluar",
+         "type": "date",
+         "row": 58,
+         "required": false,
+         "visible": {
+          "f": "jenis_perawatan",
+          "eq": "Rawat inap"
+         },
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_masuk"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "key": "tgl_pertama_berobat",
+       "label": "Tanggal pertama berobat",
+       "type": "auto",
+       "row": 59,
+       "required": true,
+       "visible": {
+        "f": "berobat",
+        "eq": "Ya"
+       },
+       "derive": {
+        "fn": "min_date",
+        "table": "riwayat_berobat",
+        "col": "tgl_masuk"
+       },
+       "col": "first_visit_date"
+      },
+      {
+       "key": "antibiotik",
+       "label": "Apakah diberikan antibiotik?",
+       "type": "select",
+       "row": 60,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "antibiotik_jenis",
+       "label": "Jenis antibiotik",
+       "type": "multiselect",
+       "row": 61,
+       "options": [
+        "Doksisiklin",
+        "Amoksisilin",
+        "Ampisilin",
+        "Penisilin G",
+        "Seftriakson",
+        "Azitromisin",
+        "Lainnya"
+       ],
+       "required": true,
+       "visible": {
+        "f": "antibiotik",
+        "eq": "Ya"
+       },
+       "minSelect": 1,
+       "other": {
+        "value": "Lainnya",
+        "key": "antibiotik_jenis_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "antibiotik_tgl",
+       "label": "Tanggal mulai antibiotik",
+       "type": "date",
+       "row": 62,
+       "required": false,
+       "visible": {
+        "f": "antibiotik",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "ket_klinis",
+       "label": "Keterangan klinis lainnya",
+       "type": "textarea",
+       "row": 63,
+       "required": false
+      }
+     ]
+    },
+    {
+     "id": "F",
+     "title": "F. Pemeriksaan Laboratorium",
+     "fields": [
+      {
+       "key": "spesimen",
+       "label": "Apakah diambil spesimen untuk pemeriksaan leptospirosis?",
+       "type": "select",
+       "row": 64,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "lab",
+       "type": "table",
+       "label": "Pemeriksaan Laboratorium",
+       "visible": {
+        "f": "spesimen",
+        "eq": "Ya"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "jenis_spesimen",
+         "label": "Jenis spesimen",
+         "type": "select",
+         "row": 65,
+         "options": [
+          "Serum darah",
+          "Darah utuh (whole blood)",
+          "Urine",
+          "Lainnya"
+         ],
+         "required": true,
+         "other": {
+          "value": "Lainnya",
+          "key": "jenis_spesimen_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        },
+        {
+         "key": "nomor_spesimen",
+         "label": "Nomor spesimen",
+         "type": "text",
+         "row": 66,
+         "required": false
+        },
+        {
+         "key": "lab_nama",
+         "label": "Laboratorium pemeriksa",
+         "type": "text",
+         "row": 67,
+         "required": false
+        },
+        {
+         "key": "tgl_ambil",
+         "label": "Tanggal ambil spesimen",
+         "type": "date",
+         "row": 68,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_mulai_sakit"
+          },
+          {
+           "op": "<=",
+           "ref": "tgl_kirim"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "tgl_kirim",
+         "label": "Tanggal kirim spesimen",
+         "type": "date",
+         "row": 69,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_ambil"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "jenis_pemeriksaan",
+         "label": "Jenis pemeriksaan",
+         "type": "select",
+         "row": 70,
+         "options": [
+          "RDT IgM",
+          "ELISA IgM",
+          "MAT (Microscopic Agglutination Test)",
+          "PCR",
+          "Kultur",
+          "Lainnya"
+         ],
+         "required": false,
+         "optionsIf": [
+          {
+           "when": {
+            "f": "jenis_spesimen",
+            "eq": "Serum darah"
+           },
+           "options": [
+            "RDT IgM",
+            "ELISA IgM",
+            "MAT (Microscopic Agglutination Test)",
+            "PCR",
+            "Lainnya"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_spesimen",
+            "in": [
+             "Darah utuh (whole blood)",
+             "Urine"
+            ]
+           },
+           "options": [
+            "PCR",
+            "Kultur",
+            "Lainnya"
+           ]
+          }
+         ],
+         "other": {
+          "value": "Lainnya",
+          "key": "jenis_pemeriksaan_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        },
+        {
+         "key": "tgl_hasil",
+         "label": "Tanggal hasil",
+         "type": "date",
+         "row": 71,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_kirim"
+          },
+          {
+           "op": ">=",
+           "ref": "tgl_ambil"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ],
+         "requiredIf": {
+          "all": [
+           {
+            "f": "hasil",
+            "filled": true
+           },
+           {
+            "not": {
+             "f": "hasil",
+             "eq": "Belum keluar (pending)"
+            }
+           }
+          ]
+         }
+        },
+        {
+         "key": "hasil",
+         "label": "Hasil pemeriksaan",
+         "type": "select",
+         "row": 72,
+         "options": [
+          "Positif",
+          "Negatif",
+          "Indeterminate",
+          "Terdeteksi",
+          "Tidak terdeteksi",
+          "Tumbuh Leptospira",
+          "Tidak tumbuh",
+          "Belum keluar (pending)"
+         ],
+         "required": false,
+         "optionsIf": [
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "in": [
+             "RDT IgM",
+             "ELISA IgM"
+            ]
+           },
+           "options": [
+            "Positif",
+            "Negatif",
+            "Indeterminate",
+            "Belum keluar (pending)"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "eq": "MAT (Microscopic Agglutination Test)"
+           },
+           "options": [
+            "Positif",
+            "Negatif",
+            "Belum keluar (pending)"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "eq": "PCR"
+           },
+           "options": [
+            "Terdeteksi",
+            "Tidak terdeteksi",
+            "Belum keluar (pending)"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "eq": "Kultur"
+           },
+           "options": [
+            "Tumbuh Leptospira",
+            "Tidak tumbuh",
+            "Belum keluar (pending)"
+           ]
+          }
+         ]
+        },
+        {
+         "key": "titer_mat",
+         "label": "Titer MAT",
+         "type": "select",
+         "row": 73,
+         "options": [
+          "1:20",
+          "1:40",
+          "1:80",
+          "1:160",
+          "1:320",
+          "1:640",
+          "1:1280",
+          "1:2560",
+          "≥1:5120"
+         ],
+         "required": false,
+         "visible": {
+          "all": [
+           {
+            "f": "jenis_pemeriksaan",
+            "eq": "MAT (Microscopic Agglutination Test)"
+           },
+           {
+            "f": "hasil",
+            "eq": "Positif"
+           }
+          ]
+         }
+        },
+        {
+         "key": "serovar",
+         "label": "Serovar",
+         "type": "text",
+         "row": 74,
+         "required": false,
+         "visible": {
+          "all": [
+           {
+            "f": "jenis_pemeriksaan",
+            "eq": "MAT (Microscopic Agglutination Test)"
+           },
+           {
+            "f": "hasil",
+            "eq": "Positif"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p3",
+   "title": "Kondisi Lingkungan dan Riwayat Kontak",
+   "sections": [
+    {
+     "id": "G",
+     "title": "G. Kondisi Lingkungan Rumah",
+     "fields": [
+      {
+       "key": "kasus_serupa",
+       "label": "Apakah di lingkungan sekitar ada yang sakit seperti yang dialami pasien?",
+       "type": "select",
+       "row": 77,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "kasus_serupa_tgl",
+       "label": "Kapan orang tersebut mulai sakit (perkiraan)?",
+       "type": "date",
+       "row": 78,
+       "required": false,
+       "visible": {
+        "f": "kasus_serupa",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "kasus_serupa_list",
+       "type": "table",
+       "label": "Penderita dengan gejala sama",
+       "visible": {
+        "f": "kasus_serupa",
+        "eq": "Ya"
+       },
+       "minRows": 1,
+       "required": true,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama dan kepala keluarga",
+         "type": "text",
+         "row": 79,
+         "required": true
+        },
+        {
+         "key": "umur",
+         "label": "Umur (tahun)",
+         "type": "number",
+         "row": 80,
+         "required": false,
+         "min": 0,
+         "max": 120,
+         "decimals": 0
+        },
+        {
+         "key": "jenis_kelamin",
+         "label": "Jenis kelamin",
+         "type": "select",
+         "row": 81,
+         "options": [
+          "Laki-laki",
+          "Perempuan"
+         ],
+         "required": false
+        },
+        {
+         "key": "pekerjaan",
+         "label": "Pekerjaan",
+         "type": "select",
+         "row": 82,
+         "options": [
+          "Belum/tidak bekerja",
+          "Petani/pekerja sawah/kebun",
+          "Peternak",
+          "Pekerja rumah potong hewan",
+          "Veterinarian (dokter hewan/paramedik veteriner)",
+          "Petugas laboratorium",
+          "Petugas kebersihan/sampah/sanitasi",
+          "Pekerja saluran air/selokan",
+          "Nelayan/pekerja tambak",
+          "Penambang",
+          "Buruh/pekerja konstruksi",
+          "TNI/Polri",
+          "Pekerja RS/Puskesmas/Klinik",
+          "Karyawan/pekerja swasta",
+          "Pedagang",
+          "Ibu rumah tangga",
+          "Pelajar/mahasiswa",
+          "Lainnya"
+         ],
+         "required": false
+        },
+        {
+         "key": "alamat",
+         "label": "Alamat",
+         "type": "text",
+         "row": 83,
+         "required": false
+        },
+        {
+         "key": "tgl_spesimen",
+         "label": "Tanggal ambil spesimen",
+         "type": "date",
+         "row": 84,
+         "required": false,
+         "rules": [
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "status",
+         "label": "Status",
+         "type": "select",
+         "row": 85,
+         "options": [
+          "Bukan kasus",
+          "Suspek",
+          "Probable",
+          "Konfirmasi",
+          "Tidak tahu"
+         ],
+         "required": false
+        }
+       ]
+      },
+      {
+       "key": "banjir",
+       "label": "Dua minggu sebelum sakit, apakah di rumah dan lingkungan sekitar terjadi banjir/banyak genangan air?",
+       "type": "select",
+       "row": 86,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "banjir_lama",
+       "label": "Berapa lama terjadi banjir/genangan (hari)?",
+       "type": "number",
+       "row": 87,
+       "required": true,
+       "visible": {
+        "f": "banjir",
+        "eq": "Ya"
+       },
+       "min": 1,
+       "max": 60,
+       "decimals": 0
+      },
+      {
+       "key": "saluran_air",
+       "label": "Apakah di sekitar rumah ada parit/selokan/kolam, dan bagaimana kondisinya?",
+       "type": "select",
+       "row": 88,
+       "options": [
+        "Buruk (sering meluap, tergenang, ada tikus, jarak ke rumah < 2 meter)",
+        "Baik (air mengalir lancar, tidak meluap, tidak ada tikus, jarak ≥ 2 meter)",
+        "Tidak ada parit/selokan/kolam"
+       ],
+       "required": true
+      },
+      {
+       "key": "tikus_rumah",
+       "label": "Apakah di rumah sering melihat tikus atau tanda keberadaan tikus?",
+       "type": "select",
+       "row": 89,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "hewan_rumah",
+       "label": "Apakah di rumah mempunyai binatang peliharaan/ternak?",
+       "type": "select",
+       "row": 90,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "hewan_jenis",
+       "label": "Jenis binatang peliharaan/ternak",
+       "type": "multiselect",
+       "row": 91,
+       "options": [
+        "Anjing",
+        "Kucing",
+        "Sapi",
+        "Kambing/domba",
+        "Babi",
+        "Unggas",
+        "Lainnya"
+       ],
+       "required": true,
+       "visible": {
+        "f": "hewan_rumah",
+        "eq": "Ya"
+       },
+       "minSelect": 1,
+       "other": {
+        "value": "Lainnya",
+        "key": "hewan_jenis_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    },
+    {
+     "id": "H",
+     "title": "H. Riwayat Kontak Faktor Risiko (2 minggu sebelum sakit)",
+     "fields": [
+      {
+       "key": "kunjungan",
+       "label": "Apakah dua minggu sebelum sakit pernah berkunjung ke hutan/sawah/kebun?",
+       "type": "select",
+       "row": 92,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kerja_genangan",
+       "label": "Apakah menuju ke tempat kerja/sekolah ada kontak dengan genangan air/banjir?",
+       "type": "select",
+       "row": 93,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kerja_tikus",
+       "label": "Apakah di tempat kerja/sekolah biasa melihat tikus/tanda-tanda kehidupan tikus?",
+       "type": "select",
+       "row": 94,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kerja_hewan",
+       "label": "Hewan apa yang sering ditemui di tempat kerja/sekolah?",
+       "type": "multiselect",
+       "row": 95,
+       "options": [
+        "Tikus",
+        "Anjing",
+        "Kucing",
+        "Sapi",
+        "Kambing/domba",
+        "Babi",
+        "Tidak ada",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "exclusive": "Tidak ada",
+       "other": {
+        "value": "Lainnya",
+        "key": "kerja_hewan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p4",
+   "title": "Kebiasaan Responden",
+   "sections": [
+    {
+     "id": "I",
+     "title": "I. Kebiasaan Responden (2 minggu sebelum sakit)",
+     "fields": [
+      {
+       "key": "got",
+       "label": "Membersihkan got/selokan/kolam",
+       "type": "select",
+       "row": 98,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "got_apd",
+       "label": "Memakai APD saat membersihkan got/selokan/kolam?",
+       "type": "select",
+       "row": 99,
+       "options": [
+        "Selalu",
+        "Kadang-kadang",
+        "Tidak pernah"
+       ],
+       "required": true,
+       "visible": {
+        "f": "got",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "sawah",
+       "label": "Pergi ke sawah/kebun/membersihkan saluran irigasi",
+       "type": "select",
+       "row": 100,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "sawah_apd",
+       "label": "Memakai APD saat di sawah/kebun/irigasi?",
+       "type": "select",
+       "row": 101,
+       "options": [
+        "Selalu",
+        "Kadang-kadang",
+        "Tidak pernah"
+       ],
+       "required": true,
+       "visible": {
+        "f": "sawah",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "genangan",
+       "label": "Kontak dengan genangan air/banjir",
+       "type": "select",
+       "row": 102,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "genangan_apd",
+       "label": "Memakai APD saat kontak genangan air/banjir?",
+       "type": "select",
+       "row": 103,
+       "options": [
+        "Selalu",
+        "Kadang-kadang",
+        "Tidak pernah"
+       ],
+       "required": true,
+       "visible": {
+        "f": "genangan",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "cuci_sungai",
+       "label": "Mencuci pakaian/alat makan di sungai",
+       "type": "select",
+       "row": 104,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "mandi_sungai",
+       "label": "Mandi/berenang di sungai",
+       "type": "select",
+       "row": 105,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "cari_sungai",
+       "label": "Mencari pasir/katak/ikan di sungai",
+       "type": "select",
+       "row": 106,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kontak_tikus",
+       "label": "Kontak dengan tikus (hidup/mati) atau kotorannya",
+       "type": "select",
+       "row": 107,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kontak_tikus_apd",
+       "label": "Memakai APD saat kontak tersebut?",
+       "type": "select",
+       "row": 109,
+       "options": [
+        "Selalu",
+        "Kadang-kadang",
+        "Tidak pernah"
+       ],
+       "required": true,
+       "visible": {
+        "f": "kontak_tikus",
+        "eq": "Ya"
+       },
+       "hint": "APD untuk: Kontak dengan tikus (hidup/mati) atau kotorannya"
+      },
+      {
+       "key": "kontak_hewan",
+       "label": "Bekerja di sawah/kebun dan kontak dengan hewan yang mungkin tertular (sapi, anjing, kucing, babi, dll)",
+       "type": "select",
+       "row": 108,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kontak_hewan_apd",
+       "label": "Memakai APD saat kontak tersebut?",
+       "type": "select",
+       "row": 109,
+       "options": [
+        "Selalu",
+        "Kadang-kadang",
+        "Tidak pernah"
+       ],
+       "required": true,
+       "visible": {
+        "f": "kontak_hewan",
+        "eq": "Ya"
+       },
+       "hint": "APD untuk: Bekerja di sawah/kebun dan kontak dengan hewan yang mungkin tertular (sapi, anjing, kucing, babi, dll)"
+      },
+      {
+       "key": "cuci_badan",
+       "label": "Apakah mencuci kaki, tangan, dan anggota badan setelah bekerja atau dari tempat tercemar (sawah, kebun, sampah, selokan, genangan air)?",
+       "type": "select",
+       "row": 110,
+       "options": [
+        "Selalu",
+        "Kadang-kadang",
+        "Tidak pernah"
+       ],
+       "required": true
+      },
+      {
+       "key": "cuci_sabun",
+       "label": "Apakah mencuci dengan sabun/desinfektan?",
+       "type": "select",
+       "row": 111,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true,
+       "visible": {
+        "f": "cuci_badan",
+        "in": [
+         "Selalu",
+         "Kadang-kadang"
+        ]
+       }
+      },
+      {
+       "key": "luka",
+       "label": "Apakah mempunyai goresan/lecet di kulit/bagian tubuh?",
+       "type": "select",
+       "row": 112,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "luka_rawat",
+       "label": "Bagaimana perawatan luka tersebut?",
+       "type": "select",
+       "row": 113,
+       "options": [
+        "Dibersihkan dan ditutup plester kedap air",
+        "Dibersihkan dan ditutup plester biasa",
+        "Dibersihkan dan tidak ditutup",
+        "Tidak dirawat sama sekali"
+       ],
+       "required": true,
+       "visible": {
+        "f": "luka",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "simpan_mentah",
+       "label": "Apakah di rumah mempunyai simpanan bahan makanan mentah (beras, ketela, jagung, dll)?",
+       "type": "select",
+       "row": 114,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "simpan_mentah_tempat",
+       "label": "Di mana disimpan bahan makanan mentah?",
+       "type": "select",
+       "row": 115,
+       "options": [
+        "Diletakkan di tempat terbuka",
+        "Diletakkan dalam keadaan tertutup"
+       ],
+       "required": true,
+       "visible": {
+        "f": "simpan_mentah",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "simpan_saji",
+       "label": "Di mana rumah tangga menyimpan makanan yang siap disajikan?",
+       "type": "select",
+       "row": 116,
+       "options": [
+        "Di atas meja tanpa ditutup",
+        "Di atas meja selalu ditutup",
+        "Di lemari dengan penutup",
+        "Di lemari tanpa penutup"
+       ],
+       "required": true
+      },
+      {
+       "key": "kendali_tikus",
+       "label": "Apakah pernah melakukan tindakan pengendalian tikus?",
+       "type": "select",
+       "row": 117,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kendali_tikus_jenis",
+       "label": "Tindakan pengendalian tikus yang dilakukan",
+       "type": "multiselect",
+       "row": 118,
+       "options": [
+        "Perangkap tikus",
+        "Racun tikus",
+        "Memelihara kucing",
+        "Membersihkan sarang/tempat persembunyian tikus",
+        "Menutup lubang/akses masuk tikus",
+        "Lainnya"
+       ],
+       "required": true,
+       "visible": {
+        "f": "kendali_tikus",
+        "eq": "Ya"
+       },
+       "minSelect": 1,
+       "other": {
+        "value": "Lainnya",
+        "key": "kendali_tikus_jenis_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p5",
+   "title": "Pemantauan Leptospirosis di Daerah KLB/Bencana",
+   "sections": [
+    {
+     "id": "J",
+     "title": "J. Pemantauan Leptospirosis di Daerah KLB/Bencana",
+     "fields": [
+      {
+       "key": "pe_klb",
+       "label": "Apakah PE ini dilakukan di daerah KLB atau bencana (misalnya banjir)?",
+       "type": "select",
+       "row": 121,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "pe_klb_info",
+       "type": "info",
+       "label": "Bagian ini tidak perlu diisi",
+       "visible": {
+        "f": "pe_klb",
+        "eq": "Tidak"
+       }
+      },
+      {
+       "key": "klb_cluster",
+       "type": "cluster_monitoring",
+       "label": "Pemantauan KLB/bencana (diisi sekali per klaster)",
+       "visible": {
+        "f": "pe_klb",
+        "eq": "Ya"
+       },
+       "hint": "Angka N1–N9 adalah data agregat populasi; disimpan pada klaster yang ditautkan di bagian A agar tidak terhitung ganda.",
+       "required": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p6",
+   "title": "Kondisi akhir pasien dan Keterangan Lainnya",
+   "sections": [
+    {
+     "id": "K",
+     "title": "K. Kondisi akhir pasien dan Keterangan Lainnya",
+     "fields": [
+      {
+       "key": "kondisi_akhir",
+       "label": "Bagaimana kondisi akhir pasien?",
+       "type": "select",
+       "row": 134,
+       "options": [
+        "Sembuh",
+        "Meninggal",
+        "Tidak Diketahui"
+       ],
+       "required": true,
+       "col": "outcome"
+      },
+      {
+       "key": "tgl_meninggal",
+       "label": "Tanggal meninggal",
+       "type": "date",
+       "row": 135,
+       "required": true,
+       "visible": {
+        "f": "kondisi_akhir",
+        "eq": "Meninggal"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_lahir"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "death_date"
+      },
+      {
+       "key": "keterangan_lain",
+       "label": "Keterangan lainnya mengenai PE/kasus",
+       "type": "textarea",
+       "row": 136,
+       "required": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p7",
+   "title": "Tim Penyelidikan Epidemiologi",
+   "sections": [
+    {
+     "id": "L",
+     "title": "L. Tim Penyelidikan Epidemiologi",
+     "fields": [
+      {
+       "key": "tim_pe",
+       "type": "table",
+       "label": "Anggota tim PE yang terlibat dalam penyelidikan",
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama",
+         "type": "text",
+         "row": 139,
+         "required": true
+        },
+        {
+         "key": "instansi",
+         "label": "Instansi/kantor",
+         "type": "text",
+         "row": 140,
+         "required": true
+        },
+        {
+         "key": "jabatan",
+         "label": "Jabatan",
+         "type": "text",
+         "row": 141,
+         "required": true
+        },
+        {
+         "key": "hp",
+         "label": "No. HP/kontak",
+         "type": "text",
+         "row": 142,
+         "required": true,
+         "format": "digits",
+         "minLen": 10,
+         "maxLen": 13
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "cluster_fields": [
+  {
+   "key": "periode_mulai",
+   "label": "Tanggal mulai pemantauan",
+   "type": "date",
+   "row": 122,
+   "required": true,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "today"
+    }
+   ]
+  },
+  {
+   "key": "periode_akhir",
+   "label": "Tanggal akhir pemantauan",
+   "type": "date",
+   "row": 122,
+   "required": true,
+   "rules": [
+    {
+     "op": ">=",
+     "ref": "periode_mulai"
+    },
+    {
+     "op": "<=",
+     "ref": "today"
+    }
+   ]
+  },
+  {
+   "key": "n1",
+   "label": "N1. Jumlah karyawan/penduduk dalam satu kawasan epidemiologi wabah (populasi berisiko)",
+   "type": "number",
+   "row": 123,
+   "required": true,
+   "min": 1,
+   "decimals": 0
+  },
+  {
+   "key": "n2",
+   "label": "N2. Jumlah orang kontak erat dengan rodent atau hewan penular lain",
+   "type": "number",
+   "row": 124,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "n1"
+    }
+   ]
+  },
+  {
+   "key": "n3",
+   "label": "N3. Jumlah orang kontak erat banjir yang dipantau kesehatannya",
+   "type": "number",
+   "row": 125,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "n1"
+    }
+   ]
+  },
+  {
+   "key": "n4",
+   "label": "N4. Jumlah orang kontak erat banjir yang sakit demam",
+   "type": "number",
+   "row": 126,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "n3"
+    }
+   ]
+  },
+  {
+   "key": "n5",
+   "label": "N5. Jumlah orang kontak erat banjir yang diperiksa darah rutin (leukosit, trombosit, neutrofil, bilirubin/amilase) dan urin (proteinuria/hematuria)",
+   "type": "number",
+   "row": 127,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "n3"
+    }
+   ]
+  },
+  {
+   "key": "n6",
+   "label": "N6. Jumlah orang kontak erat banjir dengan leukositosis",
+   "type": "number",
+   "row": 128,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "n5"
+    }
+   ]
+  },
+  {
+   "key": "n7",
+   "label": "N7. Jumlah orang kontak erat dengan demam yang diambil darah/serum",
+   "type": "number",
+   "row": 129,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "rules": [
+    {
+     "op": "<=",
+     "ref": "n4"
+    }
+   ]
+  },
+  {
+   "key": "n8",
+   "label": "N8. Jumlah orang kontak erat banjir dengan RDT (+)",
+   "type": "number",
+   "row": 130,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "sumLe": {
+    "fields": [
+     "n8",
+     "n9"
+    ],
+    "ref": "n7"
+   }
+  },
+  {
+   "key": "n9",
+   "label": "N9. Jumlah orang kontak erat banjir dengan RDT (-)",
+   "type": "number",
+   "row": 131,
+   "required": false,
+   "min": 0,
+   "decimals": 0,
+   "sumLe": {
+    "fields": [
+     "n8",
+     "n9"
+    ],
+    "ref": "n7"
+   }
+  }
+ ],
+ "classification": {
+  "needs": [
+   {
+    "f": "gejala_umum",
+    "filled": true
+   }
+  ],
+  "rules": [
+   {
+    "code": "konfirmasi",
+    "label": "Konfirmasi Leptospirosis",
+    "when": {
+     "rows": "lab",
+     "any": {
+      "any": [
+       {
+        "all": [
+         {
+          "f": "jenis_pemeriksaan",
+          "eq": "MAT (Microscopic Agglutination Test)"
+         },
+         {
+          "f": "hasil",
+          "eq": "Positif"
+         }
+        ]
+       },
+       {
+        "all": [
+         {
+          "f": "jenis_pemeriksaan",
+          "eq": "PCR"
+         },
+         {
+          "f": "hasil",
+          "eq": "Terdeteksi"
+         }
+        ]
+       },
+       {
+        "all": [
+         {
+          "f": "jenis_pemeriksaan",
+          "eq": "Kultur"
+         },
+         {
+          "f": "hasil",
+          "eq": "Tumbuh Leptospira"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "basis": "Hasil lab konfirmasi positif: MAT positif, PCR terdeteksi, atau kultur tumbuh Leptospira."
+   },
+   {
+    "code": "probable",
+    "label": "Probable Leptospirosis",
+    "when": {
+     "all": [
+      {
+       "all": [
+        {
+         "f": "gejala_umum",
+         "hasAny": [
+          "Demam akut",
+          "Nyeri kepala"
+         ]
+        },
+        {
+         "f": "gejala_umum",
+         "hasAny": [
+          "Mialgia (nyeri otot)",
+          "Malaise/lemah",
+          "Conjunctival suffusion (mata merah tanpa kotoran)"
+         ]
+        },
+        {
+         "any": [
+          {
+           "f": "banjir",
+           "eq": "Ya"
+          },
+          {
+           "f": "got",
+           "eq": "Ya"
+          },
+          {
+           "f": "sawah",
+           "eq": "Ya"
+          },
+          {
+           "f": "genangan",
+           "eq": "Ya"
+          },
+          {
+           "f": "cuci_sungai",
+           "eq": "Ya"
+          },
+          {
+           "f": "mandi_sungai",
+           "eq": "Ya"
+          },
+          {
+           "f": "cari_sungai",
+           "eq": "Ya"
+          },
+          {
+           "f": "kontak_tikus",
+           "eq": "Ya"
+          },
+          {
+           "f": "kontak_hewan",
+           "eq": "Ya"
+          },
+          {
+           "f": "kerja_genangan",
+           "eq": "Ya"
+          },
+          {
+           "f": "kerja_tikus",
+           "eq": "Ya"
+          },
+          {
+           "f": "tikus_rumah",
+           "eq": "Ya"
+          },
+          {
+           "f": "kunjungan",
+           "eq": "Ya"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "any": [
+        {
+         "count": [
+          {
+           "f": "gejala_umum",
+           "has": "Nyeri betis"
+          },
+          {
+           "f": "tanda_berat",
+           "has": "Jaundice/ikterik (kuning)"
+          },
+          {
+           "f": "tanda_berat",
+           "has": "Manifestasi perdarahan"
+          },
+          {
+           "f": "tanda_berat",
+           "has": "Batuk dengan darah"
+          },
+          {
+           "f": "tanda_berat",
+           "has": "Anuria/oliguria (tidak/sedikit kencing)"
+          },
+          {
+           "f": "tanda_berat",
+           "has": "Aritmia jantung"
+          }
+         ],
+         "gte": 2
+        },
+        {
+         "rows": "lab",
+         "any": {
+          "all": [
+           {
+            "f": "jenis_pemeriksaan",
+            "in": [
+             "RDT IgM",
+             "ELISA IgM"
+            ]
+           },
+           {
+            "f": "hasil",
+            "eq": "Positif"
+           }
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "basis": "Suspek + ≥2 gejala/tanda (nyeri betis, ikterik, perdarahan, batuk darah, anuria/oliguria, aritmia) atau RDT/ELISA IgM positif."
+   },
+   {
+    "code": "suspek",
+    "label": "Suspek Leptospirosis",
+    "when": {
+     "all": [
+      {
+       "f": "gejala_umum",
+       "hasAny": [
+        "Demam akut",
+        "Nyeri kepala"
+       ]
+      },
+      {
+       "f": "gejala_umum",
+       "hasAny": [
+        "Mialgia (nyeri otot)",
+        "Malaise/lemah",
+        "Conjunctival suffusion (mata merah tanpa kotoran)"
+       ]
+      },
+      {
+       "any": [
+        {
+         "f": "banjir",
+         "eq": "Ya"
+        },
+        {
+         "f": "got",
+         "eq": "Ya"
+        },
+        {
+         "f": "sawah",
+         "eq": "Ya"
+        },
+        {
+         "f": "genangan",
+         "eq": "Ya"
+        },
+        {
+         "f": "cuci_sungai",
+         "eq": "Ya"
+        },
+        {
+         "f": "mandi_sungai",
+         "eq": "Ya"
+        },
+        {
+         "f": "cari_sungai",
+         "eq": "Ya"
+        },
+        {
+         "f": "kontak_tikus",
+         "eq": "Ya"
+        },
+        {
+         "f": "kontak_hewan",
+         "eq": "Ya"
+        },
+        {
+         "f": "kerja_genangan",
+         "eq": "Ya"
+        },
+        {
+         "f": "kerja_tikus",
+         "eq": "Ya"
+        },
+        {
+         "f": "tikus_rumah",
+         "eq": "Ya"
+        },
+        {
+         "f": "kunjungan",
+         "eq": "Ya"
+        }
+       ]
+      }
+     ]
+    },
+    "basis": "Demam akut dan/atau nyeri kepala + mialgia/malaise/conjunctival suffusion + riwayat pajanan 2 minggu sebelum sakit."
+   }
+  ],
+  "fallback": {
+   "code": "tidak_memenuhi",
+   "label": "Tidak memenuhi definisi kasus"
+  },
+  "manual_field": "status_laporan",
+  "manual_map": {
+   "Suspek Leptospirosis": "suspek",
+   "Probable Leptospirosis": "probable",
+   "Konfirmasi Leptospirosis": "konfirmasi"
+  }
+ },
+ "finish_message": "Terima kasih, laporan PE anda telah tersimpan di SKDR"
+}

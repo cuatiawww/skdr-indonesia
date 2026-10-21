@@ -4,6 +4,8 @@ mod db;
 mod ebs;
 mod master;
 mod master_admin;
+mod pe;
+mod pe_engine;
 
 use axum::{http::StatusCode, routing::{get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -67,6 +69,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/admin/ebs/sync", post(ebs::sync_now))
         .route("/api/v1/admin/ebs/diagnosa", get(ebs::diagnosa_list))
         .route("/api/v1/admin/ebs/diagnosa/:id", put(ebs::diagnosa_map))
+        // PE forms (PR 006+): shared engine, config-driven schemas
+        .route("/api/v1/pe/forms", get(pe::forms))
+        .route("/api/v1/pe/forms/:key", get(pe::form))
+        .route("/api/v1/pe/cases", get(pe::cases).post(pe::case_create))
+        .route("/api/v1/pe/cases/:id", get(pe::case_get).put(pe::case_update))
+        .route("/api/v1/pe/cases/:id/status", post(pe::case_status))
+        .route("/api/v1/pe/cases/:id/classification", put(pe::case_classification))
+        .route("/api/v1/pe/clusters", get(pe::clusters).post(pe::cluster_create))
+        .route("/api/v1/pe/clusters/:id", put(pe::cluster_update))
+        .route("/api/v1/pe/ebs-search", get(pe::ebs_search))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
         // main dashboard (NLP shapes, form data only)
