@@ -2,12 +2,8 @@
 
 import { tr } from "@/lib/i18n/LanguageContext";
 import {
-  ChevronDown,
-  Home,
   LayoutDashboard,
   Menu,
-  Tv,
-  FileSpreadsheet,
   Settings as SettingsIcon,
   Users as UsersIcon,
   FileText,
@@ -48,14 +44,16 @@ export default function DashboardHeader({
     <header className="w-full border-b border-white/20 bg-[#102f78]">
       <div className="relative flex min-h-[118px] items-stretch overflow-visible bg-[#102f78]">
         {/* PR 014: neutral SKDR/Kemenkes gradient (old NLP header image removed) */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0b3a66] via-[#0060A9] to-[#00A3AD]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#061b50]/25 via-transparent to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-900 via-primary to-brand-500" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-900/25 via-transparent to-black/10" />
         <div className="relative grid w-full gap-5 px-4 py-4 md:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <button
+              type="button"
+              data-testid="nav-toggle"
               onClick={onToggleSidebar}
               aria-label={t("header.openMenu")}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/50 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white"
+              className="inline-flex h-11 w-11 shrink-0 lg:hidden items-center justify-center rounded-xl border border-white/50 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -99,8 +97,8 @@ export default function DashboardHeader({
                   href="/console/settings"
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                     pathname?.startsWith("/console/settings")
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                      ? "bg-primary text-white hover:bg-primary-dark"
+                      : "text-slate-700 hover:bg-white hover:text-primary"
                   }`}
                 >
                   <SettingsIcon className="h-4 w-4" />
@@ -110,8 +108,8 @@ export default function DashboardHeader({
                   href="/console/configuration-modul"
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                     pathname?.startsWith("/console/configuration-modul")
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                      ? "bg-primary text-white hover:bg-primary-dark"
+                      : "text-slate-700 hover:bg-white hover:text-primary"
                   }`}
                 >
                   <SlidersHorizontal className="h-4 w-4" />
@@ -121,8 +119,8 @@ export default function DashboardHeader({
                   href="/console/users"
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                     pathname?.startsWith("/console/users")
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                      ? "bg-primary text-white hover:bg-primary-dark"
+                      : "text-slate-700 hover:bg-white hover:text-primary"
                   }`}
                 >
                   <UsersIcon className="h-4 w-4" />
@@ -132,8 +130,8 @@ export default function DashboardHeader({
                   href="/reports/drafts"
                     className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                     pathname?.startsWith("/reports/drafts") || pathname?.startsWith("/reports/new") || pathname?.startsWith("/reports/edit")
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                      ? "bg-primary text-white hover:bg-primary-dark"
+                      : "text-slate-700 hover:bg-white hover:text-primary"
                   }`}
                 >
                   <FileText className="h-4 w-4" />
@@ -141,62 +139,13 @@ export default function DashboardHeader({
                 </Link>
                 <Link
                   href="/main-dashboard"
-                  className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-[#0060A9]"
+                  className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-primary"
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   {tr("skdr.layout.dashboardLink")}
                 </Link>
               </div>
-            ) : (
-              /* In Regular Dashboard Mode: Show Home, Main Dashboard, TV mode, and Reports */
-              <div className="hidden items-center rounded-2xl border border-white/45 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm sm:flex">
-                <Link
-                  href="/"
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    pathname === "/"
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
-                  }`}
-                >
-                  <Home className="h-4 w-4" />
-                  {t("header.home") || "HOME"}
-                </Link>
-                <Link
-                  href="/main-dashboard"
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    pathname?.startsWith("/main-dashboard")
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
-                  }`}
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  {t("header.mainDashboard") || "DASHBOARD"}
-                </Link>
-                <Link
-                  href="/tv"
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    pathname === "/tv"
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
-                  }`}
-                >
-                  <Tv className="h-4 w-4" />
-                  {t("header.tvMode")}
-                </Link>
-                {/* PR 012: legacy "Laporan Kasus" (/reports) hidden; header shortcut now opens the Penyakit pages. */}
-                <Link
-                  href="/penyakit"
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    pathname?.startsWith("/penyakit")
-                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
-                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
-                  }`}
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  {t("header.penyakit")}
-                </Link>
-              </div>
-            )}
+            ) : null}
 
             {/* SKDR: no login/logout yet; NLP user menu removed. */}
           </div>

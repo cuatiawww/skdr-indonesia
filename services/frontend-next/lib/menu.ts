@@ -99,6 +99,7 @@ export type SidebarSubItemConfig = {
   enabled: boolean
   targetRoles?: string[]
   badge?: string
+  description?: string
 }
 
 export type SidebarItemConfig = {
@@ -111,6 +112,9 @@ export type SidebarItemConfig = {
   enabled: boolean
   targetRoles?: string[]
   badge?: string
+  description?: string
+  /** PR 017: 'pe_forms' = sub-items generated from the PE form registry */
+  source?: string
   subItems?: SidebarSubItemConfig[]
 }
 
@@ -137,6 +141,8 @@ export type SidebarItem = {
   order?: number
   enabled?: boolean
   badge?: string
+  description?: string
+  source?: string
   subItems?: SidebarItem[]
 }
 
@@ -149,140 +155,123 @@ export type SidebarGroup = {
   items: SidebarItem[]
 }
 
-// PR 014: default (pre-settings) menu = the SKDR menu from app_settings.navigation_menu (migration 021),
-// so the first paint never shows the old NLP modules.
+// PR 017: default (pre-settings) menu = app_settings.navigation_menu from migration 028 (first paint only;
+// the DB value wins once settings load). Form PE sub-items per disease come from the PE form registry.
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   {
-    "id": "grp_surveillance",
+    "id": "grp_beranda",
+    "title": "Beranda",
+    "order": 1,
+    "enabled": true,
+    "items": [
+      {
+        "id": "mod_beranda",
+        "label": "Beranda",
+        "href": "/",
+        "icon": "Home",
+        "description": "Ringkasan situasi dan rilis data surveilans terkini",
+        "order": 1,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "id": "grp_dasbor",
+    "title": "Dasbor",
+    "order": 2,
+    "enabled": true,
     "items": [
       {
         "id": "mod_main_dashboard",
+        "label": "Dasbor Utama",
         "href": "/main-dashboard",
         "icon": "LayoutDashboard",
-        "label": "Dasbor Utama",
+        "description": "Indikator SKDR, peta sebaran, dan Kinerja 7-1-7",
         "order": 1,
         "enabled": true
       },
       {
         "id": "mod_penyakit",
+        "label": "Penyakit",
         "href": "/penyakit",
         "icon": "Stethoscope",
-        "label": "Penyakit",
+        "description": "Profil, tren, dan sebaran kasus per penyakit",
         "order": 2,
         "enabled": true
       },
       {
-        "id": "mod_ebs_sync",
-        "href": "/ebs",
-        "icon": "Radio",
-        "label": "Sinkronisasi EBS",
+        "id": "mod_tv",
+        "label": "Mode TV",
+        "href": "/tv",
+        "icon": "Tv",
+        "description": "Tampilan layar lebar ruang pemantauan (sedang dalam pengembangan)",
         "order": 3,
         "enabled": true
-      },
-      {
-        "id": "mod_dokumentasi",
-        "href": "/dokumentasi",
-        "icon": "BookText",
-        "label": "Dokumentasi",
-        "order": 5,
-        "enabled": true
       }
-    ],
-    "order": 1,
-    "title": "SURVEILANS",
-    "enabled": true
+    ]
   },
   {
-    "id": "grp_master_data",
-    "items": [
-      {
-        "id": "mod_master_data",
-        "href": "#",
-        "icon": "Database",
-        "label": "Master Data",
-        "order": 1,
-        "enabled": true,
-        "subItems": [
-          {
-            "id": "sub_master_provinsi",
-            "href": "/master/provinsi",
-            "icon": "Globe2",
-            "label": "Data Provinsi",
-            "order": 1,
-            "enabled": true
-          },
-          {
-            "id": "sub_master_kabupaten",
-            "href": "/master/kabupaten",
-            "icon": "MapPin",
-            "label": "Data Kabupaten/Kota",
-            "order": 2,
-            "enabled": true
-          },
-          {
-            "id": "sub_master_penyakit",
-            "href": "/master/penyakit",
-            "icon": "Stethoscope",
-            "label": "Data Penyakit",
-            "order": 3,
-            "enabled": true
-          }
-        ]
-      }
-    ],
+    "id": "grp_transaksi",
+    "title": "Transaksi",
     "order": 3,
-    "title": "MASTER DATA",
-    "enabled": true
-  },
-  {
-    "id": "grp_form_pe",
+    "enabled": true,
     "items": [
       {
         "id": "mod_form_pe",
+        "label": "Form PE",
         "href": "#",
         "icon": "FileText",
-        "label": "Form PE",
+        "description": "Formulir Penyelidikan Epidemiologi per penyakit",
+        "source": "pe_forms",
         "order": 1,
         "enabled": true,
         "subItems": [
           {
-            "id": "sub_pe_lepto",
-            "href": "/pe/lepto",
-            "icon": "Activity",
-            "label": "Leptospirosis",
-            "order": 1,
-            "enabled": true
-          },
-          {
-            "id": "sub_pe_rabies",
-            "href": "/pe/rabies",
-            "icon": "Bell",
-            "label": "Rabies/GHPR",
-            "order": 2,
-            "enabled": true
-          },
-          {
-            "id": "sub_pe_antraks",
-            "href": "/pe/antraks",
-            "icon": "Flame",
-            "label": "Antraks",
-            "order": 3,
-            "enabled": true
-          },
-          {
-            "id": "sub_pe_ai",
-            "href": "/pe/ai",
-            "icon": "Globe2",
-            "label": "Avian Influenza",
-            "order": 4,
+            "id": "sub_pe_daftar",
+            "label": "Daftar PE",
+            "href": "/pe",
+            "icon": "FileSpreadsheet",
+            "description": "Seluruh laporan PE lintas penyakit",
+            "order": 99,
             "enabled": true
           }
         ]
       }
-    ],
-    "order": 2,
-    "title": "FORM PE",
-    "enabled": true
+    ]
+  },
+  {
+    "id": "grp_integrasi",
+    "title": "Integrasi",
+    "order": 4,
+    "enabled": true,
+    "items": [
+      {
+        "id": "mod_ebs_sync",
+        "label": "Sinkronisasi EBS",
+        "href": "/ebs",
+        "icon": "Radio",
+        "description": "Penarikan dan pemantauan data sinyal EBS",
+        "order": 1,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "id": "grp_bantuan",
+    "title": "Lainnya",
+    "order": 5,
+    "enabled": true,
+    "items": [
+      {
+        "id": "mod_dokumentasi",
+        "label": "Dokumentasi",
+        "href": "/dokumentasi",
+        "icon": "BookText",
+        "description": "Panduan penggunaan, definisi indikator, dan sumber data",
+        "order": 1,
+        "enabled": true
+      }
+    ]
   }
 ]
 
@@ -305,6 +294,8 @@ export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): Side
           iconName: item.icon,
           href: item.href,
           badge: item.badge,
+          description: item.description,
+          source: item.source,
           subItems: item.subItems
             ?.filter((sub) => sub.enabled)
             .sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -316,6 +307,7 @@ export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): Side
               iconName: sub.icon,
               href: sub.href,
               badge: sub.badge,
+              description: sub.description,
             })),
         })),
     }))

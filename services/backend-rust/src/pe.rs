@@ -120,7 +120,7 @@ pub async fn cases(State(s): State<AppState>, Query(q): Query<CaseQuery>) -> Res
             "SELECT p.id, p.no_pe, p.status, COALESCE(p.classification_override, p.classification), p.classification_override IS NOT NULL,
                     p.patient_name, p.tgl_laporan::text, p.tgl_pe::text, p.onset_date::text, l.name, k.name, p.outcome,
                     to_char(p.updated_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI'), jsonb_array_length(p.errors), p.form_version,
-                    cl.code, count(*) OVER ()
+                    cl.code, count(*) OVER (), p.form_key
              FROM pe_cases p
              LEFT JOIN master_locations l ON l.id = p.province_id
              LEFT JOIN master_kabkota k ON k.id = p.kabkota_id
@@ -144,7 +144,7 @@ pub async fn cases(State(s): State<AppState>, Query(q): Query<CaseQuery>) -> Res
             "tgl_laporan": r.get::<_, Option<String>>(6), "tgl_pe": r.get::<_, Option<String>>(7), "onset_date": r.get::<_, Option<String>>(8),
             "province": r.get::<_, Option<String>>(9), "kabkota": r.get::<_, Option<String>>(10), "outcome": r.get::<_, Option<String>>(11),
             "updated_at": r.get::<_, Option<String>>(12), "error_count": r.get::<_, i32>(13), "form_version": r.get::<_, i32>(14),
-            "cluster_code": r.get::<_, Option<String>>(15),
+            "cluster_code": r.get::<_, Option<String>>(15), "form_key": r.get::<_, Option<String>>(17),
         }))
         .collect();
     // per-status counts for the list header

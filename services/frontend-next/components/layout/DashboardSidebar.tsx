@@ -1,266 +1,177 @@
 'use client'
-
+// PR 017: left sidebar with grouped navigation (Beranda, Dasbor, Transaksi, Integrasi, Bantuan & Dokumentasi).
+// Desktop (lg+): persistent, collapsible to icon-only (tooltips). Mobile: slide-in drawer.
 import { tr } from "@/lib/i18n/LanguageContext";
-import { X, ChevronDown, ChevronRight } from "lucide-react";
-import Image from "next/image";
+import { X, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SidebarGroup, SidebarItem } from "@/lib/menu";
 import { PUBLIC_BASE_PATH } from "@/lib/public-path";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useSettings } from "@/lib/settings-context";
 
+type Match = { group: SidebarGroup; item: SidebarItem; sub?: SidebarItem } | null;
 type Props = {
-  open: boolean;
-  menuGroups: SidebarGroup[];
-  onClose: () => void;
+  open: boolean; collapsed: boolean; menuGroups: SidebarGroup[]; match: Match
+  onClose: () => void; onToggleCollapse: () => void
 };
 
-export default function DashboardSidebar({ open, menuGroups, onClose }: Props) {
-  const pathname = usePathname();
+export default function DashboardSidebar({ open, collapsed, menuGroups, match, onClose, onToggleCollapse }: Props) {
   const { t } = useTranslation();
   const { settings } = useSettings();
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({});
+  const [itemOpen, setItemOpen] = useState<Record<string, boolean>>({});
+  const [flyout, setFlyout] = useState<string | null>(null);
+  const flyRef = useRef<HTMLLIElement | null>(null);
+  const gk = (g: SidebarGroup, i: number) => g.id || g.title || String(i);
+  const ik = (it: SidebarItem) => it.id || it.label;
 
   useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     if (open) document.addEventListener("keydown", onEsc);
     return () => document.removeEventListener("keydown", onEsc);
   }, [open, onClose]);
 
-  // PR 147: a menu href is active on prefix match unless a longer menu href also matches
-  // (so /reports/matriks-ledger lights "Matrix & Ledger", not "Reports > Publications").
-  const allHrefs = menuGroups.flatMap((g) => g.items.flatMap((i) => [i.href, ...(i.subItems || []).map((x) => x.href)])).filter((h): h is string => !!h && h !== '#' && h !== '/')
-  const hit = (href?: string) => {
-    if (!href || href === '#') return false
-    if (href === '/') return pathname === '/'
-    // PR 154: match whole path segments only (/reports/matrix must not light /reports/matriks-ledger).
-    const under = (p: string, h: string) => p === h || p.startsWith(h.endsWith('/') ? h : `${h}/`)
-    if (!under(pathname, href)) return false
-    return !allHrefs.some((h) => h.length > href.length && under(h, href) && under(pathname, h))
-  }
-
-  // Auto-expand parent module if current URL matches any sub-item
   useEffect(() => {
-    const nextExpanded: Record<string, boolean> = {};
-    menuGroups.forEach((group) => {
-      group.items.forEach((item) => {
-        if (item.subItems && item.subItems.length > 0) {
-          const hasActiveChild = item.subItems.some((sub) => {
-            if (!sub.href || sub.href === '#') return false;
-            return hit(sub.href);
-          });
-          if (hasActiveChild) {
-            nextExpanded[item.id || item.label] = true;
-          }
-        }
-      });
-    });
-    setExpandedItems((prev) => ({ ...prev, ...nextExpanded }));
-  }, [pathname, menuGroups]);
+    if (!flyout) return;
+    const down = (e: MouseEvent) => { if (flyRef.current && !flyRef.current.contains(e.target as Node)) setFlyout(null); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setFlyout(null); };
+    document.addEventListener("mousedown", down); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("mousedown", down); document.removeEventListener("keydown", key); };
+  }, [flyout]);
+  useEffect(() => { if (!collapsed) setFlyout(null); }, [collapsed]);
 
-  const toggleExpand = (key: string) => {
-    setExpandedItems((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const isItemActive = (item: SidebarItem) => {
-    if (item.href === "/") return pathname === "/";
-    if (item.href && item.href !== "#") return hit(item.href);
-    if (item.subItems && item.subItems.length > 0) {
-      return item.subItems.some((sub) => {
-        if (sub.href === "/") return pathname === "/";
-        return hit(sub.href);
-      });
-    }
-    return false;
-  };
-
-  const isSubActive = (sub: SidebarItem) => {
-    return hit(sub.href);
-  };
+  // auto-expand the active group and parent item
+  useEffect(() => {
+    if (!match) return;
+    setGroupOpen((p) => ({ ...p, [match.group.id || match.group.title]: true }));
+    if (match.sub) setItemOpen((p) => ({ ...p, [ik(match.item)]: true }));
+  }, [match]);
 
   const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/Logo-Kemenkes.png`;
   const appTitle = settings.app_name || tr("skdr.layout.appName");
   const appSubtitle = settings.app_tagline || tr("skdr.layout.appTagline");
+  // icon-only applies to the desktop rail only; the mobile drawer is always full width
+  const rail = collapsed && !open;
 
-  const resolveTargetUrl = (href?: string) => {
-    if (!href || href === "#") return "#";
-    if (href.startsWith("http")) return href;
-    const cleanPath = href.startsWith("/") ? href : `/${href}`;
-    return `${PUBLIC_BASE_PATH}${cleanPath === "/" ? "" : cleanPath}` || "/nlp";
+  const Tip = ({ label }: { label: string }) => rail ? (
+    <span role="tooltip" className="pointer-events-none absolute left-full top-1/2 z-[80] ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg group-hover:block group-focus-visible:block">{label}</span>
+  ) : null;
+
+  const linkCls = (active: boolean) =>
+    `group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/40 ${rail ? "justify-center px-0" : ""} ${active ? "bg-primary/10 text-primary" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`;
+
+  const ItemLink = ({ it, active }: { it: SidebarItem; active: boolean }) => {
+    const Icon = it.icon;
+    return (
+      <Link href={it.href || "#"} onClick={onClose} aria-current={active ? "page" : undefined} aria-label={rail ? it.label : undefined}
+        title={!rail ? it.description : undefined} data-nav-item className={linkCls(active)}>
+        {Icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-slate-400"}`} />}
+        {!rail && <span className="truncate">{it.label}</span>}
+        <Tip label={it.label} />
+      </Link>
+    );
   };
 
   return (
-    <aside
-      className={`fixed left-0 top-0 z-[60] h-screen w-[280px] border-r border-slate-100 bg-white text-slate-800 shadow-[2px_0_12px_rgba(0,0,0,0.03)] transition-transform duration-300 ${
-        open ? "translate-x-0 pointer-events-auto" : "-translate-x-full pointer-events-none"
-      }`}
-    >
-      <div className="h-[4px] bg-[#0060A9]" />
-      <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm overflow-hidden">
+    <aside aria-label="Navigasi utama" data-testid="nav-sidebar" data-collapsed={rail ? "true" : "false"}
+      className={`fixed left-0 top-0 z-[60] flex h-screen flex-col border-r border-slate-100 bg-white text-slate-800 shadow-[2px_0_12px_rgba(0,0,0,0.03)] transition-[transform,width] duration-300
+        ${open ? "w-[280px] translate-x-0" : "w-[280px] -translate-x-full lg:translate-x-0"} ${rail ? "lg:w-[72px]" : "lg:w-[280px]"}`}>
+      <div className="h-[4px] shrink-0 bg-primary" />
+      <div className={`flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 py-4 ${rail ? "px-2" : "px-4"}`}>
+        <div className={`flex min-w-0 items-center gap-3 ${rail ? "mx-auto" : ""}`}>
+          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={logoSrc}
-              alt={tr("skdr.layout.logo")}
-              className="h-auto w-full max-h-8 object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
+            <img src={logoSrc} alt={tr("skdr.layout.logo")} className="h-auto max-h-8 w-full object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-bold tracking-wide text-slate-800 truncate uppercase">
-              {appTitle}
-            </p>
-            <p className="mt-0.5 text-[11px] text-slate-500 truncate">
-              {appSubtitle}
-            </p>
-          </div>
+          {!rail && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold uppercase tracking-wide text-slate-800">{appTitle}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-500">{appSubtitle}</p>
+            </div>
+          )}
         </div>
-        <button
-          type="button"
-          aria-label={t("common.closeSidebar")}
-          onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-        >
+        <button type="button" aria-label={t("common.closeSidebar")} onClick={onClose} className="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden">
           <X className="h-4 w-4" />
         </button>
+        {!rail && (
+          <button type="button" onClick={onToggleCollapse} data-testid="sidebar-toggle" aria-label="Tutup sidebar" title="Tutup sidebar"
+            className="hidden shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:border-primary/40 hover:text-primary lg:inline-flex">
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        )}
       </div>
+      {rail && (
+        <div className="hidden shrink-0 justify-center border-b border-slate-100 py-2 lg:flex">
+          <button type="button" onClick={onToggleCollapse} data-testid="sidebar-toggle" aria-label="Buka sidebar"
+            className="group relative inline-flex cursor-pointer rounded-lg border border-slate-200 bg-white p-2 text-slate-500 hover:border-primary/40 hover:text-primary">
+            <PanelLeftOpen className="h-4 w-4" />
+            <Tip label="Buka sidebar" />
+          </button>
+        </div>
+      )}
 
-      <div className="h-[calc(100vh-80px)] overflow-y-auto px-3 py-4">
-        {menuGroups.map((group, groupIdx) => (
-          <div key={group.id || group.titleKey || group.title || groupIdx} className="mb-6">
-            <div className="px-3 pb-2 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-              {group.title || (group.titleKey ? t(group.titleKey) : "")}
-            </div>
-            {group.items.length === 0 ? (
-              <p className="px-3 py-1 text-xs text-slate-400 italic">{tr("skdr.layout.no_modules")}</p>
-            ) : (
-              <ul className="space-y-1">
-                {group.items.map((item, itemIdx) => {
-                  const itemKey = item.id || item.label || `item-${groupIdx}-${itemIdx}`;
-                  const Icon = item.icon;
-                  const active = isItemActive(item);
-                  const hasSubs = item.subItems && item.subItems.length > 0;
-                  const isExpanded = !!expandedItems[itemKey];
-                  const targetUrl = resolveTargetUrl(item.href);
-
-                  return (
-                    <li key={itemKey}>
-                      <div className="flex items-center">
-                        <a
-                          href={hasSubs && (!item.href || item.href === "#") ? "#" : targetUrl}
-                          onClick={(e) => {
-                            if (hasSubs && (!item.href || item.href === "#")) {
-                              e.preventDefault();
-                              toggleExpand(itemKey);
-                              return;
-                            }
-                            onClose();
-                            if (item.href && item.href !== "#") {
-                              if (pathname === item.href) {
-                                e.preventDefault();
-                              }
-                            }
-                          }}
-                          className={`flex-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
-                            active
-                              ? "bg-[#0060A9]/10 text-[#0060A9]"
-                              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                          }`}
-                        >
-                          {Icon && (
-                            <Icon
-                              className={`h-4 w-4 shrink-0 ${
-                                active ? "text-[#0060A9]" : "text-slate-400"
-                              }`}
-                            />
-                          )}
-                          <span className="truncate">
-                            {item.label || (item.labelKey ? t(item.labelKey) : "")}
-                          </span>
-                          {item.badge && (
-                            <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                              {item.badge}
-                            </span>
-                          )}
-                        </a>
-
-                        {hasSubs && (
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(itemKey)}
-                            className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition cursor-pointer"
-                            aria-label={tr("skdr.layout.toggle_sub_menu")}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            )}
-                          </button>
+      <nav className={`flex-1 py-4 ${rail ? "overflow-visible px-2" : "overflow-y-auto px-3"}`} data-testid="nav-groups">
+        {menuGroups.map((group, gi) => {
+          const key = gk(group, gi);
+          const activeGroup = match?.group === group;
+          const isOpen = rail || groupOpen[key] !== false; // groups open by default; user can collapse
+          return (
+            <div key={key} className={rail ? "mb-2 border-b border-slate-100 pb-2 last:border-0" : "mb-4"}>
+              {!rail && (
+                <button type="button" aria-expanded={isOpen} onClick={() => setGroupOpen((p) => ({ ...p, [key]: !isOpen }))}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${activeGroup ? "text-primary" : "text-slate-400 hover:text-slate-600"}`}>
+                  <span>{group.title}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition ${isOpen ? "" : "-rotate-90"}`} />
+                </button>
+              )}
+              {isOpen && (
+                <ul className="space-y-1">
+                  {group.items.map((item) => {
+                    const hasSubs = !!item.subItems?.length;
+                    const active = !!match && match.item === item;
+                    if (!hasSubs) return <li key={ik(item)}><ItemLink it={item} active={active} /></li>;
+                    const subOpen = !!itemOpen[ik(item)];
+                    const Icon = item.icon;
+                    return (
+                      <li key={ik(item)} className="relative" ref={flyout === ik(item) ? flyRef : undefined}>
+                        <button type="button" aria-expanded={rail ? flyout === ik(item) : subOpen} aria-haspopup={rail ? "true" : undefined} aria-label={rail ? item.label : undefined}
+                          onClick={() => { if (rail) setFlyout(flyout === ik(item) ? null : ik(item)); else setItemOpen((p) => ({ ...p, [ik(item)]: !subOpen })); }}
+                          className={`${linkCls(active)} w-full text-left`}>
+                          {Icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-slate-400"}`} />}
+                          {!rail && <span className="flex-1 truncate">{item.label}</span>}
+                          {!rail && (subOpen ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />)}
+                          <Tip label={item.label} />
+                        </button>
+                        {rail && flyout === ik(item) && (
+                          <div role="menu" data-testid="nav-flyout" className="absolute left-full top-0 z-[80] ml-3 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+                            <p className="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.label}</p>
+                            {item.subItems!.map((sub) => {
+                              const SubIcon = sub.icon; const on = !!match && match.sub === sub;
+                              return (
+                                <Link key={sub.id || sub.href} href={sub.href || "#"} role="menuitem" data-nav-item onClick={() => { setFlyout(null); onClose(); }} aria-current={on ? "page" : undefined}
+                                  className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold ${on ? "bg-primary/10 text-primary" : "text-slate-600 hover:bg-slate-50"}`}>
+                                  {SubIcon && <SubIcon className={`h-4 w-4 ${on ? "text-primary" : "text-slate-400"}`} />}{sub.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
                         )}
-                      </div>
+                        {subOpen && !rail && (
+                          <ul className="ml-5 mt-1 space-y-1 border-l-2 border-slate-100 pl-3">
+                            {item.subItems!.map((sub) => <li key={sub.id || sub.href}><ItemLink it={sub} active={!!match && match.sub === sub} /></li>)}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </nav>
 
-                      {/* Sub-modules (Sub-Menu) Accordion */}
-                      {hasSubs && isExpanded && (
-                        <ul className="mt-1 ml-5 pl-3 border-l-2 border-slate-100 space-y-1">
-                          {item.subItems!.map((sub, subIdx) => {
-                            const subKey = sub.id || sub.label || `sub-${subIdx}`;
-                            const SubIcon = sub.icon;
-                            const subActive = isSubActive(sub);
-                            const subUrl = resolveTargetUrl(sub.href);
-
-                            return (
-                              <li key={subKey}>
-                                <a
-                                  href={subUrl}
-                                  onClick={(e) => {
-                                    onClose();
-                                    if (sub.href && sub.href !== "#" && pathname === sub.href) {
-                                      e.preventDefault();
-                                    }
-                                  }}
-                                  className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                                    subActive
-                                      ? "bg-[#0060A9]/10 text-[#0060A9] font-bold"
-                                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                                  }`}
-                                >
-                                  {SubIcon && (
-                                    <SubIcon
-                                      className={`h-3.5 w-3.5 shrink-0 ${
-                                        subActive ? "text-[#0060A9]" : "text-slate-400"
-                                      }`}
-                                    />
-                                  )}
-                                  <span className="truncate">
-                                    {sub.label || (sub.labelKey ? t(sub.labelKey) : "")}
-                                  </span>
-                                  {sub.badge && (
-                                    <span className="ml-auto text-[9px] font-bold px-1 py-0.2 rounded bg-blue-50 text-blue-600">
-                                      {sub.badge}
-                                    </span>
-                                  )}
-                                </a>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
     </aside>
   );
 }

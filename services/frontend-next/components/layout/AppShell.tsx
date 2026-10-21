@@ -1,32 +1,13 @@
 'use client'
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { sidebarMenu, consoleMenu, SidebarGroup, convertConfigToSidebarGroups } from "@/lib/menu";
+import { useNavGroups, useNavMatch } from "@/lib/nav";
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
+import Breadcrumbs from "./Breadcrumbs";
 import Footer from "./Footer";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
-import { useSettings } from "@/lib/settings-context";
-
-const guestMenu: SidebarGroup[] = [
-  {
-    title: "SURVEILLANCE",
-    titleKey: "sidebar.sections.monitoring",
-    items: [
-      { label: "Home", labelKey: "sidebar.items.home", icon: undefined, href: "/" },
-      { label: "Main Dashboard", labelKey: "sidebar.items.mainDashboard", icon: undefined, href: "/main-dashboard" },
-      { label: "Prototype Showcase", icon: undefined, href: "/main-dashboard-prototype" },
-      { label: "Lite Dashboard", labelKey: "sidebar.items.liteDashboard", icon: undefined, href: "/lite-dashboard" },
-      { label: "Analysis Dashboard", labelKey: "sidebar.items.analysisDashboard", icon: undefined, href: "/analysis-dashboard" },
-      { label: "Web Services Dashboard", labelKey: "sidebar.items.webServicesDashboard", icon: undefined, href: "/web-services-dashboard" },
-      { label: "Disease Dashboard", labelKey: "sidebar.items.diseaseDashboard", icon: undefined, href: "/disease-dashboard" },
-      { label: "Crawling Dashboard", labelKey: "sidebar.items.crawlingDashboard", icon: undefined, href: "/crawling-dashboard" },
-      { label: "TV Mode", labelKey: "header.tvMode", icon: undefined, href: "/tv" },
-      { label: "Reports", labelKey: "header.reports", icon: undefined, href: "/reports" },
-    ],
-  },
-];
 
 export default function AppShell({
   children,
@@ -40,10 +21,13 @@ export default function AppShell({
   consoleMode?: boolean;
 }) {
   const { t } = useTranslation();
-  const { settings } = useSettings();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const authenticated = true; // SKDR: no auth; menu comes from app_settings.navigation_menu
+  // PR 017: desktop sidebar collapsible to icon-only; preference kept in localStorage
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => { setCollapsed(window.localStorage.getItem("skdr_sidebar_collapsed") === "1"); }, []);
+  const toggleCollapse = () => setCollapsed((c) => { window.localStorage.setItem("skdr_sidebar_collapsed", c ? "0" : "1"); return !c; });
+  const authenticated = true; // SKDR: no auth
   const isDirectoryPage = false;
 
   // Close sidebar drawer automatically on page/route navigation
@@ -51,24 +35,9 @@ export default function AppShell({
     setSidebarOpen(false);
   }, [pathname]);
 
-  // Filter menu groups according to user role and permitted modules
-  const activeMenu = useMemo(() => {
-    if (tvMode) return [];
-    if (!authenticated) return guestMenu;
-
-    const dynamicGroups = (settings.navigation_menu && settings.navigation_menu.length > 0)
-      ? convertConfigToSidebarGroups(settings.navigation_menu)
-      : sidebarMenu;
-
-    const baseGroups = (consoleMode && consoleMenu && consoleMenu.length > 0)
-      ? [
-          consoleMenu[0], // SYSTEM MANAGEMENT (Console tools: Settings, Modul, CMS, Users, etc.)
-          ...dynamicGroups, // Dynamic Navigation configured by administrator!
-        ]
-      : dynamicGroups;
-
-    return baseGroups;
-  }, [tvMode, authenticated, consoleMode, settings.navigation_menu]);
+  // PR 017: grouped navigation from app_settings.navigation_menu (+ Form PE sub-items from the PE form registry)
+  const navGroups = useNavGroups();
+  const match = useNavMatch(navGroups);
 
   if (tvMode)
     return (
@@ -76,19 +45,22 @@ export default function AppShell({
     );
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f8fafc] text-slate-900">
+    <main className={`flex min-h-screen flex-col bg-[#f8fafc] text-slate-900 transition-[padding] duration-300 print:pl-0 ${collapsed ? "lg:pl-[72px]" : "lg:pl-[280px]"}`}>
       {sidebarOpen && (
         <button
           type="button"
           aria-label={t("common.closeSidebar")}
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-[55] bg-slate-900/35 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[55] bg-slate-900/35 backdrop-blur-[1px] lg:hidden"
         />
       )}
       <div className="print:hidden">
         <DashboardSidebar
           open={sidebarOpen}
-          menuGroups={activeMenu}
+          menuGroups={navGroups}
+          match={match}
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapse}
           onClose={() => setSidebarOpen(false)}
         />
       </div>
@@ -99,7 +71,10 @@ export default function AppShell({
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         />
       </div>
-      <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'py-3 md:py-5'}`}>{children}</div>
+      <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'pb-3 md:pb-5'}`}>
+        <div className="print:hidden"><Breadcrumbs match={match} /></div>
+        <div className="pt-3 md:pt-4">{children}</div>
+      </div>
       <div className="print:hidden">
         <Footer />
       </div>
