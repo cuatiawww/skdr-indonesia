@@ -38,13 +38,13 @@ pub fn current_mmwr(today: NaiveDate) -> (i32, i32) {
 }
 
 pub struct Resolved {
-    start: Option<NaiveDate>,
-    end: Option<NaiveDate>,
-    province: Option<i32>,
-    kabkota: Option<i32>,
-    disease: Option<String>,
-    source: Option<String>,
-    scope: String,
+    pub(crate) start: Option<NaiveDate>,
+    pub(crate) end: Option<NaiveDate>,
+    pub(crate) province: Option<i32>,
+    pub(crate) kabkota: Option<i32>,
+    pub(crate) disease: Option<String>,
+    pub(crate) source: Option<String>,
+    pub(crate) scope: String,
 }
 
 impl Resolved {
@@ -84,7 +84,7 @@ fn base() -> String {
         .to_string()
 }
 
-async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiError> {
+pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiError> {
     let start = match (q.start_year, q.start_week) {
         (Some(y), Some(w)) => Some(mmwr_week_start(y, w)),
         _ => None,
