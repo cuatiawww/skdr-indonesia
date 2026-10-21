@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { fmt, shade } from '@/lib/analytics-api'
+import { buildChoroClasses, choroClassFor, useChoroConfig } from '@/lib/choropleth-classes'
+import ChoroLegend from '@/components/ChoroLegend'
 
 type Feat = { code: string; name: string; d: string; cx: number; cy: number }
 const cache: Record<string, any> = {}
@@ -20,6 +22,7 @@ export default function ChoroplethMap({ level, provinceCode, values, hue, onPick
   onPick?: (code: string) => void; height?: number
 }) {
   const { t } = useTranslation()
+  const cfg = useChoroConfig()
   const [geo, setGeo] = useState<any>(null)
   const [err, setErr] = useState(false)
   const [hover, setHover] = useState<Feat | null>(null)
@@ -51,6 +54,8 @@ export default function ChoroplethMap({ level, provinceCode, values, hue, onPick
     return { list, H }
   }, [geo, level, provinceCode])
   const max = Math.max(0, ...Object.values(values))
+  const classes = useMemo(() => buildChoroClasses(cfg, feats.list.map((f) => values[f.code] || 0)), [cfg, feats.list, values])
+  const fillFor = (v: number) => (classes ? choroClassFor(v, classes).color : shade(v, max, hue))
   if (err) return <div className="p-6 text-center text-xs text-red-600">{t('skdr.penyakit.mapFailed')}</div>
   if (!geo) return <div className="flex items-center justify-center text-xs text-slate-400" style={{ height }}>{t('skdr.penyakit.mapLoading')}</div>
   if (!feats.list.length) return <div className="flex items-center justify-center text-xs text-slate-400" style={{ height }}>{t('skdr.penyakit.mapNoGeometry')}</div>
@@ -58,7 +63,7 @@ export default function ChoroplethMap({ level, provinceCode, values, hue, onPick
     <div className="relative flex flex-1 flex-col justify-center" data-testid="choropleth">
       <svg viewBox={`0 0 ${W} ${feats.H}`} className="w-full" style={{ maxHeight: height }} role="img" aria-label={t('skdr.penyakit.mapAria')}>
         {feats.list.map((f) => (
-          <path key={f.code} d={f.d} fill={shade(values[f.code] || 0, max, hue)} stroke="#fff" strokeWidth={level === 'province' ? 1 : 0.6}
+          <path key={f.code} d={f.d} fill={fillFor(values[f.code] || 0)} stroke="#fff" strokeWidth={level === 'province' ? 0.8 : 0.5}
             className={onPick ? 'cursor-pointer transition-opacity hover:opacity-80' : ''} onMouseEnter={() => setHover(f)} onMouseLeave={() => setHover(null)}
             onClick={() => onPick?.(f.code)}>
             <title>{`${f.name}: ${fmt(values[f.code] || 0)}`}</title>
@@ -67,7 +72,7 @@ export default function ChoroplethMap({ level, provinceCode, values, hue, onPick
       </svg>
       {hover ? <div className="pointer-events-none absolute left-2 top-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1 text-[11px] shadow"><b>{hover.name}</b>: {fmt(values[hover.code] || 0)}</div> : null}
       <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-        <span>0</span>{[0.05, 0.2, 0.45, 0.7, 1].map((x) => <span key={x} className="h-3 w-6 rounded-sm" style={{ background: shade(x * max || 0.0001, max || 1, hue) }} />)}<span>{fmt(max)}</span>
+        {classes ? <ChoroLegend classes={classes} label={t(level === 'province' ? 'skdr.map.perProvinsi' : 'skdr.map.perKabkota')} /> : <><span>0</span>{[0.05, 0.2, 0.45, 0.7, 1].map((x) => <span key={x} className="h-3 w-6 rounded-sm" style={{ background: shade(x * max || 0.0001, max || 1, hue) }} />)}<span>{fmt(max)}</span></>}
         {onPick && level === 'province' ? <span className="ml-auto">{t('skdr.penyakit.mapDrill')}</span> : null}
       </div>
     </div>

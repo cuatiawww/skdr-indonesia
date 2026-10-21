@@ -4,6 +4,8 @@ import { tr } from "@/lib/i18n/LanguageContext";
 import { Layers, MapPin, Settings, Wind, X, Plane, Flame, Bird } from "lucide-react";
 import type { ExternalIntelLayers, MapLayerStatus } from "@/types";
 import { useEffect, useState } from "react";
+import ChoroLegend from "./ChoroLegend";
+import { buildChoroClasses, useChoroConfig, type ChoroClass } from "@/lib/choropleth-classes";
 import AseanMap, { type BorderNeighborShape, type HazardEvent, type RegionBorderLink } from "./AseanMap";
 import type { OutbreakLocation } from "@/types";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -29,6 +31,7 @@ export default function SpatialOutbreakMap({
   ebsOnly,
   hideSpreadRoute,
   sourceMode = "all",
+  fitTo,
 }: {
   countries: { name: string; cases: number; deaths?: number }[];
   locations: OutbreakLocation[];
@@ -47,10 +50,15 @@ export default function SpatialOutbreakMap({
   hideSpreadRoute?: boolean;
   /** PR 016: global Sumber filter; shown in the map legend and region popup. */
   sourceMode?: "all" | "ebs" | "pe";
+  /** PR 018: bounds of the filtered provinces / kab-kota (auto-fit). */
+  fitTo?: [number, number, number, number] | null;
 }) {
   const { t } = useTranslation();
   const [settings, setSettings] = useState(false),
     [windLegend, setWindLegend] = useState(false),
+    [adminLevel, setAdminLevel] = useState(1),
+    [regionClasses, setRegionClasses] = useState<ChoroClass[] | null>(null),
+    choroCfg = useChoroConfig(),
     [base, setBase] = useState<Base>("osm"),
     [markers, setMarkers] = useState(true),
     [markerLookbackDays, setMarkerLookbackDays] = useState<MarkerLookbackDays>(30),
@@ -101,6 +109,7 @@ export default function SpatialOutbreakMap({
 
 
 
+  const choroClasses = admin && regionClasses ? regionClasses : buildChoroClasses(choroCfg, (countries || []).map((c) => c.cases || 0));
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl">
       <AseanMap
@@ -125,11 +134,14 @@ export default function SpatialOutbreakMap({
         intelLayers={intel}
         initialCenter={initialCenter}
         initialZoom={initialZoom}
+        fitTo={fitTo}
         boundaryScope={boundaryScope}
         onLayerStatus={(key, status) =>
           setLayerStatus((prev) => (prev[key]?.state === status.state && prev[key]?.message === status.message ? prev : { ...prev, [key]: status }))
         }
         onSelectCountry={onSelectCountry}
+        onAdminLevel={setAdminLevel}
+        onChoroClasses={setRegionClasses}
       />
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
         <button
@@ -147,7 +159,8 @@ export default function SpatialOutbreakMap({
       <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-md" data-testid="map-legend">
         {sourceMode !== "pe" ? <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full border-2 border-white bg-ebs shadow" />{tr("skdr.map.legendEbs")}</span> : null}
         {sourceMode !== "ebs" ? <span className="flex items-center gap-1.5"><span className="mx-0.5 h-2.5 w-2.5 rotate-45 border border-white bg-pe shadow" />{tr("skdr.map.legendPe")}</span> : null}
-        {choropleth ? <span className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-6 rounded-sm bg-gradient-to-r from-slate-200 to-slate-500" />{tr(sourceMode === "all" ? "skdr.map.legendChoroAll" : sourceMode === "ebs" ? "skdr.map.legendChoroEbs" : "skdr.map.legendChoroPe")}</span> : null}
+        {choropleth ? <span className="text-slate-500">{tr(sourceMode === "all" ? "skdr.map.legendChoroAll" : sourceMode === "ebs" ? "skdr.map.legendChoroEbs" : "skdr.map.legendChoroPe")}</span> : null}
+        {choropleth && choroClasses ? <ChoroLegend classes={choroClasses} label={tr(adminLevel >= 3 ? "skdr.map.perKecamatan" : adminLevel === 2 ? "skdr.map.perKabkota" : "skdr.map.perProvinsi")} /> : null}
       </div>
 
       {windLegend && wind && !prototypeMode && (

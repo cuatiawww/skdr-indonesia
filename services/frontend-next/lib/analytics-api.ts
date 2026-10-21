@@ -22,7 +22,7 @@ export type DiseaseDetail = {
   age: { group: string; male: number; female: number; unknown: number }[]; sex: { sex: string; n: number }[]
   cfr: { pe: { rate: Rate; unknown: number; confirmed_classes: string[]; label: string | null }; ebs: { rate: Rate; basis: string } }
   latest: {
-    ebs: { no_ebs: string | null; date: string | null; kabkota: string | null; province: string | null; status: string | null; cases: number | null; deaths: number | null; diagnosa: string | null }[]
+    ebs: { id?: number; no_ebs: string | null; date: string | null; kabkota: string | null; province: string | null; status: string | null; cases: number | null; deaths: number | null; diagnosa: string | null }[]
     pe: { id: number; no_pe: string; form_key: string; status: string; classification: string | null; date: string | null; kabkota: string | null; province: string | null; patient_initials: string | null }[]
   }
   pe_form: string | null

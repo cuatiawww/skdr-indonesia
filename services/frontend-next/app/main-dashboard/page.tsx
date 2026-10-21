@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { tr } from "@/lib/i18n/LanguageContext";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -49,7 +49,9 @@ import { reviewEventRows } from "@/lib/multiFactDisplay.mjs";
 import CountryFlag from "@/components/CountryFlag";
 import { caseDateText, caseDateTitle, countText, signalDate, takeUniqueSignals } from "@/lib/signal-feed.mjs";
 import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
-import SkdrFilterBar, { type SkdrFilterState as EpiFilterState } from "@/components/SkdrFilterBar";
+import SectionNav from "@/components/dashboard/SectionNav";
+import SkdrFilterBar, { type SkdrFilterState as EpiFilterState, filterParams } from "@/components/SkdrFilterBar";
+import { loadGeo, saveGeo } from "@/lib/use-geo-filter";
 import { UkuranFilter } from "@/components/analytics/SourceBadge";
 import { useSumber } from "@/lib/use-sumber";
 import { getCurrentEpiWeek } from "@/lib/epi-week";
@@ -251,10 +253,10 @@ export default function DashboardPage() {
   const currentYear = new Date().getFullYear();
   const currentEpi = getCurrentEpiWeek();
   const [filters, setFilters] = useState<EpiFilterState>({
-    disease: "all",
+    diseases: [],
     source: "all",
-    provinceId: null,
-    kabkotaId: null,
+    provinceIds: [],
+    kabkotaIds: [],
     startYear: currentEpi.year || currentYear,
     startWeek: 1,
     endYear: currentEpi.year || currentYear,
@@ -268,11 +270,11 @@ export default function DashboardPage() {
       const sW = sp.get("startWeek");
       const eY = sp.get("endYear");
       const eW = sp.get("endWeek");
-      const dis = sp.get("disease");
-      const prov = sp.get("province_id");
-      const kab = sp.get("kabkota_id");
+      // PR 018: multi-select URL state ?penyakit=a,b&prov=11,12&kab=...
+      const mf = loadGeo();
       const src = sp.get("source");
-      if (sY || sW || eY || eW || dis || prov || kab || src) {
+      const any = mf.diseases.length || mf.provinceIds.length || mf.kabkotaIds.length;
+      if (sY || sW || eY || eW || any || src) {
         // PR 012: URL filters (e.g. ?source=pe from a disease page) are applied immediately, not only pre-filled.
         setFilters((prev) => {
           const next: EpiFilterState = {
@@ -281,9 +283,7 @@ export default function DashboardPage() {
           startWeek: sW ? Number(sW) : prev.startWeek,
           endYear: eY ? Number(eY) : prev.endYear,
           endWeek: eW ? Number(eW) : prev.endWeek,
-          disease: dis || prev.disease,
-          provinceId: prov ? Number(prov) : prev.provinceId,
-          kabkotaId: kab ? Number(kab) : prev.kabkotaId,
+          ...mf,
           source: src === "pe" || src === "ebs" ? src : src === "form" ? "pe" : prev.source,
           };
           queueMicrotask(() => setApplied(next));
@@ -300,8 +300,8 @@ export default function DashboardPage() {
     const url = new URL(window.location.href);
     const set = (k: string, v: string | number | null | undefined) => (v === null || v === undefined || v === "" || v === "all" ? url.searchParams.delete(k) : url.searchParams.set(k, String(v)));
     set("startYear", applied.startYear); set("startWeek", applied.startWeek); set("endYear", applied.endYear); set("endWeek", applied.endWeek);
-    set("disease", applied.disease); set("province_id", applied.provinceId); set("kabkota_id", applied.kabkotaId);
     window.history.replaceState(window.history.state, "", url.toString());
+    saveGeo({ diseases: applied.diseases, provinceIds: applied.provinceIds, kabkotaIds: applied.kabkotaIds });
   }, [applied]);
   // PR 016: one global Sumber filter (Semua/EBS/Kasus PE, in the URL) drives the whole dashboard; default Semua.
   const { sumber, setSumber, ukuran, setUkuran, ready: sumberReady } = useSumber();
@@ -315,10 +315,8 @@ export default function DashboardPage() {
 
 
   const dashboardApiFilters = useCallback((active: EpiFilterState) => ({
-    province_id: active.provinceId ?? undefined,
-    kabkota_id: active.kabkotaId ?? undefined,
+    ...filterParams(active),
     source: sumber === "all" ? undefined : sumber,
-    disease: active.disease,
     start_year: active.startYear,
     start_week: active.startWeek,
     end_year: active.endYear,
@@ -373,11 +371,24 @@ export default function DashboardPage() {
     [data?.kpis.cases, data?.kpis.deaths],
   );
   const provinceData = data?.by_province ?? [];
+  // PR 018: the map auto-fits to the markers of the selected provinces / kab-kota (whole Indonesia when not narrowed).
+  const fitTo = useMemo<[number, number, number, number] | null>(() => {
+    if (!applied.provinceIds.length && !applied.kabkotaIds.length) return null;
+    const pts = mapLocations
+      .map((l) => [Number((l as { longitude?: number }).longitude), Number((l as { latitude?: number }).latitude)])
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && (x !== 0 || y !== 0));
+    if (!pts.length) return null;
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const pad = 0.3;
+    return [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad];
+  }, [mapLocations, applied.provinceIds, applied.kabkotaIds]);
 
   // PR 016: no full-page block. The header, filter bar and ExecutiveSummary render (and fetch) immediately in parallel
   // with public-dashboard; only the map waits for its data and shows a map-shaped skeleton meanwhile.
+  const dashRootRef = useRef<HTMLDivElement>(null);
+  const navSentinelRef = useRef<HTMLDivElement>(null);
   return (
-    <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
+    <div ref={dashRootRef} className="w-full space-y-6 bg-page px-4 py-6 sm:px-6 lg:px-8" data-testid="dashboard-root">
       <section className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-wide text-slate-900">
@@ -414,6 +425,9 @@ export default function DashboardPage() {
         sumber={sumber}
         onSumberChange={setSumber}
       />
+      {/* PR 018: section quick-nav floats only after the (non-sticky) filter bar has scrolled away */}
+      <div ref={navSentinelRef} aria-hidden className="!mt-0 h-0" />
+      <SectionNav rootRef={dashRootRef} sentinelRef={navSentinelRef} />
 
 
       {error ? (
@@ -426,18 +440,18 @@ export default function DashboardPage() {
         sumber={sumber}
         ukuran={ukuran}
         afterCards={
-      <section className="w-full">
+      <section className="skdr-section w-full">
         <div className="w-full">
           <article
-            className="flex flex-col border border-brand-200 bg-white p-4 xl:h-[700px] 2xl:h-[760px]"
-            style={{ borderRadius: "17px 17px 22px 17px" }}
+            className="flex flex-col xl:h-[700px] 2xl:h-[760px]"
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex-1">
-                <h3 className="flex flex-wrap items-center gap-2 text-xl font-black uppercase leading-tight text-slate-900 sm:text-2xl">
+                <div className="skdr-eyebrow">{t("skdr.exec.eyebrowMap")}</div>
+                <h2 className="skdr-section-title">
                   {t("dashboard.spatialTitle")}
-                </h3>
-                <p className="mt-1.5 text-sm font-normal leading-relaxed text-slate-600 sm:text-base">
+                </h2>
+                <p className="skdr-section-desc">
                   {t("dashboard.spatialDesc")}
                 </p>
                 {data ? <div className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold text-primary">
@@ -448,7 +462,7 @@ export default function DashboardPage() {
                 </div> : null}
               </div>
             </div>
-            <div className="mt-4 min-h-[460px] w-full flex-1 overflow-hidden rounded-xl">
+            <div className="skdr-card mt-4 min-h-[460px] w-full flex-1 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05)]" data-testid="map-card">
               {!data ? (error ? null : <SkeletonMap height={520} />) : <SpatialOutbreakMap
                 countries={countryData}
                 locations={mapLocations}
@@ -457,6 +471,7 @@ export default function DashboardPage() {
                 initialCenter={[118, -2.5]}
                 initialZoom={5}
                 sourceMode={sumber}
+                fitTo={fitTo}
               />}
             </div>
           </article>

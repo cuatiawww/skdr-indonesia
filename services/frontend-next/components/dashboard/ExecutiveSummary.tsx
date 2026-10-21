@@ -1,6 +1,6 @@
 'use client'
 // PR 010/012: executive summary (sheet "Spesifikasi Dashboard Executive"). Order (PR 011/012): 4 summary cards → map
-// (afterCards) → charts: trend + heatmap (No. 50–64), disease table (No. 17 case status), CFR with 95% CI, Kinerja 7-1-7.
+// (afterCards) → charts: trend + heatmap (No. 50–64), disease carousel (PR 018, No. 17 case status on /penyakit cards), CFR with 95% CI, Kinerja 7-1-7.
 // Indicator definitions come from app_settings.dashboard_executive via /api/v1/dashboard/executive; UI text from locale keys.
 // Spec rule: EBS alerts and Kasus PE are always labelled by source and never summed. The indicator status table moved to /dokumentasi.
 import { useEffect, useState } from 'react'
@@ -10,7 +10,11 @@ import { peFetch } from '@/lib/pe-api'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { ciText, fmt as n, pct1, rateText, type Rate } from '@/lib/analytics-api'
 import { Empty, Panel, SourceKey } from '@/components/analytics/SourceBadge'
-import DiseaseTable, { type SummaryDisease } from '@/components/dashboard/DiseaseTable'
+import { type SummaryDisease } from '@/components/dashboard/DiseaseTable'
+import DeathListModal from '@/components/dashboard/DeathListModal'
+import NarSkdr from '@/components/dashboard/NarSkdr'
+import DiseaseCarousel from '@/components/dashboard/DiseaseCarousel'
+import { diseaseActive } from '@/components/dashboard/DiseaseCard'
 import type { Sumber, UkuranEbs } from '@/lib/use-sumber'
 import TrendHeatmap from '@/components/analytics/TrendHeatmap'
 import T717, { type T717Data } from '@/components/dashboard/T717'
@@ -22,7 +26,7 @@ type Card = {
   code: string; label: string; color: string; pe_form: string; link?: string; disease_code?: string | null; ebs: EbsSub[]
   individual: { total: number; by_status: Record<string, number>; unclassified: number; deaths: number; split?: { label: string; codes: string[] }[]; status_defs?: { code: string; label: string }[] }
 }
-type CfrRow = { label: string; star: boolean; known: number; deaths: number; unknown: number; cfr?: Rate }
+type CfrRow = { label: string; star: boolean; known: number; deaths: number; unknown: number; cfr?: Rate; form?: string; codes?: string[] }
 type Exec = {
   filters: { scope: string; disease: string | null; source: string | null; start_date: string | null; end_date: string | null }
   header: { individual_reports: number | null; ebs_alerts_zoonosis: number | null; ebs_alerts_all: number | null; form_reports: number | null }
@@ -36,7 +40,7 @@ const dmy = (s: string | null) => (s ? s.split('-').reverse().join('/') : '—')
 
 function Shell({ children, color, className = '', testId }: { children: React.ReactNode; color?: string; className?: string; testId?: string }) {
   return (
-    <article data-testid={testId} className={`relative overflow-hidden border border-slate-200 bg-white p-4 shadow-sm ${className}`} style={{ borderRadius: '17px 17px 22px 17px' }}>
+    <article data-testid={testId} className={`skdr-card relative overflow-hidden p-4 ${className}`}>
       {color ? <div className="absolute inset-x-0 top-0 h-1" style={{ background: color }} /> : null}
       {children}
     </article>
@@ -223,6 +227,7 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
   const [sm, setSm] = useState<Summary | null>(null)
   const [smErr, setSmErr] = useState('')
   const [tick, setTick] = useState(0)
+  const [deathList, setDeathList] = useState<{ title: string; form: string; codes: string[] } | null>(null)
   const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'all').map(([k, v]) => [k, String(v)])).toString()
   useEffect(() => {
     let alive = true
@@ -267,11 +272,11 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
   const epiLabel = qq.start_week && qq.end_week ? t('skdr.exec.epiRange', { sw: String(qq.start_week), sy: String(qq.start_year), ew: String(qq.end_week), ey: String(qq.end_year) }) : ''
   return (
     <section className="w-full space-y-4" aria-label={t('skdr.exec.aria')}>
-      <p className="rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm text-slate-700">
+      <p className="border-l-2 border-brand-300 pl-3 text-sm text-slate-600">
         {t('skdr.exec.showing')} {parts.join(` ${t('skdr.exec.and')} `)} · {dmy(d.filters.start_date)} – {dmy(d.filters.end_date)} {epiLabel ? `(${epiLabel})` : ''} · {d.filters.scope} · {d.filters.disease || t('skdr.exec.allDiseases')}
         {showEbs && h.ebs_alerts_all !== null ? <span className="text-slate-500"> ({t('skdr.exec.allEbs', { n: n(h.ebs_alerts_all) })})</span> : null}
       </p>
-      {d.no_group_for_disease ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">{t('skdr.exec.notZoonosis')}</div> : null}
+      {d.no_group_for_disease ? <div className="text-xs italic text-slate-500">{t('skdr.exec.notZoonosis')}</div> : null}
 
       {/* PR 016: 4 KPI cards following the global Sumber filter (replaces the fixed per-disease group cards). */}
       <div className="grid grid-cols-1 items-stretch gap-3 md:auto-rows-fr md:grid-cols-2 2xl:grid-cols-4" data-testid="summary-cards">
@@ -296,21 +301,19 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
       {/* PR 011: peta lebar penuh langsung di bawah 4 kartu ringkasan */}
       {afterCards}
 
+      {/* PR 018: carousel of compact disease cards directly below the map (replaces the PR 016 disease table panel) */}
+      {sm ? (sm.diseases.length ? <DiseaseCarousel rows={[...sm.diseases].sort((a, b) => Number(diseaseActive(b, sumber)) - Number(diseaseActive(a, sumber)) || a.name.localeCompare(b.name, 'id'))} sumber={sumber} ukuran={ukuran} /> : null)
+        : smErr ? <ErrorState message={smErr} onRetry={() => setTick((x) => x + 1)} /> : <SkeletonTable />}
+      {showEbs && sm?.ebs_unmapped_alerts ? <p className="-mt-2 text-[11px] text-slate-500">{t('skdr.charts.unmapped', { n: n(sm.ebs_unmapped_alerts) })}</p> : null}
+
       {/* PR 012: No. 50–64 — tren mingguan + heatmap minggu epid × provinsi */}
       <TrendHeatmap query={query as Record<string, unknown>} sumber={sumber} ukuran={ukuran} />
-
-      {/* PR 016: disease section driven by the DB registry (scales to new diseases / PE forms). */}
-      <Panel title={t('skdr.dtable.title')} testId="disease-section"
-        legend={<>{showEbs ? <SourceKey source="ebs" /> : null}{showPe ? <SourceKey source="pe" /> : null}</>}>
-        {sm ? <DiseaseTable rows={sm.diseases} sumber={sumber} ukuran={ukuran} /> : smErr ? <ErrorState message={smErr} onRetry={() => setTick((x) => x + 1)} /> : <SkeletonTable />}
-        {showEbs && sm?.ebs_unmapped_alerts ? <p className="mt-2 text-[11px] text-slate-500">{t('skdr.charts.unmapped', { n: n(sm.ebs_unmapped_alerts) })}</p> : null}
-      </Panel>
 
       {/* No. 21–35 — CFR + 95% CI (Kasus PE, kasus konfirmasi) */}
       {showPe && d.cfr.groups.length ? (
         <Panel title={t('skdr.exec.cfrTitle')} testId="cfr">
           {star > 0 ? (
-            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="mb-3 border-l-4 border-amber-400 bg-amber-50/70 px-3 py-2 text-sm text-amber-900" data-testid="cfr-check">
               <b>{t('skdr.exec.checkData')}</b> {t('skdr.exec.checkDataText', { n: n(star), list: d.cfr.star_deaths.map((x) => `${x.label.replace('*', '')} ${n(x.deaths)}`).join(' · ') })}
             </div>
           ) : null}
@@ -335,11 +338,11 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wider text-slate-500">
-                  <tr><th className="px-2 py-2">{t('skdr.exec.cfrStatus')}</th><th>{t('skdr.exec.cfrKnown')}</th><th>{t('skdr.exec.cfrDeaths')}</th><th>CFR</th><th>{t('skdr.exec.cfrCi')}</th><th>{t('skdr.exec.cfrUnknown')}</th></tr>
+                  <tr><th className="px-2 py-2">{t('skdr.exec.cfrStatus')}</th><th>{t('skdr.exec.cfrKnown')}</th><th>{t('skdr.exec.cfrDeaths')}</th><th>CFR</th><th>{t('skdr.exec.cfrCi')}</th><th>{t('skdr.exec.cfrUnknown')}</th><th><span className="sr-only">{t('skdr.signal.view')}</span></th></tr>
                 </thead>
                 <tbody>
                   {d.cfr.groups.map((g) => [
-                    <tr key={g.code} className="bg-slate-100"><td colSpan={6} className="px-2 py-1.5 text-xs font-black uppercase" style={{ color: g.color }}>{g.label}</td></tr>,
+                    <tr key={g.code} className="bg-slate-100"><td colSpan={7} className="px-2 py-1.5 text-xs font-black uppercase" style={{ color: g.color }}>{g.label}</td></tr>,
                     ...g.rows.map((r) => (
                       <tr key={g.code + r.label} className={`border-b border-slate-100 ${r.star && r.deaths > 0 ? 'bg-amber-50' : ''}`}>
                         <td className={`px-2 py-1.5 ${r.star ? '' : 'font-bold'}`}>{r.label}</td>
@@ -348,6 +351,10 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
                         <td>{r.star ? t('skdr.exec.notCounted') : rateText(r.cfr)}</td>
                         <td>{r.star ? '-' : ciText(r.cfr)}</td>
                         <td>{n(r.unknown)}</td>
+                        <td className="pr-2 text-right">{r.star && r.deaths > 0 && r.form && r.codes?.length ? (
+                          <button type="button" data-testid="cfr-lihat" onClick={() => setDeathList({ title: `${g.label} · ${r.label.replace('*', '')}`, form: r.form!, codes: r.codes! })}
+                            className="whitespace-nowrap rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100">
+                            {t('skdr.cfrList.button', { n: n(r.deaths) })}</button>) : null}</td>
                       </tr>
                     )),
                   ])}
@@ -355,12 +362,16 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
               </table>
             </div>
           </div>
-          <p className="mt-3 text-xs text-slate-500">{tx.cfr_note} {t('skdr.exec.fractionNote')} {t('skdr.exec.cfrZoom', { max: pct1(cfrMax) })}</p>
+          {deathList ? <DeathListModal {...deathList} qs={qs} onClose={() => setDeathList(null)} /> : null}
+          <p className="mt-3 text-xs text-slate-500">{t('skdr.cfrList.footnote')} {tx.cfr_note} {t('skdr.exec.fractionNote')} {t('skdr.exec.cfrZoom', { max: pct1(cfrMax) })}</p>
         </Panel>
       ) : null}
 
       {/* PR 016: No. 41–45 — Kinerja 7-1-7 as a 3-step timeline + per-disease table (follows the global Sumber filter). */}
       <T717 data={sm?.t717} sumber={sumber} />
+
+      {/* PR 018: NAR–SKDR (No. 76–81) — dashboard section per sheet No. 10 */}
+      <NarSkdr qs={qs} sumber={sumber} />
 
       {d.cards.length === 0 && !d.no_group_for_disease ? <div className="flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-4 w-4" />{t('skdr.exec.noConfig')}</div> : null}
     </section>

@@ -45,7 +45,7 @@ function Spark({ values, src }: { values: number[]; src: 'ebs' | 'pe' | 'brand' 
 
 function Tile({ label, value, sub, children, testId }: { label: React.ReactNode; value: string; sub?: React.ReactNode; children?: React.ReactNode; testId: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3" data-testid={testId}>
+    <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3" data-testid={testId}>
       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-black leading-none text-slate-900">{value}</div>
       {sub ? <div className="mt-1 text-[11px] text-slate-500">{sub}</div> : null}
@@ -98,18 +98,11 @@ export default function Beranda() {
 
   const te = sm?.kpi_trend?.ebs, tp = sm?.kpi_trend?.pe
   const withReports = sm ? sm.diseases.filter((d) => (d.ebs?.alerts || 0) > 0 || (d.pe?.cases || 0) > 0).length : 0
-  const bg = te?.alerts || tp?.cases || []
-  const bgMax = Math.max(1, ...bg)
-  const bgPath = bg.map((v, i) => `${(i / Math.max(1, bg.length - 1)) * 1000},${300 - (v / bgMax) * 220}`).join(' ')
 
   return (
-    <div className="relative w-full overflow-hidden bg-white" data-testid="beranda">
-      {/* faint trend line from real data (EBS alerts over the current epi year; Kasus PE when EBS is empty) */}
-      {bg.length ? (
-        <svg viewBox="0 0 1000 300" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 w-full opacity-[0.07]" aria-hidden data-testid="hero-bg-trend">
-          <polyline points={bgPath} fill="none" stroke="rgb(var(--brand-700))" strokeWidth={3} vectorEffect="non-scaling-stroke" />
-        </svg>
-      ) : null}
+    <div className="relative w-full" data-testid="beranda">
+      <div className="relative overflow-hidden" data-testid="home-hero">
+      {/* PR 018: hero background (home.webp / home.jpg) is drawn by AppShell from the very top, behind the transparent header. */}
       <div className="relative grid w-full grid-cols-1 gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:px-8 lg:py-14">
         {/* left: hero */}
         <section className="min-w-0">
@@ -123,10 +116,10 @@ export default function Beranda() {
           <form onSubmit={go} className="relative mt-7 max-w-2xl" data-testid="home-search">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('skdr.home.searchPh')} aria-label={t('skdr.home.searchPh')}
-              className="w-full rounded-2xl border border-slate-300 bg-white py-3.5 pl-12 pr-28 text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100" />
+              className="w-full rounded-xl border border-line bg-card py-3.5 pl-12 pr-28 text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100" />
             <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-primary-dark">{t('skdr.home.searchBtn')}</button>
             {suggestions.length ? (
-              <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              <ul className="absolute z-20 mt-1 w-full overflow-hidden skdr-card shadow-xs">
                 {suggestions.map((s) => (
                   <li key={s.key}><Link href={s.href} className="flex items-center justify-between px-4 py-2 text-sm hover:bg-brand-50"><span className="font-semibold text-slate-800">{s.label}</span><span className="text-[11px] text-slate-500">{s.kind}</span></Link></li>
                 ))}
@@ -135,21 +128,21 @@ export default function Beranda() {
           </form>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/main-dashboard" className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-md hover:bg-primary-dark"><LayoutDashboard className="h-4 w-4" /> {t('skdr.home.ctaDashboard')}</Link>
+            <Link href="/main-dashboard" className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white hover:bg-primary-dark"><LayoutDashboard className="h-4 w-4" /> {t('skdr.home.ctaDashboard')}</Link>
             <Link href="/penyakit" className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-white px-5 py-3 text-sm font-bold text-brand-800 hover:bg-brand-50"><List className="h-4 w-4" /> {t('skdr.home.ctaDiseases')}</Link>
             <Link href="/dokumentasi" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><BookOpen className="h-4 w-4" /> {t('skdr.home.ctaDocs')}</Link>
           </div>
         </section>
 
         {/* right: latest data release */}
-        <aside className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/80 p-5 backdrop-blur" data-testid="home-release">
+        <aside className="min-w-0 rounded-2xl border border-white/70 bg-white/70 p-5 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md" data-testid="home-release">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">{t('skdr.home.releaseTitle')}</h2>
             {sm ? <span className="text-[11px] text-slate-500" data-testid="home-until">{t('skdr.home.dataUntil', { date: dmy(sm.kpi_trend?.until) })}</span> : null}
           </div>
           {err ? <ErrorState className="mt-4" message={err} onRetry={() => setTick((x) => x + 1)} /> : !sm || !lt ? (
             <div className="mt-4 space-y-3" role="status" aria-label={t('skdr.state.loading')}>
-              <div className="grid grid-cols-2 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3"><Skeleton className="h-3 w-20" /><Skeleton className="h-6 w-16" /><Skeleton className="h-6 w-full" /></div>)}</div>
+              <div className="grid grid-cols-2 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="skdr-card space-y-2 p-3"><Skeleton className="h-3 w-20" /><Skeleton className="h-6 w-16" /><Skeleton className="h-6 w-full" /></div>)}</div>
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-4 w-full" />)}
             </div>
           ) : (
@@ -186,6 +179,7 @@ export default function Beranda() {
           )}
         </aside>
       </div>
+      </div>
       <HomeSections hm={hm} err={err} onRetry={() => setTick((x) => x + 1)} />
     </div>
   )
@@ -211,18 +205,18 @@ function HomeSections({ hm, err, onRetry }: { hm: Home | null; err: string; onRe
     { n: '04', title: t('skdr.home.ex4'), desc: t('skdr.home.ex4Desc'), foot: t('skdr.home.ex4Foot', { a: fmt(c.indicators) }), href: '/dokumentasi' },
   ]
   const stat = (label: React.ReactNode, v: number | undefined, sub?: string) => (
-    <div className="min-w-0"><div className="text-4xl font-black leading-none text-white">{v === undefined ? '—' : fmt(v)}</div><div className="mt-2 text-xs font-semibold text-brand-100">{label}</div>{sub ? <div className="text-[11px] text-brand-200/80">{sub}</div> : null}</div>
+    <div className="min-w-0"><div className="text-4xl font-black leading-none text-brand-900">{v === undefined ? '—' : fmt(v)}</div><div className="mt-2 text-xs font-semibold text-slate-700">{label}</div>{sub ? <div className="text-[11px] text-slate-500">{sub}</div> : null}</div>
   )
   return (
     <div className="relative space-y-12 pb-14">
       {/* a. situation band */}
-      <section className="w-full bg-brand-900 px-4 py-10 text-white sm:px-6 lg:px-8" data-testid="home-situation">
+      <section className="w-full border-y border-rule bg-white px-4 py-10 text-slate-900 sm:px-6 lg:px-8" data-testid="home-situation">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)] lg:items-end">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-200">{t('skdr.home.sitEyebrow', { date: dmy(until) })}</div>
-            <h2 className="mt-2 text-3xl font-black">{t('skdr.home.sitTitle')}</h2>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-brand-100">{t('skdr.home.sitNote')}</p>
-            <Link href="/main-dashboard" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-white hover:underline">{t('skdr.home.openDash')} <ArrowRight className="h-4 w-4" /></Link>
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-700">{t('skdr.home.sitEyebrow', { date: dmy(until) })}</div>
+            <h2 className="mt-2 text-3xl font-black text-brand-900">{t('skdr.home.sitTitle')}</h2>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600">{t('skdr.home.sitNote')}</p>
+            <Link href="/main-dashboard" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-brand-700 hover:underline">{t('skdr.home.openDash')} <ArrowRight className="h-4 w-4" /></Link>
           </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             {stat(t('skdr.home.sitEbs'), hm.week.ebs?.records, hm.week.ebs ? t('skdr.home.sevenDays', { date: dmy(hm.week.ebs.until) }) : t('skdr.home.noData'))}
@@ -233,11 +227,11 @@ function HomeSections({ hm, err, onRetry }: { hm: Home | null; err: string; onRe
       </section>
 
       {/* b. start exploring */}
-      <section className="px-4 sm:px-6 lg:px-8" data-testid="home-explore">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-700">{t('skdr.home.exploreTitle')}</h2>
+      <section className="skdr-section px-4 sm:px-6 lg:px-8" data-testid="home-explore">
+        <div className="skdr-section-head"><h2 className="skdr-section-title">{t('skdr.home.exploreTitle')}</h2></div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((x) => (
-            <Link key={x.n} href={x.href} className="group flex flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-md">
+            <Link key={x.n} href={x.href} className="skdr-card group flex flex-col p-5 transition-colors hover:border-brand-300">
               <span className="text-sm font-black text-brand-600">{x.n}</span>
               <span className="mt-2 text-lg font-black text-slate-900 group-hover:text-brand-800">{x.title}</span>
               <span className="mt-1 flex-1 text-sm leading-relaxed text-slate-600">{x.desc}</span>
@@ -248,16 +242,16 @@ function HomeSections({ hm, err, onRetry }: { hm: Home | null; err: string; onRe
       </section>
 
       {/* c. provinces + diseases */}
-      <section className="grid grid-cols-1 gap-8 px-4 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <section className="skdr-section grid grid-cols-1 gap-8 px-4 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div data-testid="home-provinces">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-xl font-black text-slate-900">{t('skdr.home.provTitle')}</h2>
+          <div className="skdr-section-head flex items-baseline justify-between gap-3">
+            <h2 className="skdr-section-title">{t('skdr.home.provTitle')}</h2>
             <Link href="/main-dashboard" className="text-xs font-bold text-brand-700 hover:underline">{t('skdr.home.seeAllProv', { n: fmt(c.provinces_total) })} →</Link>
           </div>
           {hm.top_provinces.length ? (
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
               {hm.top_provinces.map((p) => (
-                <Link key={p.id} href={`/main-dashboard?province_id=${p.id}`} className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-md">
+                <Link key={p.id} href={`/main-dashboard?province_id=${p.id}`} className="skdr-card p-4 transition-colors hover:border-brand-300">
                   <div className="flex items-baseline justify-between gap-2"><span className="truncate font-black text-slate-900">{p.name}</span><span className="text-[11px] font-bold text-slate-400">{p.code || '—'}</span></div>
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                     <div><dt className="text-[10.5px] uppercase tracking-wide text-slate-500">{t('skdr.home.cases')}</dt><dd className="text-xs font-bold"><span className="text-ebs">{fmt(p.ebs.cases)}</span> · <span className="text-pe">{fmt(p.pe.cases)}</span></dd></div>
@@ -272,12 +266,12 @@ function HomeSections({ hm, err, onRetry }: { hm: Home | null; err: string; onRe
           <p className="mt-2 text-[11px] text-slate-500">{t('skdr.home.provLegend')}</p>
         </div>
         <div data-testid="home-diseases">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-xl font-black text-slate-900">{t('skdr.home.disTitle')}</h2>
+          <div className="skdr-section-head flex items-baseline justify-between gap-3">
+            <h2 className="skdr-section-title">{t('skdr.home.disTitle')}</h2>
             <Link href="/penyakit" className="text-xs font-bold text-brand-700 hover:underline">{t('skdr.home.seeAll')} →</Link>
           </div>
           {hm.top_diseases.length ? (
-            <ul className="mt-4 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
+            <ul className="mt-3 divide-y divide-slate-200 border-y skdr-rule">
               {hm.top_diseases.map((d) => (
                 <li key={d.code}><Link href={`/penyakit/${d.code.toLowerCase()}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-brand-50">
                   <span className="min-w-0"><span className="block truncate font-bold text-slate-900">{d.name}</span><span className="block text-[11px] text-slate-500">{d.category || t('skdr.home.noCategory')}</span></span>

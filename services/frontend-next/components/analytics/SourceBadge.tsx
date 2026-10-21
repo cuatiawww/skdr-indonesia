@@ -51,38 +51,54 @@ export function UkuranFilter({ value, onChange }: { value: UkuranEbs; onChange: 
   )
 }
 
-export function Panel({ title, children, className = '', right, testId, legend }: {
-  title: React.ReactNode; children: React.ReactNode; className?: string; right?: React.ReactNode; testId?: string; legend?: React.ReactNode
+/** PR 018: shared section header — small uppercase eyebrow (12px), title text-2xl bold in Kemenkes dark text,
+ *  optional one-line description (14px muted), thin rule; title-to-content gap 16px. Vertical rhythm between sections
+ *  comes from the `.skdr-section` token (32px mobile / 48px ≥1024 incl. the parent stack gap). */
+export function SectionHeader({ eyebrow, title, description, right }: {
+  eyebrow?: React.ReactNode; title?: React.ReactNode; description?: React.ReactNode; right?: React.ReactNode
 }) {
   return (
-    <article data-testid={testId} className={`relative flex h-full min-w-0 flex-col overflow-hidden border border-slate-200 bg-white p-4 shadow-sm ${className}`} style={{ borderRadius: '17px 17px 22px 17px' }}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-black uppercase tracking-wide text-slate-900">{title}</h3>
-        <div className="flex flex-wrap items-center gap-3">{legend}{right}</div>
+    <header className="skdr-section-head">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          {eyebrow ? <div className="skdr-eyebrow">{eyebrow}</div> : null}
+          {title ? <h2 className="skdr-section-title">{title}</h2> : null}
+          {description ? <p className="skdr-section-desc">{description}</p> : null}
+        </div>
+        {right ? <div className="flex flex-wrap items-center gap-3">{right}</div> : null}
       </div>
-      {children}
-    </article>
+    </header>
   )
 }
 
-/** Editorial section: small uppercase eyebrow + thin rule, no card frame (PR 016 disease page). */
-export function Section({ eyebrow, title, children, right, testId, className = '' }: {
-  eyebrow: string; title?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode; testId?: string; className?: string
+/** Editorial panel (charts/maps/tables, no card frame). API unchanged so every existing Panel follows the header. */
+export function Panel({ title, children, className = '', right, testId, legend, eyebrow, description }: {
+  title: React.ReactNode; children: React.ReactNode; className?: string; right?: React.ReactNode; testId?: string; legend?: React.ReactNode
+  eyebrow?: React.ReactNode; description?: React.ReactNode
 }) {
   return (
-    <section data-testid={testId} className={`min-w-0 ${className}`}>
-      <div className="flex items-end justify-between gap-3 border-b border-slate-200 pb-1.5">
-        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-brand-700">{eyebrow}</div>
-        {right ? <div className="flex flex-wrap items-center gap-3">{right}</div> : null}
-      </div>
-      {title ? <h2 className="mt-3 text-lg font-black text-slate-900">{title}</h2> : null}
-      <div className="mt-3">{children}</div>
+    <section data-testid={testId} className={`skdr-section relative flex h-full min-w-0 flex-col ${className}`}>
+      <SectionHeader eyebrow={eyebrow} title={title} description={description} right={legend || right ? <>{legend}{right}</> : null} />
+      {children}
+    </section>
+  )
+}
+
+/** Editorial section with eyebrow + optional title (PR 016 disease page). */
+export function Section({ eyebrow, title, description, children, right, testId, className = '' }: {
+  eyebrow: string; title?: React.ReactNode; description?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode; testId?: string; className?: string
+}) {
+  return (
+    <section data-testid={testId} className={`skdr-section min-w-0 ${className}`}>
+      {title ? <SectionHeader eyebrow={eyebrow} title={title} description={description} right={right} />
+        : <SectionHeader title={eyebrow} description={description} right={right} />}
+      <div>{children}</div>
     </section>
   )
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">{children}</div>
+  return <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-line bg-page px-4 py-6 text-center text-xs text-slate-500">{children}</div>
 }
 
 /** One-line muted note when a source has no data (instead of a big empty box). */

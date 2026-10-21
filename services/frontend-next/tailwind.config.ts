@@ -15,6 +15,11 @@ const config: Config = {
     extend: {
       colors: {
         brand: BRAND,
+        // PR 018 surface tokens (globals.css)
+        page: 'rgb(var(--page-bg) / <alpha-value>)',
+        card: 'rgb(var(--card-bg) / <alpha-value>)',
+        line: 'rgb(var(--card-border) / <alpha-value>)',
+        rule: 'rgb(var(--rule) / <alpha-value>)',
         blue: BRAND,
         sky: BRAND,
         primary: { DEFAULT: v("brand-700"), dark: v("brand-800"), light: v("brand-500") },

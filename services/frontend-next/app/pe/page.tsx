@@ -1,6 +1,7 @@
 'use client'
 // PR 017: "Daftar PE" — seluruh laporan PE lintas penyakit (registri pe_form_definitions), dengan filter penyakit,
 // status, pencarian, lihat/ubah/hapus (soft delete, hanya Draf) dan tambah PE per formulir.
+import PageHeader from '@/components/PageHeader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown, Eye, FilePlus2, Pencil, RefreshCw, Search, Trash2, TriangleAlert } from 'lucide-react'
@@ -88,13 +89,9 @@ export default function DaftarPePage() {
   }
 
   return (
-    <div className="w-full space-y-5 bg-[#f8fafc] px-4 pb-6 sm:px-6 lg:px-8" data-testid="pe-daftar">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold uppercase tracking-[0.04em] text-slate-900">Daftar Penyelidikan Epidemiologi</h1>
-          <p className="text-xs text-slate-500">Seluruh laporan PE dari semua formulir penyakit yang terdaftar.</p>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="skdr-page w-full bg-page px-4 py-6 sm:px-6 lg:px-8" data-testid="pe-daftar">
+      <PageHeader eyebrow="Penyelidikan Epidemiologi" title="Daftar Penyelidikan Epidemiologi" subtitle="Seluruh laporan PE dari semua formulir penyakit yang terdaftar." actions={<>
+
           <button onClick={load} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Muat ulang
           </button>
@@ -104,13 +101,12 @@ export default function DaftarPePage() {
               <FilePlus2 className="h-4 w-4" /> Tambah PE <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {addOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" onKeyDown={(e) => e.key === 'Escape' && setAddOpen(false)}>
+              <div className="absolute right-0 top-full z-30 mt-1 w-64 skdr-card p-1.5 shadow-xs" onKeyDown={(e) => e.key === 'Escape' && setAddOpen(false)}>
                 {forms.map((f) => <Link key={f.form_key} href={`/pe/${f.form_key}/baru`} className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none">{peFormLabel(f.title)}</Link>)}
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </>} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {forms.map((f) => (
@@ -123,7 +119,7 @@ export default function DaftarPePage() {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="flex flex-wrap items-center gap-3 border-b skdr-rule pb-3">
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1) }} placeholder="Cari No. PE, nama pasien, atau kab/kota" />
@@ -143,7 +139,7 @@ export default function DaftarPePage() {
         <div className="ml-auto text-xs font-medium text-slate-500">Total: <span className="font-bold text-slate-800">{total.toLocaleString('id-ID')}</span></div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden border-b skdr-rule">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead><tr className={tableHeadCls}>

@@ -43,7 +43,7 @@ export default function MasterKabupatenPage() {
 
   const selCls = 'rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold normal-case text-slate-700 focus:border-primary focus:outline-none'
   return (
-    <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full space-y-6 bg-page px-4 py-6 sm:px-6 lg:px-8">
       <MasterHeader icon={<MapPin className="h-5 w-5" />} title={t('skdr.master.kab.title')} subtitle={t('skdr.master.kab.subtitle')}
         loading={list.loading} onRefresh={list.reload} onAdd={() => { setEditing(null); setOpen(true) }} addLabel={t('skdr.master.kab.add')} />
       <MasterToolbar search={list.search} setSearch={list.setSearch} placeholder={t('skdr.master.kab.search')}

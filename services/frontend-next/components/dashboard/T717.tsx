@@ -9,6 +9,7 @@ import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { fmt as n, pct1 } from '@/lib/analytics-api'
 import { MutedNote, Panel } from '@/components/analytics/SourceBadge'
 import type { Sumber } from '@/lib/use-sumber'
+import { LihatButton, useSignalModal } from '@/components/dashboard/SignalModal'
 
 export type Stage = { den: number; on_time: number; late: number; missing: number; median_days: number | null; pct: number | null }
 export type T717Data = {
@@ -16,6 +17,26 @@ export type T717Data = {
   missing_fields: { detection: string[]; response: string[] }
   diseases: { id: number; code: string; name: string; notification: Stage }[]
   thresholds: { green: number; yellow: number } | null
+  /** PR 018: latest alerts in the filter with their notification lag (days) */
+  signals?: { id: number; no_ebs: string | null; disease: string | null; kabkota: string | null; province: string | null; tgl_laporan: string | null; created: string | null; notif_days: number | null; status: string | null }[]
+}
+
+/** PR 018 (mockup #s3b): stacked bar on-time / late / missing date for one stage. */
+function Stack({ s, compact = false }: { s: Stage | null; compact?: boolean }) {
+  const { t } = useTranslation()
+  if (!s || !s.den) return <div className={`${compact ? 'h-2' : 'h-2.5'} rounded-full bg-slate-100`} title={t('skdr.t717.unavailable')} />
+  const parts = [
+    { k: 'on', v: s.on_time, c: 'bg-emerald-500', l: t('skdr.t717.onTime') },
+    { k: 'late', v: s.late, c: 'bg-red-500', l: t('skdr.t717.late') },
+    { k: 'miss', v: s.missing, c: 'bg-slate-300', l: t('skdr.t717.missing') },
+  ]
+  const tot = parts.reduce((a, p) => a + p.v, 0) || 1
+  return (
+    <div className={`flex ${compact ? 'h-2' : 'h-2.5'} overflow-hidden rounded-full bg-slate-100`} role="img"
+      aria-label={parts.map((p) => `${p.l} ${n(p.v)}`).join(', ')} data-testid="t717-stack">
+      {parts.map((p) => p.v > 0 ? <span key={p.k} className={p.c} style={{ width: `${(p.v * 100) / tot}%` }} title={`${p.l}: ${n(p.v)}`} /> : null)}
+    </div>
+  )
 }
 
 function tone(p: number | null | undefined, th: T717Data['thresholds']) {
@@ -47,6 +68,12 @@ function Card({ k, title, target, explain, s, missing, th, rows, open, onToggle 
           <div className="mt-1 text-xs font-semibold text-slate-600">{t('skdr.t717.meetTarget')}</div>
           <div className="mt-2 text-xs text-slate-600">{t('skdr.t717.median', { d: s!.median_days === null ? '—' : pct1(s!.median_days) })} · {t('skdr.t717.onTimeOf', { n: n(s!.on_time), N: n(s!.den) })}</div>
           {s!.missing ? <div className="text-xs text-slate-500">{t('skdr.t717.missingDates', { n: n(s!.missing) })}</div> : null}
+          <div className="mt-2"><Stack s={s} /></div>
+          <div className="mt-1 flex flex-wrap gap-x-2 text-[10.5px] text-slate-600">
+            <span><span className="text-emerald-600">■</span> {t('skdr.t717.onTime')} {n(s!.on_time)}</span>
+            <span><span className="text-red-500">■</span> {t('skdr.t717.late')} {n(s!.late)}</span>
+            <span><span className="text-slate-400">■</span> {t('skdr.t717.missing')} {n(s!.missing)}</span>
+          </div>
         </>
       ) : (
         <>
@@ -61,7 +88,7 @@ function Card({ k, title, target, explain, s, missing, th, rows, open, onToggle 
         <div className="min-h-0 overflow-hidden">
           <table className="mt-3 w-full text-left text-xs" data-testid="t717-detail">
             <thead className="border-b border-slate-200 text-[10.5px] uppercase tracking-wide text-slate-500">
-              <tr><th className="py-1.5 pr-2">{t('skdr.dtable.disease')}</th><th className="px-2 text-right">%</th><th className="px-2 text-right">{t('skdr.t717.medianShort')}</th><th className="pl-2 text-right">n/N</th></tr>
+              <tr><th className="py-1.5 pr-2">{t('skdr.dtable.disease')}</th><th className="px-2 text-right">%</th><th className="px-2 text-right">{t('skdr.t717.medianShort')}</th><th className="pl-2 text-right">n/N</th><th className="w-20 pl-2"><span className="sr-only">{t('skdr.t717.split')}</span></th></tr>
             </thead>
             <tbody className="divide-y divide-slate-200/70">
               {rows.length ? rows.map((r) => {
@@ -72,9 +99,10 @@ function Card({ k, title, target, explain, s, missing, th, rows, open, onToggle 
                     <td className={`px-2 text-right font-black ${r.s && r.s.pct !== null ? rc.text : 'text-slate-400'}`}>{r.s && r.s.pct !== null ? `${pct1(r.s.pct)}%` : '—'}</td>
                     <td className="px-2 text-right text-slate-600">{r.s && r.s.median_days !== null ? pct1(r.s.median_days) : '—'}</td>
                     <td className="pl-2 text-right text-slate-600">{r.s && r.s.den ? `${n(r.s.on_time)}/${n(r.s.den)}` : '—'}</td>
+                    <td className="pl-2"><Stack s={r.s} compact /></td>
                   </tr>
                 )
-              }) : <tr><td colSpan={4} className="py-2 text-slate-500">{t('skdr.state.empty')}</td></tr>}
+              }) : <tr><td colSpan={5} className="py-2 text-slate-500">{t('skdr.state.empty')}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -91,7 +119,8 @@ function Card({ k, title, target, explain, s, missing, th, rows, open, onToggle 
 
 export default function T717({ data, sumber }: { data: T717Data | null | undefined; sumber: Sumber }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const [open2, setOpen] = useState(false)
+  const { open, modal } = useSignalModal()
   const info = (
     <span className="inline-flex cursor-help items-center text-slate-400" title={t('skdr.t717.info')} data-testid="t717-info"><Info className="h-4 w-4" /></span>
   )
@@ -105,7 +134,7 @@ export default function T717({ data, sumber }: { data: T717Data | null | undefin
   const th = data.thresholds
   // detection/response have no per-disease values yet (fields missing from the EBS feed) → rows show "—"
   const rows = (k: Key) => data.diseases.map((d) => ({ id: d.id, name: d.name, s: k === 'notification' ? d.notification : ((d as Record<string, unknown>)[k] as Stage | undefined) ?? null }))
-  const common = { th, open, onToggle: () => setOpen((v) => !v) }
+  const common = { th, open: open2, onToggle: () => setOpen((v) => !v) }
   return (
     <Panel title={<span className="inline-flex items-center gap-2">{t('skdr.t717.title')} {info}</span>} testId="t717">
       <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-3">
@@ -113,6 +142,37 @@ export default function T717({ data, sumber }: { data: T717Data | null | undefin
         <Card k="notification" title={t('skdr.t717.notify')} target={t('skdr.t717.target', { d: 1 })} explain={t('skdr.t717.notifyExplain')} s={data.notification} rows={rows('notification')} {...common} />
         <Card k="response" title={t('skdr.t717.respond')} target={t('skdr.t717.target', { d: 7 })} explain={t('skdr.t717.respondExplain')} s={data.response} missing={data.missing_fields.response} rows={rows('response')} {...common} />
       </div>
+      {/* PR 018: per-signal timing — latest alerts with their notification lag vs the 1-day target; Lihat opens the modal */}
+      <div className="mt-4" data-testid="t717-signals">
+        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">{t('skdr.t717.signalsTitle')}</h4>
+        {data.signals?.length ? (
+          <div className="mt-2 max-h-80 overflow-auto rounded-lg border border-line">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-[10.5px] uppercase tracking-wide text-slate-500">
+                <tr><th className="px-2 py-1.5">{t('skdr.t717.colSignal')}</th><th className="px-2">{t('skdr.dtable.disease')}</th><th className="px-2">{t('skdr.t717.colLocation')}</th>
+                  <th className="px-2">{t('skdr.t717.colReport')}</th><th className="px-2">{t('skdr.t717.colCreated')}</th><th className="px-2 text-right">{t('skdr.t717.notify')}</th>
+                  <th className="px-2">{t('skdr.t717.detect')} / {t('skdr.t717.respond')}</th><th className="px-2"><span className="sr-only">{t('skdr.signal.view')}</span></th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.signals.map((r) => (
+                  <tr key={r.id}>
+                    <td className="px-2 py-1.5 font-mono font-semibold text-slate-800">{r.no_ebs || `#${r.id}`}</td>
+                    <td className="px-2 text-slate-700">{r.disease || '—'}</td>
+                    <td className="px-2 text-slate-600">{[r.kabkota, r.province].filter(Boolean).join(', ') || '—'}</td>
+                    <td className="px-2 tabular-nums text-slate-600">{r.tgl_laporan ? r.tgl_laporan.split('-').reverse().join('/') : '—'}</td>
+                    <td className="px-2 tabular-nums text-slate-600">{r.created ? `${r.created.slice(0, 10).split('-').reverse().join('/')}${r.created.slice(10)}` : '—'}</td>
+                    <td className={`px-2 text-right font-black tabular-nums ${r.notif_days === null ? 'text-slate-400' : r.notif_days <= 1 ? 'text-emerald-700' : 'text-red-600'}`}>
+                      {r.notif_days === null ? '—' : t('skdr.signal.days', { n: r.notif_days })}</td>
+                    <td className="px-2 text-[11px] text-slate-400">{t('skdr.t717.unavailable')}</td>
+                    <td className="px-2 text-right"><LihatButton onClick={() => open('ebs', r.id)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="mt-2 text-xs text-slate-500">{t('skdr.t717.unavailable')}</div>}
+      </div>
+      {modal}
       <p className="mt-3 text-[11px] leading-relaxed text-slate-500">{t('skdr.t717.footer', { g: th?.green ?? '—', y: th?.yellow ?? '—' })}</p>
     </Panel>
   )

@@ -3,19 +3,46 @@
 // SKDR filter bar: same layout/styling as NLP EpiFilterBar, but Indonesia only:
 // Penyakit + Provinsi + Kabupaten/Kota (depends on Provinsi) + MMWR epi-week range.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Filter, MapPin, Map as MapIcon, CalendarDays, Bug, Calendar, CheckCircle2, RotateCcw, ChevronDown, AlertCircle, Radio } from 'lucide-react';
+import { Filter, MapPin, Map as MapIcon, CalendarDays, Bug, Calendar, CheckCircle2, RotateCcw, AlertCircle, Radio } from 'lucide-react';
 import { getEpiWeekDateRange, getCurrentEpiWeek, formatEpiRangeDescription, getWeeksInYear } from '@/lib/epi-week';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
 import { SourceFilter } from '@/components/analytics/SourceBadge';
 import type { Sumber } from '@/lib/use-sumber';
-import { fetchProvinces, fetchKabkota, type MasterProvince, type MasterKabkota } from '@/lib/skdr-api';
+import { fetchProvinces, fetchFormDiseases, type MasterProvince, type MasterKabkota, type MasterDisease } from '@/lib/skdr-api';
+import { fetchFrom } from '@/lib/api';
+import MultiSelect from '@/components/filters/MultiSelect';
 
+/** API params for a filter state: comma lists, omitted when not narrowed. */
+export function filterParams(f: SkdrFilterState) {
+  return {
+    disease: f.diseases.length ? f.diseases.join(',') : undefined,
+    province_id: f.provinceIds.length ? f.provinceIds.join(',') : undefined,
+    kabkota_id: f.kabkotaIds.length ? f.kabkotaIds.join(',') : undefined,
+  };
+}
+/** Browser URL state: ?penyakit=a,b&prov=11,12&kab=... */
+export function readUrlFilters(sp: URLSearchParams) {
+  const ints = (v: string | null) => (v || '').split(',').map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0);
+  return {
+    diseases: (sp.get('penyakit') || '').split(',').map((x) => x.trim()).filter(Boolean),
+    provinceIds: ints(sp.get('prov')),
+    kabkotaIds: ints(sp.get('kab')),
+  };
+}
+export function writeUrlFilters(url: URL, f: SkdrFilterState) {
+  const set = (k: string, v: (string | number)[]) => (v.length ? url.searchParams.set(k, v.join(',')) : url.searchParams.delete(k));
+  set('penyakit', f.diseases); set('prov', f.provinceIds); set('kab', f.kabkotaIds);
+  for (const old of ['disease', 'province_id', 'kabkota_id']) url.searchParams.delete(old);
+}
+
+/** PR 018: multi-select — every list empty = semua (no narrowing). */
 export interface SkdrFilterState {
-  disease: string;
+  /** registry disease codes */
+  diseases: string[];
   /** 'all' | 'form' | 'ebs' */
   source: string;
-  provinceId: number | null;
-  kabkotaId: number | null;
+  provinceIds: number[];
+  kabkotaIds: number[];
   startYear: number;
   startWeek: number;
   endYear: number;
@@ -41,16 +68,17 @@ interface Props {
 }
 
 const box =
-  'relative h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-100 transition shadow-2xs';
+  'relative h-10 min-w-0 rounded-lg border border-line bg-card hover:border-brand-300 focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-100 transition shadow-2xs';
 const sel = 'h-full w-full truncate appearance-none bg-transparent px-3 text-xs font-bold text-slate-800 outline-none cursor-pointer pr-8 disabled:cursor-not-allowed disabled:text-slate-400';
 const mini = 'h-8 min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent px-1 text-xs font-bold text-slate-800 outline-none hover:bg-white';
 const chev = 'pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400';
+// PR 018: 3 columns at lg, one row from 2xl (multi-select labels like "3 provinsi dipilih" need the width)
 // static class names so Tailwind can see them: key = <has Sumber><has Penyakit>
 const GRID: Record<string, string> = {
-  '11': 'lg:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
-  '10': 'lg:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
-  '01': 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
-  '00': 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '11': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '10': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '01': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '00': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
 };
 const lbl = 'flex h-4 items-center gap-1 truncate text-[10.5px] font-extrabold uppercase leading-none tracking-wider text-slate-700';
 
@@ -72,25 +100,15 @@ export default function SkdrFilterBar({
   const [draft, setDraft] = useState<SkdrFilterState>(value);
   const [provinces, setProvinces] = useState<MasterProvince[]>([]);
   const [kabkota, setKabkota] = useState<MasterKabkota[]>([]);
+  const [diseases, setDiseases] = useState<MasterDisease[]>([]);
 
   useEffect(() => setDraft(value), [value]);
   useEffect(() => {
     fetchProvinces().then(setProvinces).catch(() => setProvinces([]));
+    // all kab/kota once (≈514 rows); the list is narrowed to the checked provinces on the client
+    fetchFrom<MasterKabkota[]>('/api/v1/master/kabkota').then(setKabkota).catch(() => setKabkota([]));
+    fetchFormDiseases().then(setDiseases).catch(() => setDiseases([]));
   }, []);
-  useEffect(() => {
-    if (!draft.provinceId) {
-      setKabkota([]);
-      return;
-    }
-    let live = true;
-    fetchKabkota(draft.provinceId)
-      .then((rows) => live && setKabkota(rows))
-      .catch(() => live && setKabkota([]));
-    return () => {
-      live = false;
-    };
-  }, [draft.provinceId]);
-
   const currentEpi = useMemo(
     () => (serverEpiWeek && serverEpiYear ? { year: serverEpiYear, week: serverEpiWeek } : getCurrentEpiWeek()),
     [serverEpiWeek, serverEpiYear],
@@ -107,12 +125,28 @@ export default function SkdrFilterBar({
     [draft.startYear, draft.startWeek, draft.endYear, draft.endWeek],
   );
   const invalid = draft.startYear > draft.endYear || (draft.startYear === draft.endYear && draft.startWeek > draft.endWeek);
+  // Penyakit options from the registry (master_diseases); availableDiseases (names) only as a fallback before it loads
   const diseaseOptions = useMemo(
-    () => Array.from(new Set(availableDiseases.filter((d) => d && d.trim()).map((d) => d.trim()))).sort((a, b) => a.localeCompare(b, 'id')),
-    [availableDiseases],
+    () => diseases.length
+      ? diseases.map((d) => ({ value: d.code, label: d.name })).sort((a, b) => a.label.localeCompare(b.label, 'id'))
+      : Array.from(new Set(availableDiseases.filter((d) => d && d.trim()))).sort((a, b) => a.localeCompare(b, 'id')).map((d) => ({ value: d, label: d })),
+    [diseases, availableDiseases],
   );
-  const provinceName = provinces.find((p) => p.id === draft.provinceId)?.name;
-  const kabName = kabkota.find((k) => k.id === draft.kabkotaId)?.name;
+  const provinceOptions = useMemo(() => provinces.map((p) => ({ value: String(p.id), label: p.name })), [provinces]);
+  // Kab/Kota limited to the checked provinces (all provinces when none checked), grouped by province
+  const kabOptions = useMemo(() => {
+    const ps = new Set(draft.provinceIds);
+    return kabkota.filter((k) => ps.size === 0 || ps.has(k.province_id))
+      .sort((a, b) => a.province_name.localeCompare(b.province_name, 'id') || a.name.localeCompare(b.name, 'id'))
+      .map((k) => ({ value: String(k.id), label: k.name, group: k.province_name }));
+  }, [kabkota, draft.provinceIds]);
+  const setProvinces2 = (ids: number[]) => {
+    // unchecking a province drops its kab/kota from the selection
+    const ps = new Set(ids);
+    const keep = draft.kabkotaIds.filter((id) => { const k = kabkota.find((x) => x.id === id); return !k || ps.size === 0 || ps.has(k.province_id); });
+    setDraft({ ...draft, provinceIds: ids, kabkotaIds: keep });
+  };
+  const ms = { searchPlaceholder: t('skdr.filter.search'), selectAllLabel: t('skdr.filter.selectAll'), clearLabel: t('skdr.filter.clear'), emptyLabel: t('skdr.filter.noOptions') };
 
   const apply = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -122,7 +156,7 @@ export default function SkdrFilterBar({
   };
   const reset = () => {
     const d: SkdrFilterState = {
-      disease: 'all', source: 'all', provinceId: null, kabkotaId: null,
+      diseases: [], source: 'all', provinceIds: [], kabkotaIds: [],
       startYear: currentEpi.year, startWeek: 1, endYear: currentEpi.year, endWeek: currentEpi.week || 1,
     };
     setDraft(d);
@@ -131,8 +165,8 @@ export default function SkdrFilterBar({
   };
 
   return (
-    <section className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all relative">
-      {compact ? null : <div className="flex flex-col gap-2 pb-3 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between">
+    <section className="relative w-full border-b skdr-rule pb-4">
+      {compact ? null : <div className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2.5 text-primary">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-primary">
             <Filter className="h-4 w-4" />
@@ -171,38 +205,24 @@ export default function SkdrFilterBar({
           {showDisease ? (
             <div className="flex min-w-0 flex-col gap-1.5">
               <label htmlFor="select-disease" className={lbl}><Bug className="h-3 w-3 text-primary" />{t('skdr.filter.disease')}</label>
-              <div className={box} title={draft.disease === 'all' ? t('skdr.filter.allClassifications') : draft.disease}>
-                <select id="select-disease" value={draft.disease} onChange={(e) => setDraft({ ...draft, disease: e.target.value })} className={sel}>
-                  <option value="all">{t('skdr.filter.allDiseases')}</option>
-                  {diseaseOptions.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-                <ChevronDown className={chev} />
-              </div>
+              <MultiSelect id="select-disease" options={diseaseOptions} value={draft.diseases} {...ms}
+                onChange={(v) => setDraft({ ...draft, diseases: v })}
+                allLabel={t('skdr.filter.allDiseasesMs')} countLabel={(n) => t('skdr.filter.nDiseases', { n })} />
             </div>
           ) : null}
 
           <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor="select-province" className={lbl}><MapIcon className="h-3 w-3 text-primary" />{t('skdr.filter.province')}</label>
-            <div className={box} title={provinceName || t('skdr.filter.allIndonesia')}>
-              <select id="select-province" value={draft.provinceId ?? ''} className={sel}
-                onChange={(e) => setDraft({ ...draft, provinceId: e.target.value ? Number(e.target.value) : null, kabkotaId: null })}>
-                <option value="">{t('skdr.filter.allProvinces', { count: provinces.length || 38 })}</option>
-                {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <ChevronDown className={chev} />
-            </div>
+            <MultiSelect id="select-province" options={provinceOptions} value={draft.provinceIds.map(String)} {...ms}
+              onChange={(v) => setProvinces2(v.map(Number))}
+              allLabel={t('skdr.filter.allProvincesMs')} countLabel={(n) => t('skdr.filter.nProvinces', { n })} />
           </div>
 
           <div className="flex min-w-0 flex-col gap-1.5">
             <label htmlFor="select-kabkota" className={lbl}><MapPin className="h-3 w-3 text-primary" />{t('skdr.filter.kabkota')}</label>
-            <div className={box} title={kabName || (draft.provinceId ? t('skdr.filter.wholeProvince') : t('skdr.filter.chooseProvinceFirst'))}>
-              <select id="select-kabkota" value={draft.kabkotaId ?? ''} disabled={!draft.provinceId} className={sel}
-                onChange={(e) => setDraft({ ...draft, kabkotaId: e.target.value ? Number(e.target.value) : null })}>
-                <option value="">{draft.provinceId ? t('skdr.filter.allKabkota', { count: kabkota.length }) : t('skdr.filter.chooseProvinceFirst')}</option>
-                {kabkota.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-              </select>
-              <ChevronDown className={chev} />
-            </div>
+            <MultiSelect id="select-kabkota" options={kabOptions} value={draft.kabkotaIds.map(String)} {...ms}
+              onChange={(v) => setDraft({ ...draft, kabkotaIds: v.map(Number) })}
+              allLabel={draft.provinceIds.length ? t('skdr.filter.allKabkotaSelected') : t('skdr.filter.allKabkotaMs')} countLabel={(n) => t('skdr.filter.nKabkota', { n })} />
           </div>
 
           <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-1">

@@ -10,8 +10,9 @@ use crate::{internal, ApiError, AppState};
 
 #[derive(Deserialize, Default, Clone)]
 pub struct DashQuery {
-    pub province_id: Option<i32>,
-    pub kabkota_id: Option<i32>,
+    /// PR 018: multi-select — comma lists ("11,12"); a single value still works.
+    pub province_id: Option<String>,
+    pub kabkota_id: Option<String>,
     pub disease: Option<String>,
     pub start_year: Option<i32>,
     pub start_week: Option<i32>,
@@ -43,14 +44,19 @@ pub fn current_mmwr(today: NaiveDate) -> (i32, i32) {
 pub struct Resolved {
     pub(crate) start: Option<NaiveDate>,
     pub(crate) end: Option<NaiveDate>,
-    pub(crate) province: Option<i32>,
-    pub(crate) kabkota: Option<i32>,
-    pub(crate) disease: Option<String>,
+    pub(crate) province: Vec<i32>,
+    pub(crate) kabkota: Vec<i32>,
+    /// disease codes/names as selected; `disease_ids` = the matching master_diseases ids
+    pub(crate) disease: Vec<String>,
+    pub(crate) disease_ids: Vec<i32>,
+    pub(crate) disease_names: Vec<String>,
     pub(crate) source: Option<String>,
     pub(crate) scope: String,
 }
 
 impl Resolved {
+    /// Display label for the disease selection (null = all diseases).
+    pub(crate) fn disease_label(&self) -> Option<String> { if self.disease.is_empty() { None } else if self.disease_names.is_empty() { Some(self.disease.join(", ")) } else { Some(self.disease_names.join(", ")) } }
     fn params(&self) -> [&(dyn ToSql + Sync); 6] {
         [&self.start, &self.end, &self.province, &self.kabkota, &self.disease, &self.source]
     }
@@ -65,7 +71,7 @@ impl Resolved {
             self.start.map(|d| d.to_string()).unwrap_or_default(),
             self.end.map(|d| d.to_string()).unwrap_or_default(),
             self.scope,
-            self.disease.clone().unwrap_or_else(|| "all".into())
+            if self.disease.is_empty() { "all".to_string() } else { self.disease.join(",") }
         )
     }
 }
@@ -81,8 +87,8 @@ fn base() -> String {
      LEFT JOIN master_locations l ON l.id = r.location_id
      LEFT JOIN master_kabkota k ON k.id = r.kabkota_id
      WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
-       AND ($3::int IS NULL OR r.location_id = $3) AND ($4::int IS NULL OR r.kabkota_id = $4)
-       AND ($5::text IS NULL OR d.name = $5 OR d.code = $5 OR (d.id IS NULL AND r.diagnosa = $5))
+       AND (cardinality($3::int[]) = 0 OR r.location_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR r.kabkota_id = ANY($4))
+       AND (cardinality($5::text[]) = 0 OR d.name = ANY($5) OR d.code = ANY($5) OR (d.id IS NULL AND r.diagnosa = ANY($5)))
        AND ($6::text IS NULL OR r.source = $6)"
         .to_string()
 }
@@ -99,18 +105,29 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
     let pd = |s: &Option<String>| s.as_deref().and_then(|s| NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d").ok());
     let start = pd(&q.start_date).or(start);
     let end = pd(&q.end_date).or(end);
-    let disease = q.disease.clone().map(|d| d.trim().to_string()).filter(|d| !d.is_empty() && d.to_lowercase() != "all");
-    // Scope label: kab/kota name, else province name, else Indonesia.
-    let scope = if let Some(k) = q.kabkota_id {
-        c.query_opt("SELECT name FROM master_kabkota WHERE id = $1", &[&k]).await.map_err(internal)?.map(|r| r.get::<_, String>(0))
-    } else if let Some(p) = q.province_id {
-        c.query_opt("SELECT name FROM master_locations WHERE id = $1", &[&p]).await.map_err(internal)?.map(|r| r.get::<_, String>(0))
+    let ints = |v: &Option<String>| -> Vec<i32> { v.as_deref().unwrap_or("").split(',').filter_map(|x| x.trim().parse().ok()).collect() };
+    let province = ints(&q.province_id);
+    let kabkota = ints(&q.kabkota_id);
+    let disease: Vec<String> = q.disease.as_deref().unwrap_or("").split(',').map(|d| d.trim().to_string())
+        .filter(|d| !d.is_empty() && d.to_lowercase() != "all").collect();
+    let drows = if disease.is_empty() { vec![] } else {
+        c.query("SELECT id, name FROM master_diseases WHERE code = ANY($1) OR name = ANY($1) OR lower(code) = ANY($1) ORDER BY name", &[&disease]).await.map_err(internal)?
+    };
+    let disease_ids: Vec<i32> = drows.iter().map(|r| r.get(0)).collect();
+    let disease_names: Vec<String> = drows.iter().map(|r| r.get(1)).collect();
+    // Scope label: one kab/kota or province by name, several = count, none = Indonesia.
+    let scope = if !kabkota.is_empty() {
+        if kabkota.len() == 1 { c.query_opt("SELECT name FROM master_kabkota WHERE id = $1", &[&kabkota[0]]).await.map_err(internal)?.map(|r| r.get::<_, String>(0)) }
+        else { Some(format!("{} kab/kota", kabkota.len())) }
+    } else if !province.is_empty() {
+        if province.len() == 1 { c.query_opt("SELECT name FROM master_locations WHERE id = $1", &[&province[0]]).await.map_err(internal)?.map(|r| r.get::<_, String>(0)) }
+        else { Some(format!("{} provinsi", province.len())) }
     } else {
         None
     };
     // PR 012: "pe" = Kasus PE (individual reports); "form" = legacy case_reports (hidden menu, data kept)
     let source = q.source.clone().map(|s| s.trim().to_lowercase()).filter(|s| s == "form" || s == "ebs" || s == "pe");
-    Ok(Resolved { start, end, province: q.province_id, kabkota: q.kabkota_id, disease, source, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
+    Ok(Resolved { start, end, province, kabkota, disease, disease_ids, disease_names, source, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
 }
 
 async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
@@ -247,7 +264,7 @@ async fn by_province(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
     let mut rows = grouped(c, f, "COALESCE(l.name, 'Tidak diketahui')").await?;
     // Every province is listed, with 0 when it has no reports (all 38 unless filtered to one province).
     let names = c
-        .query("SELECT name FROM master_locations WHERE is_active AND ($1::int IS NULL OR id = $1) ORDER BY name", &[&f.province])
+        .query("SELECT name FROM master_locations WHERE is_active AND (cardinality($1::int[]) = 0 OR id = ANY($1)) ORDER BY name", &[&f.province])
         .await
         .map_err(internal)?;
     for n in names {
@@ -322,7 +339,7 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
             "available_years": years, "available_diseases": diseases,
             "current_epi_week": ew, "current_epi_year": ey,
             "filters": {
-                "country": COUNTRY, "scope": f.scope, "province_id": q.province_id, "kabkota_id": q.kabkota_id, "disease": f.disease, "source": null,
+                "country": COUNTRY, "scope": f.scope, "province_id": f.province, "kabkota_id": f.kabkota, "disease": f.disease_label(), "source": null,
                 "start_date": f.start.map(|d| d.to_string()), "end_date": f.end.map(|d| d.to_string()),
                 "start_year": q.start_year, "start_week": q.start_week, "end_year": q.end_year, "end_week": q.end_week, "year": q.end_year,
             },

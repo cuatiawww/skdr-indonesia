@@ -1,5 +1,8 @@
 mod cache;
 mod case_reports;
+mod signals;
+mod privacy;
+mod nar;
 mod dashboard;
 mod db;
 mod ebs;
@@ -95,6 +98,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/analytics/home", get(analytics::home))
         .route("/api/v1/analytics/diseases", get(analytics::diseases))
         .route("/api/v1/analytics/diseases/:code", get(analytics::disease))
+        // PR 018: one detail endpoint for the signal modal (EBS or PE)
+        .route("/api/v1/signals/pe-deaths", get(signals::pe_deaths))
+        .route("/api/v1/signals/:source/:id", get(signals::detail))
+        .route("/api/v1/nar/summary", get(nar::summary))
         .route("/api/v1/crawling-stats", get(dashboard::crawling_stats))
         .route("/api/v1/crawling-stats/live", get(dashboard::crawling_stats_live))
         .route("/api/v1/crawl-history/summary", get(dashboard::crawl_history_summary))

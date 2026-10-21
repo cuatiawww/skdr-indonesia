@@ -23,7 +23,7 @@ import CircleGeom from "ol/geom/Circle";
 import Point from "ol/geom/Point";
 import LineString from "ol/geom/LineString";
 import type { FeatureLike } from "ol/Feature";
-import { fromLonLat, toLonLat } from "ol/proj";
+import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { getCenter } from "ol/extent";
 import { getDistance } from "ol/sphere";
 import { unByKey } from "ol/Observable";
@@ -47,6 +47,7 @@ import {
   type MasterCountry,
 } from "@/lib/api";
 import FlightRoutesLayer from "@/components/FlightRoutesLayer";
+import { buildChoroClasses, choroClassFor, useChoroConfig, type ChoroClass, type ChoroConfig } from "@/lib/choropleth-classes";
 import { adminLevelCode, countryInScope, nextAdminLevel, sameCountry } from "@/lib/map-boundary-scope.mjs";
 import { classifyLayerError, statusFromPayload } from "@/lib/map-layer-client.mjs";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -104,8 +105,14 @@ type Props = {
   intelLayers?: ExternalIntelLayers;
   onLayerStatus?: (key: string, status: MapLayerStatus) => void;
   onSelectCountry?: (country: string) => void;
+  /** PR 018: reports the admin level whose polygons are coloured (1 = provinsi, 2 = kab/kota, …). */
+  onAdminLevel?: (level: number) => void;
+  /** PR 018: classes (quartile breaks) of the polygons currently coloured, for the legend. */
+  onChoroClasses?: (classes: ChoroClass[] | null) => void;
   initialCenter?: [number, number];
   initialZoom?: number;
+  /** PR 018: [minLon, minLat, maxLon, maxLat] of the filtered selection; the view auto-fits when it changes. */
+  fitTo?: [number, number, number, number] | null;
   boundaryScope?: "asean" | "asean3" | "global" | "indonesia";
   prototypeMode?: boolean;
   ebsOnly?: boolean;
@@ -335,7 +342,22 @@ function partTouchesCountry(part: Geometry, countries: Geometry[]): boolean {
   return false;
 }
 
-function heatFill(value: number, maximum: number): string {
+// PR 018: classed fill from app_settings.map_choropleth (set each render by AseanMap); null = legacy graded fill.
+let CHORO_CFG: ChoroConfig | null = null;
+const countryClassCache = new WeakMap<object, ChoroClass[] | null>();
+function countryClasses(data: { cases?: number }[] | undefined): ChoroClass[] | null {
+  if (!CHORO_CFG || !data) return null;
+  if (!countryClassCache.has(data)) countryClassCache.set(data, buildChoroClasses(CHORO_CFG, data.map((d) => d.cases || 0)));
+  return countryClassCache.get(data) || null;
+}
+function hexAlpha(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return hex;
+  return `rgba(${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)}, ${a})`;
+}
+
+function heatFill(value: number, maximum: number, classes?: ChoroClass[] | null): string {
+  if (classes?.length) return hexAlpha(choroClassFor(value, classes).color, 0.88);
   // PR 016: neutral slate choropleth (does not clash with the orange EBS / teal PE markers), graded 0.25–0.45 opacity
   // so markers and basemap stay readable. Regions without reports are almost transparent.
   if (value <= 0 || maximum <= 0) return "rgba(226, 232, 240, 0.12)";
@@ -442,6 +464,8 @@ function statusFromCatch(err: unknown): MapLayerStatus {
 }
 
 export default function AseanMap({
+  onAdminLevel,
+  onChoroClasses,
 
   result,
   countryData,
@@ -467,6 +491,7 @@ export default function AseanMap({
   onSelectCountry,
   initialCenter,
   initialZoom,
+  fitTo,
   boundaryScope,
   prototypeMode = false,
   ebsOnly = false,
@@ -560,6 +585,12 @@ export default function AseanMap({
     neighbors: string[];
   } | null>(null);
   const [adminDrill, setAdminDrill] = useState<{ iso3: string; countryName: string; level: number } | null>(null);
+  const choroCfg = useChoroConfig();
+  CHORO_CFG = choroCfg;
+  const onChoroRef = useRef(onChoroClasses);
+  onChoroRef.current = onChoroClasses;
+  useEffect(() => { onAdminLevel?.(adminDrill?.level || 1); }, [adminDrill?.level, onAdminLevel]);
+  useEffect(() => { vectorRef.current?.changed(); regionRef.current?.changed(); }, [choroCfg]);
   const [adminCrumbs, setAdminCrumbs] = useState<{ name: string; level: number }[]>([]);
   const [adminNote, setAdminNote] = useState<string | null>(null);
   const [boundaryStatus, setBoundaryStatus] = useState<string | null>(null);
@@ -714,7 +745,7 @@ export default function AseanMap({
         const name = String(f.get("name") || "").toLowerCase();
         const item = countryData?.find((d) => sameCountry(d.name, name));
         const maximum = Math.max(...(countryData || []).map((d) => d.cases || 0), 0);
-        const fill = heatFill(item?.cases || 0, maximum);
+        const fill = heatFill(item?.cases || 0, maximum, countryClasses(countryData));
         return new Style({
           fill: new Fill({ color: fill }),
           // PR 016: one thin neutral outline; deaths are no longer drawn as a second crimson dashed border.
@@ -825,8 +856,8 @@ export default function AseanMap({
         };
         const maximum = Number(f.get("regionMaximumCases")) || 0;
         return new Style({
-          fill: new Fill({ color: heatFill(metric.cases, maximum) }),
-          stroke: new Stroke({ color: "rgba(255, 255, 255, 0.85)", width: 0.6 }),
+          fill: new Fill({ color: heatFill(metric.cases, maximum, f.get("regionClasses") as ChoroClass[] | null) }),
+          stroke: new Stroke({ color: "rgba(255, 255, 255, 0.9)", width: 0.5 }),
         });
       },
     });
@@ -1789,8 +1820,8 @@ export default function AseanMap({
       const isHighlighted =
         !!targetCountry && (name === targetCountry || name === highlightCountry?.toLowerCase());
       const fill = isHighlighted
-        ? heatFill(Math.max(item?.cases || 0, maximum * 0.18), maximum || 1)
-        : heatFill(item?.cases || 0, maximum);
+        ? heatFill(Math.max(item?.cases || 0, maximum * 0.18), maximum || 1, countryClasses(countryData))
+        : heatFill(item?.cases || 0, maximum, countryClasses(countryData));
       const stroke = isHighlighted
         ? themeRgb("brand-700")
         : (item?.deaths || 0) > 0
@@ -1870,6 +1901,18 @@ export default function AseanMap({
         });
     }
   }, [countryData, result, effectiveOutbreaks, highlightCountry, borderNeighbors, markerLookbackDays, initialCenter, initialZoom]);
+
+  // PR 018: follow the province / kab-kota multi-select — fit after the default country framing above.
+  const fitKey = fitTo ? fitTo.map((v) => v.toFixed(3)).join(",") : "";
+  useEffect(() => {
+    if (!fitTo || !mapReady) return;
+    const id = window.setTimeout(() => {
+      const ext = transformExtent(fitTo, "EPSG:4326", "EPSG:3857");
+      mapRef.current?.getView().fit(ext, { padding: [50, 50, 50, 50], maxZoom: 9, duration: 600 });
+    }, 650);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey, mapReady]);
 
   // Refresh the selected country's outer polygon from the current
   // geoBoundaries gbOpen dataset. The bundled ASEAN geometry remains as a
@@ -2170,7 +2213,9 @@ export default function AseanMap({
           feature.set("adminLevel", level);
           feature.set("iso3", iso3);
         });
-        features.forEach((feature) => feature.set("regionMaximumCases", maximumCases));
+        const regionClasses = buildChoroClasses(CHORO_CFG, features.map((feature) => Number((feature.get("regionMetric") as { cases?: number } | undefined)?.cases) || 0));
+        features.forEach((feature) => { feature.set("regionMaximumCases", maximumCases); feature.set("regionClasses", regionClasses); });
+        if (!cancelled) onChoroRef.current?.(regionClasses);
         if (cancelled) return;
         source.addFeatures(features);
         layer.setVisible(Boolean(showAdmin));
@@ -2203,7 +2248,7 @@ export default function AseanMap({
       source.clear();
       layer.setVisible(false);
     };
-  }, [adminDrill, selected?.name, highlightCountry, showAdmin, outbreakLocations, catalogTick, mapReady]);
+  }, [adminDrill, selected?.name, highlightCountry, showAdmin, outbreakLocations, catalogTick, mapReady, choroCfg]);
 
   const resetView = () => {
     setIsNavigating(false);

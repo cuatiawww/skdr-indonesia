@@ -20,10 +20,13 @@ export default function DashboardHeader({
   onToggleSidebar,
   authenticated = true,
   consoleMode = false,
+  transparent = false,
 }: {
   onToggleSidebar: () => void;
   authenticated?: boolean;
   consoleMode?: boolean;
+  /** PR 018: Beranda — no own background/border; the page background shows through. */
+  transparent?: boolean;
 }) {
   const pathname = usePathname();
   const { t } = useTranslation();
@@ -41,11 +44,18 @@ export default function DashboardHeader({
     : (settings.app_tagline || tr("skdr.layout.appTagline"));
 
   return (
-    <header className="w-full border-b border-white/20 bg-[#102f78]">
-      <div className="relative flex min-h-[118px] items-stretch overflow-visible bg-[#102f78]">
-        {/* PR 014: neutral SKDR/Kemenkes gradient (old NLP header image removed) */}
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-900 via-primary to-brand-500" />
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-900/25 via-transparent to-black/10" />
+    <header className={`w-full ${transparent ? "bg-transparent" : "border-b border-rule bg-white"}`} data-testid="app-header">
+      <div className={`relative flex min-h-[118px] items-stretch overflow-visible ${transparent ? "bg-transparent" : "bg-white"}`}>
+        {transparent ? null : <>
+        {/* PR 018: light line-art banner (public/header.jpg), right-aligned so the illustrations stay visible;
+            a white fade on the left keeps the dark-teal title readable (stronger on mobile, where the image is cropped). */}
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-cover bg-no-repeat bg-[position:right_center]"
+          style={{ backgroundImage: `url(${PUBLIC_BASE_PATH}/header.webp), url(${PUBLIC_BASE_PATH}/header.jpg)` }}
+        />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 md:via-white/50 md:to-transparent" />
+        </>}
         <div className="relative grid w-full gap-5 px-4 py-4 md:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <button
@@ -53,7 +63,7 @@ export default function DashboardHeader({
               data-testid="nav-toggle"
               onClick={onToggleSidebar}
               aria-label={t("header.openMenu")}
-              className="inline-flex h-11 w-11 shrink-0 lg:hidden items-center justify-center rounded-xl border border-white/50 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white"
+              className="inline-flex h-11 w-11 shrink-0 lg:hidden items-center justify-center rounded-xl border border-brand-200 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -70,18 +80,18 @@ export default function DashboardHeader({
                   e.currentTarget.style.display = 'none';
                 }}
               />
-              <div className="min-w-0 border-white/35 md:border-l md:pl-5">
+              <div className="min-w-0 border-brand-200 md:border-l md:pl-5">
                 <div className="flex items-center gap-2">
-                  <h1 className="max-w-[720px] text-lg font-extrabold uppercase leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] sm:text-2xl md:text-3xl">
+                  <h1 className="max-w-[720px] text-lg font-extrabold uppercase leading-tight text-brand-900 sm:text-2xl md:text-3xl">
                     {appTitle}
                   </h1>
                   {consoleMode && (
-                    <span className="hidden items-center rounded-md border border-white/30 bg-white/15 px-2 py-0.5 text-xs font-bold text-white sm:inline-flex">
+                    <span className="hidden items-center rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-800 sm:inline-flex">
                       ADMIN CONSOLE
                     </span>
                   )}
                 </div>
-                <p className="mt-2 hidden max-w-[760px] text-xs leading-relaxed text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)] sm:block md:text-sm lg:text-base">
+                <p className="mt-2 hidden max-w-[760px] text-xs leading-relaxed text-slate-600 sm:block md:text-sm lg:text-base">
                   {appSubtitle}
                 </p>
               </div>

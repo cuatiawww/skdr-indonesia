@@ -1,5 +1,6 @@
 'use client'
 // PR 005: Sinkronisasi EBS (SKDR Kemenkes API) — status, log, "Sinkron sekarang", pemetaan diagnosa -> master penyakit.
+import PageHeader from '@/components/PageHeader'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, PlayCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -73,22 +74,15 @@ export default function EbsSyncPage() {
   const rows = useMemo(() => diag.filter((d) => (!onlyUnmapped || !d.disease_id) && d.diagnosa.toLowerCase().includes(search.toLowerCase())), [diag, search, onlyUnmapped])
   const mappedReports = diag.filter((d) => d.disease_id).reduce((s, d) => s + d.reports, 0)
   const tot = st?.totals
-  const card = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-xs'
+  const card = 'skdr-card p-4'
   const statusBadge = (s: string) =>
     s === 'sukses' ? <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />{t('skdr.ebs.statusOk')}</span>
       : s === 'gagal' ? <span className="inline-flex items-center gap-1 rounded-full border border-red-200/60 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700"><XCircle className="h-3 w-3" />{t('skdr.ebs.statusFail')}</span>
       : <span className="inline-flex items-center gap-1 rounded-full border border-blue-200/60 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-primary"><Loader2 className="h-3 w-3 animate-spin" />{t('skdr.ebs.statusRunning')}</span>
 
   return (
-    <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2.5">
-          <div>
-            <h1 className="text-xl font-bold uppercase tracking-[0.04em] text-slate-900">{t('skdr.ebs.title')}</h1>
-            <p className="text-xs text-slate-500">{t('skdr.ebs.subtitle')}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="skdr-page w-full bg-page px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader eyebrow={t('skdr.eyebrow.ebs')} title={t('skdr.ebs.title')} subtitle={<>{t('skdr.ebs.subtitle')}</>} actions={<>
           <button onClick={load} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('skdr.master.refresh')}
           </button>
@@ -96,8 +90,7 @@ export default function EbsSyncPage() {
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-primary-dark disabled:opacity-50">
             {st?.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} {st?.running ? t('skdr.ebs.running') : t('skdr.ebs.syncNow')}
           </button>
-        </div>
-      </div>
+        </>} />
 
       {st && !st.key_configured && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{t('skdr.ebs.noKey')}</div>}
 
@@ -115,8 +108,8 @@ export default function EbsSyncPage() {
           <p className="text-[11px] text-slate-400">{st?.config?.enabled ? t('skdr.ebs.scheduleOn') : t('skdr.ebs.scheduleOff')}</p></div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div className="border-b border-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-600">{t('skdr.ebs.logTitle')}</div>
+      <div className="overflow-hidden border-b skdr-rule">
+        <div className="skdr-section-head"><div className="skdr-eyebrow">{t('skdr.eyebrow.ebsLog')}</div><h2 className="skdr-section-title">{t('skdr.ebs.logTitle')}</h2></div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead><tr className={tableHeadCls}>
@@ -148,10 +141,10 @@ export default function EbsSyncPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">{t('skdr.ebs.mapTitle')}</span>
-          <span className="text-[11px] text-slate-500">{t('skdr.ebs.mapCoverage', { reports: pct(mappedReports, diag.reduce((s, d) => s + d.reports, 0)) })}</span>
+      <div className="overflow-hidden border-b skdr-rule">
+        <div className="skdr-section-head flex flex-wrap items-end gap-3">
+          <div><div className="skdr-eyebrow">{t('skdr.eyebrow.ebsMap')}</div><h2 className="skdr-section-title">{t('skdr.ebs.mapTitle')}</h2>
+          <p className="skdr-section-desc">{t('skdr.ebs.mapCoverage', { reports: pct(mappedReports, diag.reduce((s, d) => s + d.reports, 0)) })}</p></div>
           <div className="relative ml-auto w-full max-w-xs"><SearchInput value={search} onChange={setSearch} placeholder={t('skdr.ebs.mapSearch')} /></div>
           <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={onlyUnmapped} onChange={(e) => setOnlyUnmapped(e.target.checked)} /> {t('skdr.ebs.onlyUnmapped')}</label>
         </div>

@@ -235,16 +235,17 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
   }
 
   return (
-    <div className="w-full space-y-5 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full space-y-5 bg-page px-4 py-6 sm:px-6 lg:px-8">
       {/* header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2.5">
+      <header className="skdr-section-head flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-testid="page-header">
+        <div className="flex items-center gap-3">
           <Link href={`/pe/${formKey}`} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title={t('skdr.pe.backToList')}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <h1 className="text-lg font-bold uppercase tracking-[0.04em] text-slate-900">{schema.title}</h1>
-            <p className="text-xs text-slate-500">
+            <div className="skdr-eyebrow">{t('skdr.eyebrow.peForm')}</div>
+            <h1 className="skdr-section-title">{schema.title}</h1>
+            <p className="skdr-section-desc">
               {rec ? <span className="font-mono font-semibold text-slate-700">{rec.no_pe}</span> : t('skdr.pe.newDraft')} · {t('skdr.pe.formVersion', { v: rec?.form_version ?? def.version })}
               {rec && <> · <span className={badge(STATUS_STYLE[rec.status] || '')}>{statusLabel(rec.status)}</span></>}
             </p>
@@ -265,7 +266,7 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       {viewOnly && rec && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-primary">
@@ -366,10 +367,10 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         {/* main form */}
-        <div className="space-y-5 xl:col-span-9">
+        <div className="skdr-page xl:col-span-9">
           {step.sections.filter((se) => !se.visible || cond(se.visible, data)).map((se) => (
             <section key={se.id} data-pe-section={se.id} className={`${card} p-5`}>
-              <h2 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">{se.title}</h2>
+              <div className="skdr-section-head"><h2 className="skdr-section-title">{se.title}</h2></div>
               <div className="grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2 xl:grid-cols-3">
                 {se.fields.map((f) => (
                   <FieldView key={f.key} f={f} value={data[f.key]} path={f.key} ctx={ctx} onChange={(v) => update(f.key, v)} setOther={update} />

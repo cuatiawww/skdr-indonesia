@@ -17,6 +17,13 @@
   --brand-900: 6 69 64;
   --brand-accent: 5 187 204;
   --brand-lime: 215 223 33;
+  /* PR 018: editorial surface tokens — page, card and hairline (light neutral close to the page) */
+  --page-bg: 247 249 249;
+  --card-bg: 255 255 255;
+  --card-border: 228 234 233;
+  --section-pad: 1rem;
+    --section-gap: 2rem;
+    --rule: 221 228 227;
   --src-ebs: 232 113 10;
   --src-pe: 10 143 163;
   --scale-ebs-0: 255 241 230; --scale-ebs-1: 253 186 116; --scale-ebs-2: 249 115 22; --scale-ebs-3: 194 65 12; --scale-ebs-4: 124 45 18;
@@ -370,3 +377,19 @@
 }
 @keyframes skdr-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .skdr-skeleton { animation: none; } }
+
+/* PR 018: shared surfaces. Cards only where they carry meaning (KPI tiles, disease cards, carousel items, modals). */
+@layer components {
+  .skdr-card { background: rgb(var(--card-bg)); border: 1px solid rgb(var(--card-border)); border-radius: 12px; }
+  .skdr-rule { border-color: rgb(var(--rule)); }
+  .skdr-section { padding-top: var(--section-pad); }
+  /* page-level stack: 32px between sections on mobile, 48px at >=1024; header-to-content 16px (header margin) */
+  .skdr-page > * + * { margin-top: var(--section-gap); }
+  .skdr-page > .skdr-section-head + * { margin-top: 0; }
+  .skdr-section-head { margin-bottom: 1rem; border-bottom: 1px solid rgb(var(--rule)); padding-bottom: 0.5rem; }
+  .skdr-section-title { margin-top: 0.25rem; font-size: 1.5rem; line-height: 2rem; font-weight: 700; color: rgb(var(--brand-900, 0 61 54)); letter-spacing: -0.01em; }
+  .skdr-section-desc { margin-top: 0.25rem; font-size: 0.875rem; line-height: 1.25rem; color: rgb(100 116 139); }
+  .skdr-eyebrow { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: rgb(var(--brand-700)); }
+}
+
+@media (min-width: 1024px) { :root { --section-pad: 2rem; --section-gap: 3rem; } }

@@ -41,10 +41,10 @@ function Indicators() {
       </div>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">{t('skdr.docs.colNo')}</th><th className="px-3 py-2">{t('skdr.docs.colName')}</th><th className="px-3 py-2">{t('skdr.docs.colStatus')}</th><th className="px-3 py-2">{t('skdr.docs.colNote')}</th></tr></thead>
+          <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">{t('skdr.docs.colName')}</th><th className="px-3 py-2">{t('skdr.docs.colStatus')}</th><th className="px-3 py-2">{t('skdr.docs.colNote')}</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {list.map((i, k) => (
-              <tr key={k} className="align-top"><td className="w-28 px-3 py-2 font-mono text-slate-500">{i.no}</td><td className="px-3 py-2 text-slate-800">{i.name}</td>
+              <tr key={k} className="align-top"><td className="px-3 py-2 text-slate-800">{i.name}</td>
                 <td className="w-28 px-3 py-2"><span className={`rounded px-1.5 py-0.5 font-semibold ${IND_TONE[i.status] || ''}`}>{t(`skdr.docs.status.${i.status}`)}</span></td><td className="px-3 py-2 text-slate-500">{i.note}</td></tr>
             ))}
           </tbody>
@@ -71,8 +71,8 @@ export default function DokumentasiPage() {
       .then((txt) => setMd((m) => ({ ...m, [cur.file!]: txt }))).catch((e) => setErr(e.message))
   }, [cur.file]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="w-full space-y-5 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
-      <PageHeader title={t('skdr.docs.title')} subtitle={t('skdr.docs.subtitle')} />
+    <div className="skdr-page w-full bg-page px-4 py-6 sm:px-6 lg:px-8">
+      <PageHeader eyebrow={t('skdr.eyebrow.docs')} title={t('skdr.docs.title')} subtitle={t('skdr.docs.subtitle')} />
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
         {TABS.map((x) => (
           <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => { setTab(x.id); history.replaceState(null, '', `#${x.id}`) }}
@@ -81,7 +81,7 @@ export default function DokumentasiPage() {
           </button>
         ))}
       </div>
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" role="tabpanel" data-testid={`doc-${tab}`}>
+      <section className="min-w-0" role="tabpanel" data-testid={`doc-${tab}`}>
         {cur.file ? (err ? <p className="text-sm text-red-600">{t('skdr.docs.loadFailed')}: {err}</p> : md[cur.file] ? <Markdown text={md[cur.file]} /> : <p className="text-sm text-primary">{t('skdr.docs.loading')}</p>) : <Indicators />}
       </section>
     </div>

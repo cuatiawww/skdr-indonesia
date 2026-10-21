@@ -1307,8 +1307,9 @@ export const deleteLanguageModel = (id: string) =>
 export const fetchDashboardStats = () =>
   fetchFrom<DashboardStats>("/api/v1/events/stats");
 export interface PublicDashboardApiParams {
-  province_id?: number;
-  kabkota_id?: number;
+  /** PR 018: comma list for multi-select ("11,12") */
+  province_id?: number | string;
+  kabkota_id?: number | string;
   country?: string;
   scope?: string;
   year?: number;

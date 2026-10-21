@@ -45,7 +45,7 @@ export function MasterToolbar({ search, setSearch, placeholder, status, setStatu
 }) {
   const { t } = useTranslation()
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
+    <div className="flex flex-wrap items-center gap-3 border-b skdr-rule pb-3">
       <div className="relative w-full max-w-sm">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <SearchInput value={search} onChange={setSearch} placeholder={placeholder} />

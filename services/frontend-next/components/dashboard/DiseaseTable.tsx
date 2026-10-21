@@ -11,26 +11,27 @@ import { SOURCE_COLOR } from '@/lib/theme'
 import { SourceKey } from '@/components/analytics/SourceBadge'
 import type { Sumber, UkuranEbs } from '@/lib/use-sumber'
 
-type Delta = { last4: number; prev4: number } | null
+export type Delta = { last4: number; prev4: number } | null
+export type D24 = { cur: number; prev: number } | null
 export type SummaryDisease = {
   id: number; code: string; name: string; category: string | null; is_zoonotic: boolean; pe_form: string | null
-  ebs: { alerts: number; cases: number; deaths: number; provinces: number; spark_alerts: number[]; spark_cases: number[]; delta_alerts: Delta; delta_cases: Delta } | null
-  pe: { cases: number; deaths: number; provinces: number; spark: number[]; delta: Delta
+  ebs: { alerts: number; cases: number; deaths: number; provinces: number; spark_alerts: number[]; spark_cases: number[]; delta_alerts: Delta; delta_cases: Delta; last_date?: string | null; d24?: D24 } | null
+  pe: { cases: number; deaths: number; provinces: number; spark: number[]; delta: Delta; last_date?: string | null; d24?: D24; known_outcome?: number
     /** sheet No. 17: Kasus PE per case status; classes + labels from the registry (dashboard_executive.groups[].pe_status) */
     status?: { classes: { code: string; label: string; n: number }[]; unclassified: number } | null } | null
 }
 
-function Spark({ values, color }: { values: number[]; color: string }) {
+export function Spark({ values, color, fluid = false }: { values: number[]; color: string; fluid?: boolean }) {
   const max = Math.max(1, ...values)
   const w = 96, h = 24
   const pts = values.map((v, i) => `${((i / Math.max(1, values.length - 1)) * w).toFixed(1)},${(h - 2 - (v / max) * (h - 4)).toFixed(1)}`).join(' ')
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="shrink-0">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+    <svg width={fluid ? '100%' : w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio={fluid ? 'none' : undefined} aria-hidden className={fluid ? 'block' : 'shrink-0'}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   )
 }
-function Trend({ d }: { d: Delta }) {
+export function Trend({ d }: { d: Delta }) {
   const { t } = useTranslation()
   if (!d || (d.last4 === 0 && d.prev4 === 0)) return <span className="text-[11px] text-slate-400">—</span>
   const up = d.last4 > d.prev4, same = d.last4 === d.prev4

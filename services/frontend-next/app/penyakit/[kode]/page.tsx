@@ -12,6 +12,8 @@ import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, Pie, PieChart, B
 import ChoroplethMap from '@/components/analytics/ChoroplethMap'
 import { MutedNote, Section, SourceKey, SOURCE_COLOR } from '@/components/analytics/SourceBadge'
 import { useEpiRange } from '@/components/analytics/EpiRangePicker'
+import { geoParams, useGeoFilter } from '@/lib/use-geo-filter'
+import { LihatButton, useSignalModal } from '@/components/dashboard/SignalModal'
 import SkdrFilterBar from '@/components/SkdrFilterBar'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { peFetch, STATUS_STYLE } from '@/lib/pe-api'
@@ -50,20 +52,19 @@ export default function DiseaseDetailPage() {
   const { sumber, setSumber, ready: sReady } = useSumber()
   const ukuran = 'alert' as 'alert' | 'kasus'
   const { range, setRange, ready: rReady } = useEpiRange()
-  const ready = sReady && rReady
-  const [prov, setProv] = useState('')
-  const [kab, setKab] = useState('')
-  const barValue = useMemo(() => ({ disease: 'all', source: sumber, provinceId: prov ? Number(prov) : null, kabkotaId: kab ? Number(kab) : null, ...range }), [sumber, prov, kab, range])
+  // PR 018: global multi-select wilayah (URL + session); the disease is fixed by the page
+  const { geo, setGeo, ready: gReady } = useGeoFilter()
+  const { open: openSignal, modal: signalModal } = useSignalModal()
+  const ready = sReady && rReady && gReady
+  const barValue = useMemo(() => ({ ...geo, diseases: [], source: sumber, ...range }), [sumber, geo, range])
   const [provinces, setProvinces] = useState<Opt[]>([])
-  const [kabs, setKabs] = useState<Opt[]>([])
   const [d, setD] = useState<DiseaseDetail | null>(null)
   const [err, setErr] = useState<{ msg: string; status?: number } | null>(null)
   const [tick, setTick] = useState(0)
   useEffect(() => { peFetch<{ data: Opt[] }>('/api/v1/master/provinces').then((j) => setProvinces(j.data)).catch(() => {}) }, [])
-  useEffect(() => { setKabs([]); if (prov) peFetch<{ data: Opt[] }>(`/api/v1/master/kabkota?province_id=${prov}`).then((j) => setKabs(j.data)).catch(() => {}) }, [prov])
   const query = useMemo(() => {
-    return qs({ source: sumber, province_id: prov, kabkota_id: kab, start_year: range.startYear, start_week: range.startWeek, end_year: range.endYear, end_week: range.endWeek })
-  }, [sumber, prov, kab, range])
+    return qs({ source: sumber, ...geoParams(geo, false), start_year: range.startYear, start_week: range.startWeek, end_year: range.endYear, end_week: range.endWeek })
+  }, [sumber, geo, range])
   useEffect(() => {
     if (!ready) return
     let a = true; setErr(null)
@@ -75,7 +76,7 @@ export default function DiseaseDetailPage() {
   if (err) return (
     <div className="w-full space-y-4 px-4 py-6 sm:px-6 lg:px-8">
       <Link href="/penyakit" className="inline-flex items-center gap-1 text-xs font-semibold text-primary"><ArrowLeft className="h-3.5 w-3.5" /> {t('skdr.penyakit.back')}</Link>
-      {err.status === 404 ? <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-600">{t('skdr.penyakit.notFound')}</div> : <ErrorState message={err.msg} onRetry={() => setTick((x) => x + 1)} />}
+      {err.status === 404 ? <div className="skdr-card p-4 text-sm font-semibold text-slate-600">{t('skdr.penyakit.notFound')}</div> : <ErrorState message={err.msg} onRetry={() => setTick((x) => x + 1)} />}
     </div>
   )
   if (!d) return <SkeletonDetail />
@@ -85,7 +86,7 @@ export default function DiseaseDetailPage() {
   const ebsKey = ukuran === 'kasus' ? 'ebs_cases' : 'ebs_alerts'
   const ebsLabel = ukuran === 'kasus' ? t('skdr.charts.metricEbsCases') : t('skdr.charts.metricAlerts')
   const epi = d.weeks.map((w, i) => ({ label: w.label, start: w.start, ebs: d.epi[ebsKey][i], pe_cases: d.epi.pe_cases[i], pe_deaths: d.epi.pe_deaths[i] }))
-  const provCode = provinces.find((p) => String(p.id) === prov)?.code ?? d.regions[0]?.code?.slice(0, 2) ?? null
+  const provCode = (geo.provinceIds.length === 1 ? provinces.find((p) => p.id === geo.provinceIds[0])?.code : undefined) ?? d.regions[0]?.code?.slice(0, 2) ?? null
   const hasEbs = d.totals.ebs_alerts > 0, hasPe = d.totals.pe_cases > 0
   const peak = (arr: number[]) => { let k = -1; arr.forEach((v, i) => { if (v > 0 && (k < 0 || v > arr[k])) k = i }); return k < 0 ? null : { label: d.weeks[k].label, start: d.weeks[k].start, v: arr[k] } }
   const pkE = peak(d.epi[ebsKey]), pkP = peak(d.epi.pe_cases)
@@ -94,7 +95,7 @@ export default function DiseaseDetailPage() {
   const period = `${d.weeks[0]?.start} → ${d.weeks[d.weeks.length - 1]?.start}`
   const sexColors = [cssv('brand-700'), '#db2777', '#94a3b8']
   const noPeText = d.pe_form ? t('skdr.penyakit.emptyPe') : t('skdr.penyakit.noPeForm')
-  const pick = (code: string) => { const p = provinces.find((x) => x.code === code); if (p) { setProv(String(p.id)); setKab('') } }
+  const pick = (code: string) => { const p = provinces.find((x) => x.code === code); if (p) setGeo({ ...geo, provinceIds: [p.id], kabkotaIds: [] }) }
   const topRows = [...d.regions].filter((r) => (showEbs ? r[ebsKey] : 0) + (showPe ? r.pe_cases : 0) > 0)
     .sort((a, b) => (showEbs ? b[ebsKey] - a[ebsKey] : 0) || b.pe_cases - a.pe_cases).slice(0, 10)
   const topMax = { e: Math.max(1, ...topRows.map((r) => r[ebsKey])), p: Math.max(1, ...topRows.map((r) => r.pe_cases)) }
@@ -125,13 +126,13 @@ export default function DiseaseDetailPage() {
       </Section>
 
       {/* single page filter */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3" data-testid="disease-filters">
+      <div className="min-w-0" data-testid="disease-filters">
         {/* PR 017: filter bar static in document flow (no sticky/overlay over the stats) */}
         {/* PR 016: same SkdrFilterBar as the dashboard (Sumber + Provinsi + Kab/Kota + Periode), disease fixed by the page */}
         <SkdrFilterBar compact showDisease={false} sumber={sumber} onSumberChange={setSumber}
           value={barValue}
           onChange={() => {}}
-          onApply={(f) => { setProv(f.provinceId ? String(f.provinceId) : ''); setKab(f.kabkotaId ? String(f.kabkotaId) : ''); setRange({ startYear: f.startYear, startWeek: f.startWeek, endYear: f.endYear, endWeek: f.endWeek }) }} />
+          onApply={(f) => { setGeo({ diseases: geo.diseases, provinceIds: f.provinceIds, kabkotaIds: f.kabkotaIds }); setRange({ startYear: f.startYear, startWeek: f.startWeek, endYear: f.endYear, endWeek: f.endWeek }) }} />
         <p className="mt-2 text-right text-[11px] text-slate-500">{d.scope} · {period}</p>
       </div>
 
@@ -199,11 +200,11 @@ export default function DiseaseDetailPage() {
           <div className={`grid gap-6 ${twoMaps ? 'md:grid-cols-2' : ''}`} data-testid="map-panel">
             {showEbs ? (
               <div><SourceKey source="ebs" label={ebsLabel} />
-                <ChoroplethMap level={d.level} provinceCode={provCode} values={Object.fromEntries(d.regions.map((r) => [r.code, r[ebsKey]]))} hue="ebs" onPick={d.level === 'province' ? pick : undefined} /></div>
+                <div className="skdr-card mt-2 overflow-hidden p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)]" data-testid="map-card"><ChoroplethMap level={d.level} provinceCode={provCode} values={Object.fromEntries(d.regions.map((r) => [r.code, r[ebsKey]]))} hue="ebs" onPick={d.level === 'province' ? pick : undefined} /></div></div>
             ) : null}
             {showPe && hasPe ? (
               <div><SourceKey source="pe" label={t('skdr.charts.metricPeCases')} />
-                <ChoroplethMap level={d.level} provinceCode={provCode} values={Object.fromEntries(d.regions.map((r) => [r.code, r.pe_cases]))} hue="pe" onPick={d.level === 'province' ? pick : undefined} /></div>
+                <div className="skdr-card mt-2 overflow-hidden p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)]" data-testid="map-card"><ChoroplethMap level={d.level} provinceCode={provCode} values={Object.fromEntries(d.regions.map((r) => [r.code, r.pe_cases]))} hue="pe" onPick={d.level === 'province' ? pick : undefined} /></div></div>
             ) : null}
             {showPe && !hasPe ? <MutedNote>{t('skdr.source.pe')}: {noPeText}</MutedNote> : null}
           </div>
@@ -270,9 +271,10 @@ export default function DiseaseDetailPage() {
             <div data-testid="latest-ebs"><SourceKey source="ebs" label={t('skdr.penyakit.latestEbs')} />
               {d.latest.ebs.length ? (
                 <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
-                  <thead className="border-b border-slate-200 text-[11px] uppercase text-slate-500"><tr><th className="py-1.5">{t('skdr.penyakit.colNoEbs')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th className="text-right">{t('skdr.penyakit.colCases')}</th><th className="text-right">{t('skdr.penyakit.colDeaths')}</th></tr></thead>
+                  <thead className="border-b border-slate-200 text-[11px] uppercase text-slate-500"><tr><th className="py-1.5">{t('skdr.penyakit.colNoEbs')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th className="text-right">{t('skdr.penyakit.colCases')}</th><th className="text-right">{t('skdr.penyakit.colDeaths')}</th><th><span className="sr-only">{t('skdr.signal.view')}</span></th></tr></thead>
                   <tbody>{d.latest.ebs.map((r, i) => (
-                    <tr key={(r.no_ebs || '') + i} className="border-b border-slate-100"><td className="py-1.5 font-mono">{r.no_ebs || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}<span className="text-slate-400"> · {r.province || ''}</span></td><td>{r.status || '—'}</td><td className="text-right">{fmt(r.cases)}</td><td className="text-right text-red-600">{fmt(r.deaths)}</td></tr>
+                    <tr key={(r.no_ebs || '') + i} className="border-b border-slate-100"><td className="py-1.5 font-mono">{r.no_ebs || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}<span className="text-slate-400"> · {r.province || ''}</span></td><td>{r.status || '—'}</td><td className="text-right">{fmt(r.cases)}</td><td className="text-right text-red-600">{fmt(r.deaths)}</td>
+                      <td className="pl-2 text-right">{r.id ? <LihatButton onClick={() => openSignal('ebs', r.id as number)} /> : null}</td></tr>
                   ))}</tbody></table></div>
               ) : <MutedNote>{t('skdr.penyakit.emptyEbs')}</MutedNote>}
             </div>
@@ -281,11 +283,12 @@ export default function DiseaseDetailPage() {
             <div data-testid="latest-pe"><SourceKey source="pe" label={t('skdr.penyakit.latestPe')} />
               {d.latest.pe.length ? (
                 <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
-                  <thead className="border-b border-slate-200 text-[11px] uppercase text-slate-500"><tr><th className="py-1.5">{t('skdr.penyakit.colNoPe')}</th><th>{t('skdr.penyakit.colPatient')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th></tr></thead>
+                  <thead className="border-b border-slate-200 text-[11px] uppercase text-slate-500"><tr><th className="py-1.5">{t('skdr.penyakit.colNoPe')}</th><th>{t('skdr.penyakit.colPatient')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th><span className="sr-only">{t('skdr.signal.view')}</span></th></tr></thead>
                   <tbody>{d.latest.pe.map((r) => (
                     <tr key={r.id} className="border-b border-slate-100"><td className="py-1.5"><Link href={`/pe/${r.form_key}/${r.id}?mode=lihat`} className="font-mono font-semibold text-primary hover:underline">{r.no_pe}</Link></td>
                       <td>{r.patient_initials || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}</td>
-                      <td><span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[r.status] || ''}`}>{r.status}</span></td></tr>
+                      <td><span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[r.status] || ''}`}>{r.status}</span></td>
+                      <td className="pl-2 text-right"><LihatButton onClick={() => openSignal('pe', r.id)} /></td></tr>
                   ))}</tbody></table>
                   <p className="mt-2 text-[11px] text-slate-400">{t('skdr.penyakit.privacy')}</p></div>
               ) : <MutedNote>{noPeText}</MutedNote>}
@@ -293,6 +296,7 @@ export default function DiseaseDetailPage() {
           ) : null}
         </div>
       </Section>
+      {signalModal}
     </div>
   )
 }

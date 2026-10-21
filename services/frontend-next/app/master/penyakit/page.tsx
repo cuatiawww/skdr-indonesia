@@ -28,7 +28,7 @@ export default function MasterPenyakitPage() {
   }
 
   return (
-    <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full space-y-6 bg-page px-4 py-6 sm:px-6 lg:px-8">
       <MasterHeader icon={<Stethoscope className="h-5 w-5" />} title={t('skdr.master.dis.title')} subtitle={t('skdr.master.dis.subtitle')}
         loading={list.loading} onRefresh={list.reload} onAdd={() => { setEditing(null); setOpen(true) }} addLabel={t('skdr.master.dis.add')} />
       <MasterToolbar search={list.search} setSearch={list.setSearch} placeholder={t('skdr.master.dis.search')}

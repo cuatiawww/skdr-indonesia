@@ -110,16 +110,17 @@ function Heatmap({ ov, sumber, ukuran }: { ov: Overview; sumber: Sumber; ukuran:
   return (
     <Panel title={t('skdr.charts.heatmap')} testId="heatmap">
       {!rows.length ? <Empty>{t('skdr.charts.emptyHeat')}</Empty> : (
-        <div className="overflow-x-auto">
+        // PR 018: only the grid + its legend sit in a subtle card (same .skdr-card style); the section header stays outside
+        <div className="skdr-card overflow-x-auto p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)] sm:p-4" data-testid="heatmap-card">
           <table className="w-full border-separate text-xs" style={{ borderSpacing: 2 }}>
-            <thead><tr><th className="sticky left-0 z-10 min-w-[140px] bg-white text-left font-semibold text-slate-500">{t('skdr.charts.province')}</th>
+            <thead><tr><th className="sticky left-0 z-10 min-w-[140px] bg-card text-left font-semibold text-slate-500">{t('skdr.charts.province')}</th>
               {ov.weeks.map((w) => <th key={w.start} className="min-w-[22px] whitespace-nowrap font-normal text-slate-400" title={w.start}>{w.week}</th>)}
               {showEbs ? <th className="pl-2 text-right font-semibold text-ebs">EBS</th> : null}
               {showPe ? <th className="pl-2 text-right font-semibold text-pe">PE</th> : null}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="sticky left-0 z-10 truncate bg-white pr-2 font-semibold text-slate-700">{r.name}</td>
+                  <td className="sticky left-0 z-10 truncate bg-card pr-2 font-semibold text-slate-700">{r.name}</td>
                   {ov.weeks.map((w, i) => {
                     const e = r.e?.values[i] || 0, p = r.p?.values[i] || 0
                     const title = `${r.name} · ${w.label}: ${showEbs ? `EBS ${fmt(e)}` : ''}${both ? ' · ' : ''}${showPe ? `PE ${fmt(p)}` : ''}`

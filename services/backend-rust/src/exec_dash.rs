@@ -60,14 +60,11 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
     let mut groups: Vec<Value> = vec![];
     for g in &groups_cfg {
         let codes = strs(g.get("disease_codes"));
-        let ok = match &f.disease {
-            None => true,
-            Some(d) => c
-                .query_opt("SELECT 1 FROM master_diseases WHERE code = ANY($1) AND (code = $2 OR name = $2)", &[&codes, d])
-                .await
-                .map_err(internal)?
-                .is_some(),
-        };
+        let ok = f.disease.is_empty() || c
+            .query_opt("SELECT 1 FROM master_diseases WHERE code = ANY($1) AND (code = ANY($2) OR name = ANY($2) OR id = ANY($3))", &[&codes, &f.disease, &f.disease_ids])
+            .await
+            .map_err(internal)?
+            .is_some();
         if ok {
             groups.push(g.clone());
         }
@@ -94,8 +91,8 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                  FROM ebs_reports e
                  WHERE ($1::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) <= $2)
-                   AND ($3::int IS NULL OR e.province_id = $3) AND ($4::int IS NULL OR e.kabkota_id = $4)
-                   AND ($5::text IS NULL OR true) AND ($6::text IS NULL OR true)
+                   AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4))
+                   AND ($5::text[] IS NULL OR true) AND ($6::text IS NULL OR true)
                  GROUP BY 1",
                 &[&f.start, &f.end, &f.province, &f.kabkota, &f.disease, &f.source, &verified_prefix, &discarded],
             )
@@ -123,7 +120,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                  FROM pe_cases
                  WHERE deleted_at IS NULL AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
-                   AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR kabkota_id = $4)
+                   AND (cardinality($3::int[]) = 0 OR province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR kabkota_id = ANY($4))
                  GROUP BY 1, 2, 3, 4, 5",
                 &[&f.start, &f.end, &f.province, &f.kabkota],
             )
@@ -194,14 +191,15 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         };
         let conf = strs(cfr.get("confirmed"));
         let (d, k, u) = agg(&conf);
-        let mut crow = vec![json!({"label": cfr.get("confirmed_label"), "star": false, "known": k, "deaths": d, "unknown": u, "cfr": rate(d, k, &cfg)})];
+        let mut crow = vec![json!({"label": cfr.get("confirmed_label"), "star": false, "known": k, "deaths": d, "unknown": u, "cfr": rate(d, k, &cfg), "form": form, "codes": conf})];
         for st in cfr.get("star").and_then(|v| v.as_array()).into_iter().flatten() {
             let code = strs(Some(&json!([st.get("code")])));
             let (d, k, u) = agg(&code);
             if d > 0 {
                 star_deaths.push(json!({"label": st.get("label"), "deaths": d}));
             }
-            crow.push(json!({"label": st.get("label"), "star": true, "known": k, "deaths": d, "unknown": u}));
+            // PR 018: form + class codes so the UI can list these deaths (GET /api/v1/signals/pe-deaths)
+            crow.push(json!({"label": st.get("label"), "star": true, "known": k, "deaths": d, "unknown": u, "form": form, "codes": code}));
         }
         cfr_groups.push(json!({"code": g.get("code"), "label": g.get("label"), "color": g.get("color"), "rows": crow}));
     }
@@ -211,8 +209,8 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         c.query_one(
             "SELECT COUNT(*)::bigint FROM case_reports r LEFT JOIN master_diseases d ON d.id = r.disease_id
              WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
-               AND ($3::int IS NULL OR r.location_id = $3) AND ($4::int IS NULL OR r.kabkota_id = $4)
-               AND ($5::text IS NULL OR d.name = $5 OR d.code = $5)",
+               AND (cardinality($3::int[]) = 0 OR r.location_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR r.kabkota_id = ANY($4))
+               AND (cardinality($5::text[]) = 0 OR d.name = ANY($5) OR d.code = ANY($5))",
             &[&f.start, &f.end, &f.province, &f.kabkota, &f.disease],
         ).await.map_err(internal)?.get(0)
     } else { 0 };
@@ -223,11 +221,11 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
     Ok(Json(json!({
         "success": true,
         "data": {
-            "filters": {"scope": f.scope, "disease": f.disease, "source": f.source,
+            "filters": {"scope": f.scope, "disease": f.disease_label(), "source": f.source,
                         "start_date": f.start.map(|d| d.to_string()), "end_date": f.end.map(|d| d.to_string())},
             "header": {"individual_reports": if show_ind { Some(ind_total) } else { None }, "ebs_alerts_zoonosis": if show_ebs { Some(zoonosis_ebs) } else { None },
-                       "ebs_alerts_all": if show_ebs && f.disease.is_none() { Some(ebs_total) } else { None }, "form_reports": if show_ind { Some(form_reports) } else { None }},
-            "no_group_for_disease": f.disease.is_some() && groups.is_empty(),
+                       "ebs_alerts_all": if show_ebs && f.disease.is_empty() { Some(ebs_total) } else { None }, "form_reports": if show_ind { Some(form_reports) } else { None }},
+            "no_group_for_disease": !f.disease.is_empty() && groups.is_empty(),
             "cards": cards,
             "cfr": {"groups": cfr_groups, "star_deaths": star_deaths},
             "config": {"indicators": cfg.get("indicators"), "status_labels": cfg.get("pe_status_labels"), "texts": cfg.get("texts"),

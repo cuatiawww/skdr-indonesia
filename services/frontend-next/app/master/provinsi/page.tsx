@@ -29,7 +29,7 @@ export default function MasterProvinsiPage() {
   }
 
   return (
-    <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full space-y-6 bg-page px-4 py-6 sm:px-6 lg:px-8">
       <MasterHeader icon={<Globe2 className="h-5 w-5" />} title={t('skdr.master.prov.title')} subtitle={t('skdr.master.prov.subtitle')}
         loading={list.loading} onRefresh={list.reload} onAdd={() => { setEditing(null); setOpen(true) }} addLabel={t('skdr.master.prov.add')} />
       <MasterToolbar search={list.search} setSearch={list.setSearch} placeholder={t('skdr.master.prov.search')}
