@@ -1526,7 +1526,15 @@
       "noConfig": "Konfigurasi dashboard eksekutif belum tersedia.",
       "noData": "Tidak ada data.",
       "loading": "Memuat ringkasan…",
-      "loadFailed": "Gagal memuat ringkasan"
+      "loadFailed": "Gagal memuat ringkasan",
+      "cfrZoom": "X-axis auto-zoomed to {max}% (highest CI upper bound + padding).",
+      "peTotal": "PE reports",
+      "nikTitle": "NIK completeness",
+      "nikUnit": "reports with NIK",
+      "reporting": "reporting",
+      "missingProv": "Provinces not reporting ({n})",
+      "allReported": "All provinces reported in this period.",
+      "lowestKab": "Provinces with lowest district coverage"
     },
     "charts": {
       "trendEbs": "Tren mingguan alert EBS per penyakit",

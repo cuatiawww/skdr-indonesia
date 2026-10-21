@@ -28,7 +28,7 @@ function CfrCard({ title, src, r, note }: { title: string; src: 'ebs' | 'pe'; r:
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">{title} <SourceBadge source={src} /></div>
       <div className="mt-1 text-2xl font-black text-red-600">{rateText(r)}</div>
       <div className="text-[11px] text-slate-600">95% CI (Wilson): {ciText(r)} · {fmt(r.num)} / {fmt(r.den)}</div>
-      <div className="mt-1 text-[10px] text-slate-400">{note}</div>
+      <div className="mt-1 text-xs text-slate-400">{note}</div>
     </div>
   )
 }
@@ -135,10 +135,10 @@ export default function DiseaseDetailPage() {
         {d.sources.ebs ? (
           <Panel title={t('skdr.penyakit.epiEbs')} sources={['ebs']} testId="epi-ebs">
             {hasEbs ? (
-              <div className="h-64"><ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={epi}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis yAxisId="a" tick={{ fontSize: 10 }} allowDecimals={false} width={36} /><YAxis yAxisId="c" orientation="right" tick={{ fontSize: 10 }} allowDecimals={false} width={40} />
-                  <Tooltip formatter={(v: any) => fmt(Number(v))} /><Legend wrapperStyle={{ fontSize: 11 }} />
+              <div className="h-80"><ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={epi}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="label" tick={{ fontSize: 12 }} interval="preserveStartEnd" />
+                  <YAxis yAxisId="a" tick={{ fontSize: 12 }} allowDecimals={false} width={36} /><YAxis yAxisId="c" orientation="right" tick={{ fontSize: 12 }} allowDecimals={false} width={40} />
+                  <Tooltip formatter={(v: any) => fmt(Number(v))} /><Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar yAxisId="a" dataKey="ebs_alerts" name={t('skdr.charts.metricAlerts')} fill={SOURCE_COLOR.ebs} isAnimationActive={false} />
                   <Line yAxisId="c" dataKey="ebs_cases" name={t('skdr.charts.metricEbsCases')} stroke="#7c2d12" dot={false} strokeWidth={2} isAnimationActive={false} />
                 </ComposedChart></ResponsiveContainer></div>
@@ -148,9 +148,9 @@ export default function DiseaseDetailPage() {
         {d.sources.pe ? (
           <Panel title={t('skdr.penyakit.epiPe')} sources={['pe']} testId="epi-pe">
             {hasPe ? (
-              <div className="h-64"><ResponsiveContainer width="100%" height="100%">
-                <BarChart data={epi}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 10 }} allowDecimals={false} width={30} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
+              <div className="h-80"><ResponsiveContainer width="100%" height="100%">
+                <BarChart data={epi}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="label" tick={{ fontSize: 12 }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} width={30} /><Tooltip /><Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="pe_cases" name={t('skdr.charts.metricPeCases')} fill={SOURCE_COLOR.pe} isAnimationActive={false} />
                   <Bar dataKey="pe_deaths" name={t('skdr.penyakit.deaths')} fill="#dc2626" isAnimationActive={false} />
                 </BarChart></ResponsiveContainer></div>
@@ -169,9 +169,12 @@ export default function DiseaseDetailPage() {
         <Panel title={t('skdr.penyakit.topRegions')} sources={[topMetric.startsWith('ebs') ? 'ebs' : 'pe']} testId="top-regions"
           right={<select aria-label={t('skdr.charts.metric')} className={sel} value={topMetric} onChange={(e) => setTopMetric(e.target.value as any)}>{metricOpts.map((m) => <option key={m} value={m}>{metricLabel(m)}</option>)}</select>}>
           {d.top[topMetric]?.length ? (
-            <table className="w-full text-xs"><tbody>
+            <table className="w-full text-sm"><tbody>
+              {/* PR 013: larger rows + share bar so the list fills the card next to the map */}
               {d.top[topMetric].map((r, i) => (
-                <tr key={r.id} className="border-b border-slate-100"><td className="w-6 py-1.5 text-slate-400">{i + 1}</td><td className="font-semibold text-slate-700">{r.name}</td><td className="text-right font-mono">{fmt(r.value)}</td></tr>
+                <tr key={r.id} className="border-b border-slate-100"><td className="w-7 py-2.5 text-slate-400">{i + 1}</td>
+                  <td className="font-semibold text-slate-700">{r.name}<div className="mt-1 h-1.5 rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${(r.value / Math.max(1, d.top[topMetric][0].value)) * 100}%`, background: topMetric.startsWith('ebs') ? SOURCE_COLOR.ebs : SOURCE_COLOR.pe }} /></div></td>
+                  <td className="pl-3 text-right font-mono font-bold">{fmt(r.value)}</td></tr>
               ))}
             </tbody></table>
           ) : <Empty>{t('skdr.penyakit.emptyRegions')}</Empty>}
@@ -184,14 +187,14 @@ export default function DiseaseDetailPage() {
           <Panel title={t('skdr.penyakit.ageSex')} sources={['pe']} className="xl:col-span-2" testId="age-sex">
             {d.age.length ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="h-56 md:col-span-2"><ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={d.age}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="group" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} tick={{ fontSize: 10 }} width={28} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
+                <div className="h-72 md:col-span-2"><ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={d.age}><CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" /><XAxis dataKey="group" tick={{ fontSize: 12 }} /><YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={28} /><Tooltip /><Legend wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="male" stackId="s" name={t('skdr.penyakit.male')} fill="#0060A9" isAnimationActive={false} />
                     <Bar dataKey="female" stackId="s" name={t('skdr.penyakit.female')} fill="#db2777" isAnimationActive={false} />
                     <Bar dataKey="unknown" stackId="s" name={t('skdr.penyakit.unknown')} fill="#94a3b8" isAnimationActive={false} />
                   </BarChart></ResponsiveContainer></div>
-                <div className="h-56"><ResponsiveContainer width="100%" height="100%">
-                  <PieChart><Pie data={d.sex} dataKey="n" nameKey="sex" innerRadius="50%" outerRadius="85%" isAnimationActive={false}>{d.sex.map((s, i) => <Cell key={s.sex} fill={sexColors[i % 3]} />)}</Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} /></PieChart>
+                <div className="h-72"><ResponsiveContainer width="100%" height="100%">
+                  <PieChart><Pie data={d.sex} dataKey="n" nameKey="sex" innerRadius="50%" outerRadius="85%" isAnimationActive={false}>{d.sex.map((s, i) => <Cell key={s.sex} fill={sexColors[i % 3]} />)}</Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 12 }} /></PieChart>
                 </ResponsiveContainer></div>
               </div>
             ) : <Empty>{t('skdr.penyakit.emptyAge')}</Empty>}
@@ -199,7 +202,7 @@ export default function DiseaseDetailPage() {
           </Panel>
         ) : null}
         <Panel title="CFR" testId="cfr-disease">
-          <div className="space-y-3">
+          <div className="flex flex-1 flex-col justify-center gap-3">
             {d.sources.pe ? <CfrCard title={t('skdr.penyakit.cfrPe')} src="pe" r={d.cfr.pe.rate} note={d.cfr.pe.label ? t('skdr.penyakit.cfrPeNote', { label: d.cfr.pe.label }) : t('skdr.penyakit.cfrPeNoteAll')} /> : null}
             {d.sources.ebs ? <CfrCard title={t('skdr.penyakit.cfrEbs')} src="ebs" r={d.cfr.ebs.rate} note={t('skdr.penyakit.cfrEbsNote')} /> : null}
           </div>
@@ -213,7 +216,7 @@ export default function DiseaseDetailPage() {
           <Panel title={t('skdr.penyakit.latestEbs')} sources={['ebs']} testId="latest-ebs">
             {d.latest.ebs.length ? (
               <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
-                <thead className="text-[10px] uppercase text-slate-500"><tr><th className="py-1">{t('skdr.penyakit.colNoEbs')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th className="text-right">{t('skdr.penyakit.colCases')}</th><th className="text-right">{t('skdr.penyakit.colDeaths')}</th></tr></thead>
+                <thead className="text-xs uppercase text-slate-500"><tr><th className="py-1">{t('skdr.penyakit.colNoEbs')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th className="text-right">{t('skdr.penyakit.colCases')}</th><th className="text-right">{t('skdr.penyakit.colDeaths')}</th></tr></thead>
                 <tbody>{d.latest.ebs.map((r, i) => (
                   <tr key={(r.no_ebs || '') + i} className="border-b border-slate-100"><td className="py-1.5 font-mono">{r.no_ebs || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}<span className="text-slate-400"> · {r.province || ''}</span></td><td>{r.status || '—'}</td><td className="text-right">{fmt(r.cases)}</td><td className="text-right text-red-600">{fmt(r.deaths)}</td></tr>
                 ))}</tbody></table></div>
@@ -224,11 +227,11 @@ export default function DiseaseDetailPage() {
           <Panel title={t('skdr.penyakit.latestPe')} sources={['pe']} testId="latest-pe">
             {d.latest.pe.length ? (
               <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
-                <thead className="text-[10px] uppercase text-slate-500"><tr><th className="py-1">{t('skdr.penyakit.colNoPe')}</th><th>{t('skdr.penyakit.colPatient')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th></tr></thead>
+                <thead className="text-xs uppercase text-slate-500"><tr><th className="py-1">{t('skdr.penyakit.colNoPe')}</th><th>{t('skdr.penyakit.colPatient')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th></tr></thead>
                 <tbody>{d.latest.pe.map((r) => (
                   <tr key={r.id} className="border-b border-slate-100"><td className="py-1.5"><Link href={`/pe/${r.form_key}/${r.id}?mode=lihat`} className="font-mono font-semibold text-[#0060A9] hover:underline">{r.no_pe}</Link></td>
                     <td>{r.patient_initials || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}</td>
-                    <td><span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLE[r.status] || ''}`}>{r.status}</span></td></tr>
+                    <td><span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[r.status] || ''}`}>{r.status}</span></td></tr>
                 ))}</tbody></table></div>
             ) : <Empty>{d.pe_form ? t('skdr.penyakit.emptyPe') : t('skdr.penyakit.noPeForm')}</Empty>}
             <p className="mt-2 text-[11px] text-slate-400">{t('skdr.penyakit.privacy')}</p>

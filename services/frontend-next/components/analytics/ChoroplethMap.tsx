@@ -55,7 +55,7 @@ export default function ChoroplethMap({ level, provinceCode, values, hue, onPick
   if (!geo) return <div className="flex items-center justify-center text-xs text-slate-400" style={{ height }}>{t('skdr.penyakit.mapLoading')}</div>
   if (!feats.list.length) return <div className="flex items-center justify-center text-xs text-slate-400" style={{ height }}>{t('skdr.penyakit.mapNoGeometry')}</div>
   return (
-    <div className="relative" data-testid="choropleth">
+    <div className="relative flex flex-1 flex-col justify-center" data-testid="choropleth">
       <svg viewBox={`0 0 ${W} ${feats.H}`} className="w-full" style={{ maxHeight: height }} role="img" aria-label={t('skdr.penyakit.mapAria')}>
         {feats.list.map((f) => (
           <path key={f.code} d={f.d} fill={shade(values[f.code] || 0, max, hue)} stroke="#fff" strokeWidth={level === 'province' ? 1 : 0.6}
@@ -66,7 +66,7 @@ export default function ChoroplethMap({ level, provinceCode, values, hue, onPick
         ))}
       </svg>
       {hover ? <div className="pointer-events-none absolute left-2 top-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1 text-[11px] shadow"><b>{hover.name}</b>: {fmt(values[hover.code] || 0)}</div> : null}
-      <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+      <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
         <span>0</span>{[0.05, 0.2, 0.45, 0.7, 1].map((x) => <span key={x} className="h-3 w-6 rounded-sm" style={{ background: shade(x * max || 0.0001, max || 1, hue) }} />)}<span>{fmt(max)}</span>
         {onPick && level === 'province' ? <span className="ml-auto">{t('skdr.penyakit.mapDrill')}</span> : null}
       </div>

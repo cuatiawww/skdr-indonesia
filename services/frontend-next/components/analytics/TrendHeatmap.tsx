@@ -35,24 +35,25 @@ function Trend({ ov, src }: { ov: Overview; src: 'ebs' | 'pe' }) {
             {list.slice(0, 12).map((s, k) => {
               const on = sel.includes(s.disease_id)
               return (
-                <label key={s.disease_id} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] ${on ? 'border-slate-300 bg-slate-50 font-semibold text-slate-800' : 'border-slate-200 text-slate-500'}`}>
+                <label key={s.disease_id} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-xs ${on ? 'border-slate-300 bg-slate-50 font-semibold text-slate-800' : 'border-slate-200 text-slate-500'}`}>
                   <input type="checkbox" className="h-3.5 w-3.5 accent-[#0060A9]" checked={on} onChange={() => setSel(on ? sel.filter((x) => x !== s.disease_id) : [...sel, s.disease_id])} />
                   <span className="h-2 w-2 rounded-full" style={{ background: COLORS[k % COLORS.length] }} />{s.name} <span className="text-slate-400">{fmt(s.total)}</span>
                 </label>
               )
             })}
           </div>
-          <div className="h-64">
+          {/* PR 013: chart grows to fill the card; absolute inner box avoids a ResponsiveContainer resize loop */}
+          <div className="relative min-h-[20rem] flex-1"><div className="absolute inset-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} width={40} />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} width={40} />
                 <Tooltip formatter={(v: any) => fmt(Number(v))} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 {list.slice(0, 12).map((s, k) => sel.includes(s.disease_id) ? <Line key={s.disease_id} type="monotone" dataKey={s.name} stroke={COLORS[k % COLORS.length]} strokeWidth={2} dot={false} isAnimationActive={false} /> : null)}
               </LineChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer></div>
           </div>
         </>
       )}
@@ -79,7 +80,7 @@ function Heatmap({ ov }: { ov: Overview }) {
       </select>}>
       {!rows.length ? <Empty>{t('skdr.charts.emptyHeat')}</Empty> : (
         <div className="overflow-x-auto">
-          <table className="w-full border-separate text-[10px]" style={{ borderSpacing: 2 }}>
+          <table className="w-full border-separate text-xs" style={{ borderSpacing: 2 }}>
             <thead><tr><th className="sticky left-0 z-10 min-w-[140px] bg-white text-left font-semibold text-slate-500">{t('skdr.charts.province')}</th>
               {ov.weeks.map((w) => <th key={w.start} className="min-w-[22px] whitespace-nowrap font-normal text-slate-400" title={w.start}>{w.week}</th>)}
               <th className="pl-2 text-right font-semibold text-slate-500">{t('skdr.charts.total')}</th></tr></thead>
@@ -93,7 +94,7 @@ function Heatmap({ ov }: { ov: Overview }) {
               ))}
             </tbody>
           </table>
-          <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500">
+          <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
             <span>{t('skdr.charts.low')}</span>{[0.05, 0.2, 0.45, 0.7, 1].map((x) => <span key={x} className="h-3 w-6 rounded-sm" style={{ background: shade(x * max, max, hue) }} />)}<span>{t('skdr.charts.high')} ({fmt(max)})</span>
             <span className="ml-auto">{t('skdr.charts.weekAxis')}</span>
           </div>

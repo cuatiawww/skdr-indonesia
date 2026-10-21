@@ -242,12 +242,26 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                   AND ($3::int IS NULL OR location_id = $3) AND ($4::int IS NULL OR kabkota_id = $4))
              SELECT (SELECT COUNT(DISTINCT p) FROM u WHERE p IS NOT NULL)::bigint, (SELECT COUNT(DISTINCT k) FROM u WHERE k IS NOT NULL)::bigint,
                     (SELECT COUNT(*) FROM master_locations WHERE is_active AND ($3::int IS NULL OR id = $3))::bigint,
-                    (SELECT COUNT(*) FROM master_kabkota WHERE is_active AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR id = $4))::bigint",
+                    (SELECT COUNT(*) FROM master_kabkota WHERE is_active AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR id = $4))::bigint,
+                    -- PR 013: names of active provinces without any report (shown on the coverage card)
+                    ARRAY(SELECT l.name FROM master_locations l WHERE l.is_active AND ($3::int IS NULL OR l.id = $3)
+                           AND NOT EXISTS (SELECT 1 FROM u WHERE u.p = l.id) ORDER BY l.name),
+                    -- PR 013: 5 provinces with the lowest kab/kota reporting coverage
+                    (SELECT COALESCE(json_agg(x ORDER BY x.ratio, x.name), '[]'::json)::text FROM (
+                       SELECT l.name, COUNT(DISTINCT u.k) FILTER (WHERE u.k IS NOT NULL)::int AS num, kt.n::int AS den,
+                              COUNT(DISTINCT u.k) FILTER (WHERE u.k IS NOT NULL)::float / kt.n AS ratio
+                         FROM master_locations l
+                         JOIN LATERAL (SELECT COUNT(*) n FROM master_kabkota mk WHERE mk.is_active AND mk.province_id = l.id) kt ON kt.n > 0
+                         LEFT JOIN u ON u.p = l.id AND u.k IN (SELECT id FROM master_kabkota WHERE province_id = l.id)
+                        WHERE l.is_active AND ($3::int IS NULL OR l.id = $3)
+                        GROUP BY l.name, kt.n ORDER BY ratio, l.name LIMIT 5) x)",
             &[&f.start, &f.end, &f.province, &f.kabkota, &show_ebs, &show_ind],
         )
         .await
         .map_err(internal)?;
     let (cp, ck, tp, tk): (i64, i64, i64, i64) = (cov.get(0), cov.get(1), cov.get(2), cov.get(3));
+    let missing_prov: Vec<String> = cov.get(4);
+    let kab_low: Value = serde_json::from_str(&cov.get::<_, String>(5)).unwrap_or(json!([]));
     let zoonosis_ebs: i64 = cards.iter().flat_map(|c| c["ebs"].as_array().cloned().unwrap_or_default()).map(|s| s["alerts"].as_i64().unwrap_or(0)).sum();
 
     Ok(Json(json!({
@@ -262,7 +276,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
             "cfr": {"groups": cfr_groups, "star_deaths": star_deaths},
             "pe_status": status_cards,
             "nik": rate(nik_num, nik_den, &cfg),
-            "coverage": {"provinces": rate(cp, tp, &cfg), "kabkota": rate(ck, tk, &cfg)},
+            "coverage": {"provinces": rate(cp, tp, &cfg), "kabkota": rate(ck, tk, &cfg), "provinces_missing": missing_prov, "kab_by_province": kab_low},
             "config": {"indicators": cfg.get("indicators"), "status_labels": cfg.get("pe_status_labels"), "texts": cfg.get("texts"),
                        "pe_count_statuses": cfg.get("pe_count_statuses"), "fraction_below": cfg.get("fraction_below")},
             "updated_at": chrono::Utc::now().to_rfc3339(),

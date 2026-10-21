@@ -40,10 +40,10 @@ export function Panel({ title, sources, children, className = '', right, testId 
   title: React.ReactNode; sources?: (Source | 'both')[]; children: React.ReactNode; className?: string; right?: React.ReactNode; testId?: string
 }) {
   return (
-    <article data-testid={testId} className={`relative min-w-0 overflow-hidden border border-slate-200 bg-white p-4 shadow-sm ${className}`} style={{ borderRadius: '17px 17px 22px 17px' }}>
+    <article data-testid={testId} className={`relative flex h-full min-w-0 flex-col overflow-hidden border border-slate-200 bg-white p-4 shadow-sm ${className}`} style={{ borderRadius: '17px 17px 22px 17px' }}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-black uppercase tracking-wide text-slate-900">{title}</h3>
+          <h3 className="text-base font-black uppercase tracking-wide text-slate-900">{title}</h3>
           {(sources || []).map((s) => <SourceBadge key={s} source={s} />)}
         </div>
         {right}
