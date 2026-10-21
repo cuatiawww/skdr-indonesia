@@ -37,9 +37,11 @@ def split_options(v):
     parts = [p for p in parts if p]
     if len(parts) == 1 and re.search(r'\s/|/\s', parts[0]):
         parts = [clean(p) for p in re.split(r'\s*/\s*', parts[0]) if clean(p)]
+    numbered = bool(parts) and re.match(r'^1\.', parts[0]) is not None
     out = []
     for p in parts:
-        p = re.sub(r'^\d+\.\s+', '', p).rstrip(',').strip()
+        # numbered list: also tolerate sheet typos such as '2.Ruam' / '3 Ruam'
+        p = re.sub(r'^\d+\.?\s*' if numbered else r'^\d+\.\s+', '', p).rstrip(',').strip()
         p = re.sub(r'\s*\(\+ free text\)$', '', p)
         out.append(p[:1].upper() + p[1:])
     return out
