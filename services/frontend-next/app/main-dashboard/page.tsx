@@ -282,6 +282,7 @@ function CrawlingInfoModal({
     web: t("crawling.sourceLabels.web"),
     unknown: t("crawling.sourceLabels.unknown"),
     form: t("crawling.sourceLabels.form"),
+    ebs: t("crawling.sourceLabels.ebs"),
   };
 
   // Older backend deployments may return a partial crawling-stats payload.
@@ -910,6 +911,7 @@ export default function DashboardPage() {
   const currentEpi = getCurrentEpiWeek();
   const [filters, setFilters] = useState<EpiFilterState>({
     disease: "all",
+    source: "all",
     provinceId: null,
     kabkotaId: null,
     startYear: currentEpi.year || currentYear,
@@ -928,7 +930,8 @@ export default function DashboardPage() {
       const dis = sp.get("disease");
       const prov = sp.get("province_id");
       const kab = sp.get("kabkota_id");
-      if (sY || sW || eY || eW || dis || prov || kab) {
+      const src = sp.get("source");
+      if (sY || sW || eY || eW || dis || prov || kab || src) {
         setFilters((prev) => ({
           ...prev,
           startYear: sY ? Number(sY) : prev.startYear,
@@ -938,6 +941,7 @@ export default function DashboardPage() {
           disease: dis || prev.disease,
           provinceId: prov ? Number(prov) : prev.provinceId,
           kabkotaId: kab ? Number(kab) : prev.kabkotaId,
+          source: src === "form" || src === "ebs" ? src : prev.source,
         }));
       }
     }
@@ -960,6 +964,7 @@ export default function DashboardPage() {
   const dashboardApiFilters = useCallback((active: EpiFilterState) => ({
     province_id: active.provinceId ?? undefined,
     kabkota_id: active.kabkotaId ?? undefined,
+    source: active.source && active.source !== "all" ? active.source : undefined,
     disease: active.disease,
     start_year: active.startYear,
     start_week: active.startWeek,

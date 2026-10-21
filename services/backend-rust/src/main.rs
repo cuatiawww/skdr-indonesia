@@ -1,10 +1,11 @@
 mod case_reports;
 mod dashboard;
 mod db;
+mod ebs;
 mod master;
 mod master_admin;
 
-use axum::{http::StatusCode, routing::{get, patch, put}, Json, Router};
+use axum::{http::StatusCode, routing::{get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
 use tower_http::cors::{Any, CorsLayer};
@@ -12,6 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 #[derive(Clone)]
 pub struct AppState {
     pub pool: Pool,
+    pub ebs_running: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 pub type ApiError = (StatusCode, Json<Value>);
@@ -39,6 +41,8 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::build_pool()?;
     let migrations_dir = std::env::var("MIGRATIONS_DIR").unwrap_or_else(|_| "/init".into());
     db::run_migrations(&pool, &migrations_dir).await?;
+    let ebs_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    ebs::spawn_scheduler(pool.clone(), ebs_running.clone());
 
     let app = Router::new()
         .route("/health", get(health))
@@ -58,6 +62,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/admin/master/diseases", get(master_admin::diseases_list).post(master_admin::disease_create))
         .route("/api/v1/admin/master/diseases/:id", put(master_admin::disease_update))
         .route("/api/v1/admin/master/diseases/:id/status", patch(master_admin::disease_status))
+        // EBS sync (PR 005)
+        .route("/api/v1/admin/ebs/status", get(ebs::status))
+        .route("/api/v1/admin/ebs/sync", post(ebs::sync_now))
+        .route("/api/v1/admin/ebs/diagnosa", get(ebs::diagnosa_list))
+        .route("/api/v1/admin/ebs/diagnosa/:id", put(ebs::diagnosa_map))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
         // main dashboard (NLP shapes, form data only)
@@ -67,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/crawling-stats/live", get(dashboard::crawling_stats_live))
         .route("/api/v1/crawl-history/summary", get(dashboard::crawl_history_summary))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
-        .with_state(AppState { pool });
+        .with_state(AppState { pool, ebs_running });
 
     let bind = std::env::var("BACKEND_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8091".into());
     let listener = tokio::net::TcpListener::bind(&bind).await?;

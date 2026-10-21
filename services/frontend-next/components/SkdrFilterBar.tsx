@@ -3,13 +3,15 @@
 // SKDR filter bar: same layout/styling as NLP EpiFilterBar, but Indonesia only:
 // Penyakit + Provinsi + Kabupaten/Kota (depends on Provinsi) + MMWR epi-week range.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Filter, MapPin, Map as MapIcon, CalendarDays, Bug, Calendar, CheckCircle2, RotateCcw, ChevronDown, AlertCircle } from 'lucide-react';
+import { Filter, MapPin, Map as MapIcon, CalendarDays, Bug, Calendar, CheckCircle2, RotateCcw, ChevronDown, AlertCircle, Radio } from 'lucide-react';
 import { getEpiWeekDateRange, getCurrentEpiWeek, formatEpiRangeDescription, getWeeksInYear } from '@/lib/epi-week';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
 import { fetchProvinces, fetchKabkota, type MasterProvince, type MasterKabkota } from '@/lib/skdr-api';
 
 export interface SkdrFilterState {
   disease: string;
+  /** 'all' | 'form' | 'ebs' */
+  source: string;
   provinceId: number | null;
   kabkotaId: number | null;
   startYear: number;
@@ -98,7 +100,7 @@ export default function SkdrFilterBar({
   };
   const reset = () => {
     const d: SkdrFilterState = {
-      disease: 'all', provinceId: null, kabkotaId: null,
+      disease: 'all', source: 'all', provinceId: null, kabkotaId: null,
       startYear: currentEpi.year, startWeek: 1, endYear: currentEpi.year, endWeek: currentEpi.week || 1,
     };
     setDraft(d);
@@ -132,7 +134,7 @@ export default function SkdrFilterBar({
       </div>
 
       <form onSubmit={apply} className="mt-4 space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(14,minmax(0,1fr))]">
           <div className="lg:col-span-2 flex flex-col gap-1">
             <label htmlFor="select-disease" className={lbl}>
               <Bug className="h-3 w-3 text-red-500" />
@@ -150,6 +152,22 @@ export default function SkdrFilterBar({
             <p className="text-[10px] text-slate-500 px-1 truncate">
               {draft.disease === 'all' ? t('skdr.filter.allClassifications') : t('skdr.filter.selected', { value: draft.disease })}
             </p>
+          </div>
+
+          <div className="lg:col-span-2 flex flex-col gap-1">
+            <label htmlFor="select-source" className={lbl}>
+              <Radio className="h-3 w-3 text-emerald-600" />
+              {t('skdr.filter.source')}
+            </label>
+            <div className={box}>
+              <select id="select-source" value={draft.source || 'all'} onChange={(e) => setDraft({ ...draft, source: e.target.value })} className={sel}>
+                <option value="all">{t('skdr.filter.sourceAll')}</option>
+                <option value="form">{t('skdr.filter.sourceForm')}</option>
+                <option value="ebs">{t('skdr.filter.sourceEbs')}</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            </div>
+            <p className="text-[10px] text-slate-500 px-1 truncate">{t('skdr.filter.sourceHint')}</p>
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-1">

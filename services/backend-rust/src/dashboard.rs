@@ -17,6 +17,7 @@ pub struct DashQuery {
     pub start_week: Option<i32>,
     pub end_year: Option<i32>,
     pub end_week: Option<i32>,
+    pub source: Option<String>,
 }
 
 /// MMWR week 1 starts on the Sunday on or before 4 January.
@@ -42,20 +43,22 @@ pub struct Resolved {
     province: Option<i32>,
     kabkota: Option<i32>,
     disease: Option<String>,
+    source: Option<String>,
     scope: String,
 }
 
 impl Resolved {
-    fn params(&self) -> [&(dyn ToSql + Sync); 5] {
-        [&self.start, &self.end, &self.province, &self.kabkota, &self.disease]
+    fn params(&self) -> [&(dyn ToSql + Sync); 6] {
+        [&self.start, &self.end, &self.province, &self.kabkota, &self.disease, &self.source]
     }
-    fn params_no_dates(&self) -> [&(dyn ToSql + Sync); 5] {
+    fn params_no_dates(&self) -> [&(dyn ToSql + Sync); 6] {
         const NONE: Option<NaiveDate> = None;
-        [&NONE, &NONE, &self.province, &self.kabkota, &self.disease]
+        [&NONE, &NONE, &self.province, &self.kabkota, &self.disease, &self.source]
     }
     fn filter_key(&self) -> String {
         format!(
-            "{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}",
+            self.source.clone().unwrap_or_else(|| "all".into()),
             self.start.map(|d| d.to_string()).unwrap_or_default(),
             self.end.map(|d| d.to_string()).unwrap_or_default(),
             self.scope,
@@ -66,15 +69,18 @@ impl Resolved {
 
 const COUNTRY: &str = "Indonesia";
 const LOC: &str = "COALESCE(NULLIF(r.location_name, ''), k.name, l.name, 'Tidak diketahui')";
+/// Disease label: master name, else the EBS diagnosa text (unmapped EBS rows are kept).
+const DN: &str = "COALESCE(d.name, r.diagnosa, 'Tidak diketahui')";
 
 fn base() -> String {
-    "FROM case_reports r
-     JOIN master_diseases d ON d.id = r.disease_id
+    "FROM surveillance_reports r
+     LEFT JOIN master_diseases d ON d.id = r.disease_id
      LEFT JOIN master_locations l ON l.id = r.location_id
      LEFT JOIN master_kabkota k ON k.id = r.kabkota_id
      WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
        AND ($3::int IS NULL OR r.location_id = $3) AND ($4::int IS NULL OR r.kabkota_id = $4)
-       AND ($5::text IS NULL OR d.name = $5 OR d.code = $5)"
+       AND ($5::text IS NULL OR d.name = $5 OR d.code = $5 OR (d.id IS NULL AND r.diagnosa = $5))
+       AND ($6::text IS NULL OR r.source = $6)"
         .to_string()
 }
 
@@ -96,7 +102,8 @@ async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiError> {
     } else {
         None
     };
-    Ok(Resolved { start, end, province: q.province_id, kabkota: q.kabkota_id, disease, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
+    let source = q.source.clone().map(|s| s.trim().to_lowercase()).filter(|s| s == "form" || s == "ebs");
+    Ok(Resolved { start, end, province: q.province_id, kabkota: q.kabkota_id, disease, source, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
 }
 
 async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
@@ -134,8 +141,9 @@ async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
 
 fn outbreak(
     country: String, loc: String, province: Option<String>, disease: String, lat: Option<f64>, lng: Option<f64>,
-    cases: i64, deaths: i64, events: i64, case_date: String, created: String, reviewed: bool, detail: Value,
+    cases: i64, deaths: i64, events: i64, case_date: String, created: String, reviewed: bool, detail: Value, src: String,
 ) -> Value {
+    let (sname, stype) = if src == "ebs" { ("EBS SKDR Kemenkes", "ebs") } else { ("Formulir Laporan Kasus", "form") };
     json!({
         "location_name": loc, "disease": disease, "country": country, "province": province, "city": null,
         "latitude": lat, "longitude": lng, "cases": cases, "deaths": deaths,
@@ -144,14 +152,14 @@ fn outbreak(
         "case_date": case_date, "sort_date": case_date, "case_date_precision": "day",
         "latest_date": case_date, "published_date": created, "crawled_at": created,
         "geo_level": if lat.is_some() && lng.is_some() { "location" } else { "none" },
-        "is_national": false, "source_type": "FORM", "is_official": false,
-        "sources": [{ "url": null, "source_name": "Formulir Laporan Kasus", "source_type": "form", "published_at": created }],
+        "is_national": false, "source_type": stype.to_uppercase(), "is_official": false,
+        "sources": [{ "url": null, "source_name": sname, "source_type": stype, "published_at": created }],
         "detail": detail.as_object().map(|o| {
             let mut o = o.clone();
             o.insert("needs_review".into(), json!(!reviewed));
             o.insert("is_health_related".into(), json!(true));
-            o.insert("source_name".into(), json!("Formulir Laporan Kasus"));
-            o.insert("source_type".into(), json!("form"));
+            o.insert("source_name".into(), json!(sname));
+            o.insert("source_type".into(), json!(stype));
             Value::Object(o)
         }).unwrap_or(json!({})),
     })
@@ -164,12 +172,12 @@ fn iso(col: &str) -> String {
 
 async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-        "SELECT '{COUNTRY}', {LOC}, MAX(l.name), d.name,
+        "SELECT '{COUNTRY}', {LOC}, MAX(l.name), {DN},
                 (array_agg(r.latitude ORDER BY r.created_at DESC) FILTER (WHERE r.latitude IS NOT NULL))[1],
                 (array_agg(r.longitude ORDER BY r.created_at DESC) FILTER (WHERE r.longitude IS NOT NULL))[1],
                 SUM(r.cases)::bigint, SUM(r.deaths)::bigint, COUNT(*)::bigint, MAX(r.report_date)::text,
-                {}, BOOL_AND(r.is_reviewed)
-         {} GROUP BY 2, 4 ORDER BY 7 DESC LIMIT 250",
+                {}, BOOL_AND(r.is_reviewed), MIN(r.source)
+         {} GROUP BY 2, 4 ORDER BY 7 DESC LIMIT 1000",
         iso("MAX(r.created_at)"),
         base()
     );
@@ -180,7 +188,7 @@ async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
             let (cases, deaths): (i64, i64) = (r.get(6), r.get(7));
             outbreak(
                 r.get(0), r.get(1), r.get(2), r.get(3), r.get(4), r.get(5), cases, deaths, r.get(8), r.get(9), r.get(10), r.get(11),
-                json!({ "case_count": cases, "death_count": deaths }),
+                json!({ "case_count": cases, "death_count": deaths }), r.get(12),
             )
         })
         .collect())
@@ -188,8 +196,8 @@ async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
 
 async fn signal_feed(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-        "SELECT r.id::text, '{COUNTRY}', {LOC}, l.name, d.name, r.latitude, r.longitude, r.cases, r.deaths,
-                r.report_date::text, {}, r.is_reviewed, r.notes
+        "SELECT r.id::text, '{COUNTRY}', {LOC}, l.name, {DN}, r.latitude, r.longitude, r.cases, r.deaths,
+                r.report_date::text, {}, r.is_reviewed, r.notes, r.source
          {} ORDER BY r.report_date DESC, r.created_at DESC LIMIT 200",
         iso("r.created_at"),
         base()
@@ -206,8 +214,8 @@ async fn signal_feed(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
                 json!({
                     "event_id": r.get::<_, String>(0), "url": null, "content": r.get::<_, Option<String>>(12),
                     "published_at": created, "crawled_at": created, "case_date": date, "event_date": date,
-                    "case_count": cases, "death_count": deaths, "publish_source": "form",
-                }),
+                    "case_count": cases, "death_count": deaths, "publish_source": r.get::<_, String>(13),
+                }), r.get(13),
             )
         })
         .collect())
@@ -269,7 +277,7 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
     let f = resolve(&c, &q).await?;
     let (ey, ew) = current_mmwr(chrono::Local::now().date_naive());
     let years: Vec<i32> = c
-        .query("SELECT DISTINCT EXTRACT(YEAR FROM report_date)::int FROM case_reports ORDER BY 1 DESC", &[])
+        .query("SELECT DISTINCT EXTRACT(YEAR FROM report_date)::int FROM surveillance_reports ORDER BY 1 DESC", &[])
         .await
         .map_err(internal)?
         .iter()
@@ -298,8 +306,8 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
             "signal_feed": signal_feed(&c, &f).await?,
             "signal_feed_page_size": 20,
             "locations": locations(&c, &f).await?,
-            "map_locations_limit": 250,
-            "by_disease": grouped(&c, &f, "d.name").await?,
+            "map_locations_limit": 1000,
+            "by_disease": grouped(&c, &f, DN).await?,
             "by_province": by_province(&c, &f).await?,
             "ai_summary": { "text": "", "provider": "unavailable", "cached": false, "mode": "disabled" },
             "trends": trends(&c, &f).await?,
@@ -328,7 +336,7 @@ async fn form_counts(c: &Object) -> Result<(i64, i64, i64, i64, Option<String>),
                         COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint,
                         COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()) - interval '1 month' AND created_at < date_trunc('month', now()))::bigint,
                         COUNT(*) FILTER (WHERE is_reviewed)::bigint, {}
-                 FROM case_reports",
+                 FROM surveillance_reports",
                 iso("MAX(created_at)")
             ),
             &[],
@@ -349,7 +357,7 @@ pub async fn crawling_stats(State(s): State<AppState>) -> Result<Json<Value>, Ap
     let (total, this_month, last_month, reviewed, last_at) = form_counts(&c).await?;
     let monthly = c
         .query(
-            "SELECT EXTRACT(MONTH FROM created_at)::int, COUNT(*)::bigint FROM case_reports
+            "SELECT EXTRACT(MONTH FROM created_at)::int, COUNT(*)::bigint FROM surveillance_reports
              WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM now()) GROUP BY 1",
             &[],
         )
@@ -397,7 +405,7 @@ pub async fn crawl_history_summary(State(s): State<AppState>) -> Result<Json<Val
     let r = c
         .query_one(
             "SELECT COUNT(*)::bigint, COUNT(*) FILTER (WHERE latitude IS NOT NULL AND longitude IS NOT NULL)::bigint,
-                    COUNT(*) FILTER (WHERE NOT is_reviewed)::bigint FROM case_reports",
+                    COUNT(*) FILTER (WHERE NOT is_reviewed)::bigint FROM surveillance_reports",
             &[],
         )
         .await

@@ -369,7 +369,8 @@
       "skdr_api": "API SKDR & Kementerian",
       "web": "Portal Web",
       "unknown": "Sumber Lainnya",
-      "form": "Formulir"
+      "form": "Formulir",
+      "ebs": "EBS"
     },
     "ibsDiseasesDetected": "Penyakit Terekstraksi",
     "ibsTotalCases": "Total Kasus Terpantau",
@@ -1114,7 +1115,12 @@
       "weekShort": "M{week}",
       "apply": "Terapkan",
       "resetTitle": "Kembalikan ke bawaan",
-      "invalidRange": "Rentang minggu tidak valid: minggu awal harus lebih awal atau sama dengan minggu akhir."
+      "invalidRange": "Rentang minggu tidak valid: minggu awal harus lebih awal atau sama dengan minggu akhir.",
+      "source": "Sumber",
+      "sourceAll": "Semua Sumber",
+      "sourceForm": "Formulir",
+      "sourceEbs": "EBS (SKDR Kemenkes)",
+      "sourceHint": "Formulir dan/atau EBS"
     },
     "form": {
       "title": "Formulir Laporan Kasus",
@@ -1309,6 +1315,55 @@
         "total": "Total Penyakit",
         "zoonotic": "Zoonosis",
         "zoonoticYes": "Zoonosis"
+      }
+    },
+    "ebs": {
+      "title": "Sinkronisasi EBS",
+      "subtitle": "Laporan EBS dari API SKDR Kemenkes — tersinkron otomatis sesuai jadwal; data pelapor tidak disimpan",
+      "syncNow": "Sinkron sekarang",
+      "running": "Sedang sinkron...",
+      "started": "Sinkronisasi EBS dimulai",
+      "noKey": "Kunci API (SKDR_EBS_USER_KEY) belum diisi di .env, sinkronisasi tidak bisa dijalankan.",
+      "rows": "Laporan EBS tersimpan",
+      "cases": "Kasus",
+      "withKabkota": "Terhubung kab/kota",
+      "withProvince": "Terhubung provinsi",
+      "withDisease": "Terpetakan ke master penyakit",
+      "diagMapped": "{mapped} dari {total} diagnosa terpetakan",
+      "config": "Konfigurasi",
+      "configText": "Tahun {years} · tiap {interval} menit · {size} baris/halaman · maks. {retries} ulang",
+      "scheduleOn": "Jadwal otomatis aktif",
+      "scheduleOff": "Jadwal otomatis nonaktif",
+      "logTitle": "Riwayat sinkronisasi",
+      "trigger": "Pemicu",
+      "years": "Tahun",
+      "start": "Mulai",
+      "end": "Selesai",
+      "pages": "Halaman",
+      "fetched": "Diambil",
+      "upserted": "Disimpan",
+      "retries": "Ulang",
+      "error": "Galat",
+      "noLogs": "Belum ada sinkronisasi.",
+      "manual": "Manual",
+      "scheduled": "Terjadwal",
+      "statusOk": "Sukses",
+      "statusFail": "Gagal",
+      "statusRunning": "Berjalan",
+      "mapTitle": "Pemetaan diagnosa EBS → master penyakit",
+      "mapCoverage": "{reports} laporan EBS terpetakan; yang belum terpetakan tetap tampil dengan nama diagnosa aslinya",
+      "mapSearch": "Cari diagnosa...",
+      "onlyUnmapped": "Hanya yang belum terpetakan",
+      "diagnosa": "Diagnosa EBS",
+      "reports": "Laporan",
+      "mappedTo": "Master penyakit",
+      "matchSource": "Cara pemetaan",
+      "unmapped": "— Belum terpetakan —",
+      "mapSaved": "Pemetaan \"{name}\" disimpan",
+      "match": {
+        "otomatis": "Otomatis (nama/alias)",
+        "manual": "Manual",
+        "seed": "Bawaan migrasi"
       }
     }
   }

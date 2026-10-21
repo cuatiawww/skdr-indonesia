@@ -369,7 +369,8 @@
       "skdr_api": "SKDR & Ministry API",
       "web": "Web Portal",
       "unknown": "Other Sources",
-      "form": "Form"
+      "form": "Form",
+      "ebs": "EBS"
     },
     "ibsDiseasesDetected": "Diseases Extracted",
     "ibsTotalCases": "Total Cases Captured",
@@ -1114,7 +1115,12 @@
       "weekShort": "W{week}",
       "apply": "Apply",
       "resetTitle": "Reset to default",
-      "invalidRange": "Invalid week range: the start week must be earlier than or equal to the end week."
+      "invalidRange": "Invalid week range: the start week must be earlier than or equal to the end week.",
+      "source": "Source",
+      "sourceAll": "All sources",
+      "sourceForm": "Form",
+      "sourceEbs": "EBS (SKDR MoH)",
+      "sourceHint": "Form and/or EBS"
     },
     "form": {
       "title": "Case Report Form",
@@ -1309,6 +1315,55 @@
         "total": "Total diseases",
         "zoonotic": "Zoonotic",
         "zoonoticYes": "Zoonotic"
+      }
+    },
+    "ebs": {
+      "title": "EBS Sync",
+      "subtitle": "EBS reports from the SKDR MoH API",
+      "syncNow": "Sync now",
+      "running": "Syncing...",
+      "started": "EBS sync started",
+      "noKey": "SKDR_EBS_USER_KEY missing in .env",
+      "rows": "Stored EBS reports",
+      "cases": "Cases",
+      "withKabkota": "Linked to regency/city",
+      "withProvince": "Linked to province",
+      "withDisease": "Mapped to disease master",
+      "diagMapped": "{mapped} of {total} diagnoses mapped",
+      "config": "Configuration",
+      "configText": "Years {years} · every {interval} min · {size} rows/page · {retries} retries",
+      "scheduleOn": "Schedule on",
+      "scheduleOff": "Schedule off",
+      "logTitle": "Sync history",
+      "trigger": "Trigger",
+      "years": "Years",
+      "start": "Start",
+      "end": "End",
+      "pages": "Pages",
+      "fetched": "Fetched",
+      "upserted": "Stored",
+      "retries": "Retries",
+      "error": "Error",
+      "noLogs": "No sync yet.",
+      "manual": "Manual",
+      "scheduled": "Scheduled",
+      "statusOk": "Success",
+      "statusFail": "Failed",
+      "statusRunning": "Running",
+      "mapTitle": "EBS diagnosis → disease mapping",
+      "mapCoverage": "{reports} of EBS reports mapped",
+      "mapSearch": "Search diagnosis...",
+      "onlyUnmapped": "Only unmapped",
+      "diagnosa": "EBS diagnosis",
+      "reports": "Reports",
+      "mappedTo": "Disease master",
+      "matchSource": "Match",
+      "unmapped": "— Unmapped —",
+      "mapSaved": "Mapping \"{name}\" saved",
+      "match": {
+        "otomatis": "Automatic",
+        "manual": "Manual",
+        "seed": "Seed"
       }
     }
   }
