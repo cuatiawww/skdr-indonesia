@@ -100,6 +100,15 @@ pub fn cond(c: &Value, ctx: &Ctx) -> bool {
     if o.get("filled").is_some() {
         return filled(v);
     }
+    // PR 009: date in f lies more than `days` days before the date in `ref` (e.g. contact > 7 days before onset)
+    if let Some(d) = o.get("daysBeforeGt") {
+        let r = d.get("ref").and_then(|x| x.as_str()).unwrap_or("");
+        let n = d.get("days").and_then(|x| x.as_i64()).unwrap_or(0);
+        return match (parse_date(v), parse_date(ctx.get(r))) {
+            (Some(a), Some(b)) => (b - a).num_days() > n,
+            _ => false,
+        };
+    }
     true
 }
 
@@ -238,6 +247,18 @@ impl<'a> Engine<'a> {
                     .flatten()
                     .map(|x| json!(x.format("%Y-%m-%d").to_string()))
                     .unwrap_or(Value::Null),
+                // PR 009: days from the latest `col` date among table rows matching `where` up to the `to` date
+                "days_since_latest" => {
+                    let latest = data.get(s(d, "table")).and_then(|v| v.as_array()).and_then(|rows| {
+                        rows.iter().filter_map(|r| r.as_object())
+                            .filter(|r| d.get("where").map(|w| cond(w, &Ctx { root: data, row: Some(r) })).unwrap_or(true))
+                            .filter_map(|r| parse_date(r.get(s(d, "col")))).max()
+                    });
+                    match (latest, parse_date(data.get(s(d, "to")))) {
+                        (Some(a), Some(b)) => json!((b - a).num_days()),
+                        _ => Value::Null,
+                    }
+                }
                 "first_match" => {
                     let ctx = Ctx { root: data, row: None };
                     d.get("cases").and_then(|v| v.as_array()).into_iter().flatten()
@@ -426,6 +447,15 @@ impl<'a> Engine<'a> {
                         msgs.push(format!("{label}: isi minimal {n} baris"));
                     }
                 }
+                if let Some(mr) = f.get("maxRowsRef") {
+                    if let Some(n) = parse_num(ctx.get(s(mr, "ref"))) {
+                        let max = n - mr.get("minus").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                        if rows.len() as f64 > max {
+                            msgs.push(format!("{label}: maksimal {} baris ({} − {})", fmt_num(max.max(0.0)), self.ref_label(s(mr, "ref")),
+                                fmt_num(mr.get("minus").and_then(|v| v.as_f64()).unwrap_or(0.0))));
+                        }
+                    }
+                }
                 for (i, r) in rows.iter().enumerate() {
                     let rc = Ctx { root: ctx.root, row: Some(r) };
                     for c in fields_of(f) {
@@ -559,6 +589,58 @@ mod tests {
         assert!(warns.iter().any(|i| i.msg.contains("Status GHPR")));
         let (errs, _) = e.validate(&obj(json!({"status_laporan": "Rabies Klinis"})));
         assert!(errs.iter().any(|i| i.key == "tgl_mulai_sakit"));
+    }
+
+    fn load(name: &str) -> Value {
+        let p = format!("{}/../../database/pe/{}.v1.json", env!("CARGO_MANIFEST_DIR"), name);
+        serde_json::from_str(&std::fs::read_to_string(p).expect("schema")).unwrap()
+    }
+
+    #[test]
+    fn antraks_classification() {
+        let s = load("antraks");
+        let e = Engine::new(&s, NaiveDate::from_ymd_opt(2026, 10, 21).unwrap());
+        let mut d = obj(json!({"kulit": "Ya", "cerna": "Tidak", "napas": "Tidak", "kontak_hewan": "Tidak", "kontak_produk": "Tidak"}));
+        assert_eq!(e.classify(&d).unwrap().0, "suspek");
+        d.insert("kontak_hewan".into(), json!("Ya"));
+        assert_eq!(e.classify(&d).unwrap().0, "probabel");
+        d.insert("lab_diperiksa".into(), json!("Ya"));
+        d.insert("lab".into(), json!([{"jenis_pemeriksaan": "PCR", "hasil": "Terdeteksi"}]));
+        assert_eq!(e.classify(&d).unwrap().0, "konfirmasi");
+        let n = obj(json!({"kulit": "Tidak", "cerna": "Tidak", "napas": "Tidak"}));
+        assert_eq!(e.classify(&n).unwrap().0, "tidak_memenuhi");
+        // lab result options depend on the test type
+        let errs = e.validate(&obj(json!({"lab_diperiksa": "Ya", "lab": [{"jenis_pemeriksaan": "Elisa", "hasil": "Terdeteksi"}]}))).0;
+        assert!(errs.iter().any(|i| i.key == "lab.0.hasil"));
+    }
+
+    #[test]
+    fn ai_classification_incubation_and_rows() {
+        let s = load("ai");
+        let e = Engine::new(&s, NaiveDate::from_ymd_opt(2026, 10, 21).unwrap());
+        let mut d = obj(json!({"gejala": ["Demam (≥ 38°C)", "Batuk"], "tgl_mulai_sakit": "2026-10-10", "kontak_hewan": "Pernah",
+            "kontak_hewan_list": [{"kondisi": "Mati", "tgl_kontak": "2026-10-06"}, {"kondisi": "Sehat", "tgl_kontak": "2026-10-09"},
+                                  {"kondisi": "Sakit", "tgl_kontak": "2026-09-30"}]}));
+        e.derive(&mut d, "PE-AI-2026-000001");
+        assert_eq!(d["masa_inkubasi"], json!(4));
+        assert_eq!(e.classify(&d).unwrap().0, "suspek");
+        d.insert("foto_paru".into(), json!("Abnormal (infiltrat/pneumonia)"));
+        assert_eq!(e.classify(&d).unwrap().0, "probable");
+        d.insert("spesimen".into(), json!("Ya"));
+        d.insert("lab".into(), json!([{"hasil": "Positif H5N1"}]));
+        assert_eq!(e.classify(&d).unwrap().0, "konfirmasi");
+        let (errs, warns) = e.validate(&d);
+        assert!(warns.iter().any(|i| i.key == "kontak_hewan_list.2.tgl_kontak"));
+        assert!(!warns.iter().any(|i| i.key == "kontak_hewan_list.0.tgl_kontak"));
+        let _ = errs;
+        let no_resp = obj(json!({"gejala": ["Demam (≥ 38°C)"], "kunjungi_wabah": "Pernah"}));
+        assert_eq!(e.classify(&no_resp).unwrap().0, "tidak_memenuhi");
+        assert!(e.validate(&no_resp).1.iter().any(|i| i.msg.contains("Definisi suspek")));
+        let errs = e.validate(&obj(json!({"jumlah_serumah": 2, "keluarga_berisiko": "Ya",
+            "keluarga_berisiko_list": [{"nama": "A", "tempat_kerja": "Laboratorium"}, {"nama": "B", "tempat_kerja": "Laboratorium"}]}))).0;
+        assert!(errs.iter().any(|i| i.key == "keluarga_berisiko_list" && i.msg.contains("maksimal 1 baris")));
+        let errs = e.validate(&obj(json!({"hewan_rumah": ["Tidak ada", "Ayam"]}))).0;
+        assert!(errs.iter().any(|i| i.key == "hewan_rumah"));
     }
 
     #[test]

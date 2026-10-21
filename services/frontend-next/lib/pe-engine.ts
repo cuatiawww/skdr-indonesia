@@ -8,6 +8,7 @@ export interface PeField {
   exclusive?: string; minSelect?: number; min?: number; max?: number; decimals?: number; format?: string; minLen?: number; maxLen?: number
   rules?: { op: '<=' | '>='; ref: string }[]; sumLe?: { fields: string[]; ref: string }; warn?: { when: Cond; msg: string }[]
   hint?: string; depends?: string; derive?: any; columns?: PeField[]; minRows?: number; col?: string
+  maxRowsRef?: { ref: string; minus?: number }
 }
 export interface PeSection { id: string; title: string; fields: PeField[]; visible?: Cond }
 export interface PeStep { id: string; title: string; sections: PeSection[] }
@@ -38,6 +39,7 @@ export function cond(c: Cond | undefined, root: Data, row: Data | null = null): 
   if ('has' in c) return arrHas(v, txt(c.has))
   if (c.hasAny) return c.hasAny.some((e: any) => arrHas(v, txt(e)))
   if (c.filled) return isFilled(v)
+  if (c.daysBeforeGt) { const a = date(v), b = date(get(root, row, c.daysBeforeGt.ref)); return !!(a && b) && (Date.parse(b) - Date.parse(a)) / 86400000 > c.daysBeforeGt.days }
   return true
 }
 
@@ -99,6 +101,7 @@ export function checkField(f: PeField, root: Data, row: Data | null, step: strin
     case 'table': {
       const rows: Data[] = Array.isArray(v) ? v : []
       if (required && f.minRows && rows.length < f.minRows) push(`${f.label}: isi minimal ${f.minRows} baris`)
+      if (f.maxRowsRef) { const n = num(get(root, row, f.maxRowsRef.ref)); const m = n === null ? null : n - (f.maxRowsRef.minus ?? 0); if (m !== null && rows.length > m) push(`${f.label}: maksimal ${Math.max(m, 0)} baris (${refLabel(f.maxRowsRef.ref)} − ${f.maxRowsRef.minus ?? 0})`) }
       rows.forEach((r, i) => (f.columns || []).forEach((c) => checkField(c, root, r, step, `${path}.${i}.`, today, labels, out)))
       break
     }

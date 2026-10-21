@@ -1,0 +1,2065 @@
+{
+ "form_key": "ai",
+ "disease_code": "AVIAN_INFLUENZA",
+ "version": 1,
+ "no_pe_prefix": "PE-AI",
+ "title": "Formulir Penyelidikan Epidemiologi (PE) Avian Influenza (Flu Burung) H5N1",
+ "source": "Tracker review SKDR, sheet \"Form PE Avian Influenza - Spesi\" (docs/pe-spec/ai.json)",
+ "age_reference": [
+  "tgl_mulai_sakit",
+  "tgl_laporan"
+ ],
+ "steps": [
+  {
+   "id": "p1",
+   "title": "Identitas Laporan, Pelaporan, dan Pasien",
+   "sections": [
+    {
+     "id": "A",
+     "title": "A. Status Laporan",
+     "fields": [
+      {
+       "key": "status_laporan",
+       "label": "Status Laporan",
+       "type": "select",
+       "row": 4,
+       "options": [
+        "Suspek Flu Burung",
+        "Probable Flu Burung",
+        "Konfirmasi Flu Burung (H5N1)"
+       ],
+       "required": true,
+       "col": "status_laporan",
+       "warn": [
+        {
+         "when": {
+          "all": [
+           {
+            "f": "status_laporan",
+            "eq": "Konfirmasi Flu Burung (H5N1)"
+           },
+           {
+            "not": {
+             "all": [
+              {
+               "f": "spesimen",
+               "eq": "Ya"
+              },
+              {
+               "rows": "lab",
+               "any": {
+                "f": "hasil",
+                "in": [
+                 "Positif H5N1",
+                 "Positif (serologi)"
+                ]
+               }
+              }
+             ]
+            }
+           }
+          ]
+         },
+         "msg": "Status konfirmasi belum didukung hasil lab. Periksa kembali."
+        }
+       ]
+      },
+      {
+       "key": "rumor_terkait",
+       "label": "Apakah laporan berkaitan dengan rumor KLB/wabah atau kasus serupa lainnya?",
+       "type": "select",
+       "row": 5,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "tgl_rumor",
+       "label": "Tanggal Rumor",
+       "type": "date",
+       "row": 6,
+       "required": true,
+       "visible": {
+        "f": "rumor_terkait",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_pe"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_rumor"
+      },
+      {
+       "key": "lokasi_rumor",
+       "label": "Lokasi Rumor",
+       "type": "text",
+       "row": 7,
+       "required": true,
+       "visible": {
+        "f": "rumor_terkait",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "cluster_id",
+       "label": "Link dengan kasus/KLB serupa di SKDR",
+       "type": "cluster",
+       "row": 8,
+       "required": false,
+       "col": "cluster_id"
+      }
+     ]
+    },
+    {
+     "id": "B",
+     "title": "B. Identitas Pelapor & Laporan",
+     "fields": [
+      {
+       "key": "no_pe",
+       "label": "No. PE",
+       "type": "auto",
+       "row": 9,
+       "required": true,
+       "derive": {
+        "fn": "no_pe"
+       }
+      },
+      {
+       "key": "tgl_laporan",
+       "label": "Tanggal Laporan",
+       "type": "date",
+       "row": 10,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_rumor"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_laporan",
+       "hint": "Isi sesuai tanggal laporan diterima (tidak terisi otomatis)."
+      },
+      {
+       "key": "tgl_pe",
+       "label": "Tanggal PE",
+       "type": "date",
+       "row": 11,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_pertama_berobat"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_rumor"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "tgl_pe"
+      },
+      {
+       "key": "ebs_link",
+       "label": "Link No. EBS",
+       "type": "ebs",
+       "row": 12,
+       "required": true,
+       "col": "ebs_link"
+      },
+      {
+       "key": "petugas_nama",
+       "label": "Nama Petugas PE",
+       "type": "text",
+       "row": 13,
+       "required": true
+      },
+      {
+       "key": "petugas_telp",
+       "label": "Telp Petugas",
+       "type": "text",
+       "row": 14,
+       "required": true,
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      },
+      {
+       "key": "petugas_jabatan",
+       "label": "Jabatan Petugas",
+       "type": "select",
+       "row": 15,
+       "options": [
+        "Petugas Surveilans",
+        "Epidemiolog",
+        "Dokter",
+        "Perawat",
+        "Bidan",
+        "Admin",
+        "Sanitarian/Kesling",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "petugas_jabatan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    },
+    {
+     "id": "C",
+     "title": "C. Wilayah Unit Pelapor",
+     "fields": [
+      {
+       "key": "lapor_provinsi",
+       "label": "Provinsi",
+       "type": "province",
+       "row": 16,
+       "required": true,
+       "col": "province_id"
+      },
+      {
+       "key": "lapor_kabkota",
+       "label": "Kab/Kota",
+       "type": "kabkota",
+       "row": 17,
+       "required": true,
+       "depends": "lapor_provinsi",
+       "col": "kabkota_id"
+      },
+      {
+       "key": "lapor_kecamatan",
+       "label": "Kecamatan",
+       "type": "text",
+       "row": 18,
+       "required": true
+      },
+      {
+       "key": "unit_pelapor",
+       "label": "Unit Pelapor",
+       "type": "text",
+       "row": 19,
+       "required": true,
+       "hint": "Master sarana belum tersedia; isi nama faskes."
+      }
+     ]
+    },
+    {
+     "id": "D",
+     "title": "D. Identitas Pasien",
+     "fields": [
+      {
+       "key": "no_epid",
+       "label": "No Epid",
+       "type": "text",
+       "row": 20,
+       "required": true,
+       "format": "digits",
+       "minLen": 11,
+       "maxLen": 11
+      },
+      {
+       "key": "nama_pasien",
+       "label": "Nama Pasien",
+       "type": "text",
+       "row": 21,
+       "required": true,
+       "col": "patient_name"
+      },
+      {
+       "key": "nama_ortu",
+       "label": "Nama Orang Tua / KK",
+       "type": "text",
+       "row": 22,
+       "required": false
+      },
+      {
+       "key": "nik",
+       "label": "NIK",
+       "type": "text",
+       "row": 23,
+       "required": true,
+       "col": "nik",
+       "format": "digits",
+       "minLen": 16,
+       "maxLen": 16
+      },
+      {
+       "key": "jenis_kelamin",
+       "label": "Jenis Kelamin",
+       "type": "select",
+       "row": 24,
+       "options": [
+        "Laki-laki",
+        "Perempuan"
+       ],
+       "required": true,
+       "col": "sex"
+      },
+      {
+       "key": "tgl_lahir",
+       "label": "Tanggal Lahir",
+       "type": "date",
+       "row": 25,
+       "required": true,
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "today"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_mulai_sakit"
+        }
+       ]
+      },
+      {
+       "key": "umur_tahun",
+       "label": "Umur (Tahun)",
+       "type": "auto",
+       "row": 26,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "years"
+       },
+       "col": "age_years",
+       "hint": "Dihitung dari Tanggal Lahir sampai Tanggal Mulai Sakit (atau Tanggal Laporan), disimpan statis."
+      },
+      {
+       "key": "umur_bulan",
+       "label": "Umur (Bulan)",
+       "type": "auto",
+       "row": 27,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "months"
+       }
+      },
+      {
+       "key": "umur_hari",
+       "label": "Umur (Hari)",
+       "type": "auto",
+       "row": 28,
+       "required": true,
+       "derive": {
+        "fn": "age",
+        "part": "days"
+       }
+      },
+      {
+       "key": "alamat",
+       "label": "Alamat Domisili Pasien",
+       "type": "textarea",
+       "row": 29,
+       "required": true
+      },
+      {
+       "key": "dom_provinsi",
+       "label": "Provinsi Domisili Pasien",
+       "type": "province",
+       "row": 30,
+       "required": true
+      },
+      {
+       "key": "dom_kabkota",
+       "label": "Kab/Kota Domisili Pasien",
+       "type": "kabkota",
+       "row": 31,
+       "required": true,
+       "depends": "dom_provinsi"
+      },
+      {
+       "key": "dom_kecamatan",
+       "label": "Kecamatan Domisili Pasien",
+       "type": "text",
+       "row": 32,
+       "required": true
+      },
+      {
+       "key": "dom_kelurahan",
+       "label": "Kelurahan/Desa",
+       "type": "text",
+       "row": 33,
+       "required": true
+      },
+      {
+       "key": "telp_pasien",
+       "label": "Tlp/HP Pasien",
+       "type": "text",
+       "row": 34,
+       "required": false,
+       "format": "digits",
+       "minLen": 11,
+       "maxLen": 13
+      },
+      {
+       "key": "pekerjaan",
+       "label": "Pekerjaan pasien",
+       "type": "select",
+       "row": 35,
+       "options": [
+        "Belum/tidak bekerja",
+        "Pekerja RS/Puskesmas/Klinik",
+        "Petugas laboratorium",
+        "Veterinarian (dokter hewan/paramedik veteriner)",
+        "Peternak unggas",
+        "Peternak babi",
+        "Pedagang/pekerja pasar unggas/babi",
+        "Pekerja pemotongan/pemrosesan unggas",
+        "Petani",
+        "Pedagang (selain unggas/babi)",
+        "Karyawan/pekerja swasta",
+        "Ibu rumah tangga",
+        "Pelajar/mahasiswa",
+        "Lainnya"
+       ],
+       "required": true,
+       "other": {
+        "value": "Lainnya",
+        "key": "pekerjaan_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "alamat_kerja",
+       "label": "Alamat Tempat Kerja",
+       "type": "text",
+       "row": 36,
+       "required": false
+      },
+      {
+       "key": "kerabat_nama",
+       "label": "Nama Saudara Dekat yang Dapat Dihubungi",
+       "type": "text",
+       "row": 37,
+       "required": false
+      },
+      {
+       "key": "kerabat_telp",
+       "label": "No Telp Kontak Darurat",
+       "type": "text",
+       "row": 38,
+       "required": false,
+       "format": "digits",
+       "minLen": 10,
+       "maxLen": 13
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p2",
+   "title": "Klinis Pasien dan Pemeriksaan Laboratorium",
+   "sections": [
+    {
+     "id": "E",
+     "title": "E. Informasi Klinis Pasien",
+     "fields": [
+      {
+       "key": "tgl_mulai_sakit",
+       "label": "Tanggal mulai sakit (demam)",
+       "type": "date",
+       "row": 41,
+       "required": true,
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_lahir"
+        },
+        {
+         "op": "<=",
+         "ref": "tgl_laporan"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "onset_date"
+      },
+      {
+       "key": "gejala",
+       "label": "Gejala dan tanda sakit",
+       "type": "multiselect",
+       "row": 42,
+       "options": [
+        "Demam (≥ 38°C)",
+        "Batuk",
+        "Pilek",
+        "Sakit tenggorok",
+        "Napas pendek/sesak napas",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "warn": [
+        {
+         "when": {
+          "all": [
+           {
+            "f": "gejala",
+            "filled": true
+           },
+           {
+            "not": {
+             "all": [
+              {
+               "f": "gejala",
+               "has": "Demam (≥ 38°C)"
+              },
+              {
+               "f": "gejala",
+               "hasAny": [
+                "Batuk",
+                "Pilek",
+                "Sakit tenggorok",
+                "Napas pendek/sesak napas"
+               ]
+              }
+             ]
+            }
+           }
+          ]
+         },
+         "msg": "Definisi suspek flu burung: demam ≥ 38°C disertai minimal satu gejala pernapasan. Periksa kembali."
+        }
+       ],
+       "other": {
+        "value": "Lainnya",
+        "key": "gejala_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "penunjang",
+       "label": "Apakah dilakukan pemeriksaan darah rutin atau foto paru?",
+       "type": "select",
+       "row": 43,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "penunjang_tgl",
+       "label": "Tanggal pemeriksaan penunjang",
+       "type": "date",
+       "row": 44,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "leukosit",
+       "label": "Leukosit darah terendah (sel/µL)",
+       "type": "number",
+       "row": 45,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 200000,
+       "decimals": 0
+      },
+      {
+       "key": "trombosit",
+       "label": "Trombosit terendah (sel/µL)",
+       "type": "number",
+       "row": 46,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 2000000,
+       "decimals": 0
+      },
+      {
+       "key": "limfosit",
+       "label": "Limfosit terendah (sel/µL)",
+       "type": "number",
+       "row": 47,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 100000,
+       "decimals": 0
+      },
+      {
+       "key": "sgot",
+       "label": "SGOT tertinggi (U/L)",
+       "type": "number",
+       "row": 48,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 20000,
+       "decimals": 0
+      },
+      {
+       "key": "sgpt",
+       "label": "SGPT tertinggi (U/L)",
+       "type": "number",
+       "row": 49,
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       },
+       "min": 0,
+       "max": 20000,
+       "decimals": 0
+      },
+      {
+       "key": "foto_paru",
+       "label": "Foto paru",
+       "type": "select",
+       "row": 50,
+       "options": [
+        "Normal",
+        "Abnormal (infiltrat/pneumonia)",
+        "Tidak dilakukan"
+       ],
+       "required": false,
+       "visible": {
+        "f": "penunjang",
+        "eq": "Ya"
+       }
+      },
+      {
+       "key": "berobat",
+       "label": "Apakah pasien sudah berobat ke fasyankes?",
+       "type": "select",
+       "row": 51,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "riwayat_berobat",
+       "type": "table",
+       "label": "Riwayat Berobat",
+       "visible": {
+        "f": "berobat",
+        "eq": "Ya"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "faskes",
+         "label": "Nama klinik/RS",
+         "type": "text",
+         "row": 52,
+         "required": true,
+         "hint": "Master fasilitas belum tersedia; isi nama klinik/RS."
+        },
+        {
+         "key": "jenis_perawatan",
+         "label": "Jenis perawatan",
+         "type": "select",
+         "row": 53,
+         "options": [
+          "Rawat jalan",
+          "Rawat inap"
+         ],
+         "required": true
+        },
+        {
+         "key": "tgl_masuk",
+         "label": "Tanggal masuk/berobat",
+         "type": "date",
+         "row": 54,
+         "required": true,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_mulai_sakit"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "tgl_keluar",
+         "label": "Tanggal keluar",
+         "type": "date",
+         "row": 55,
+         "required": false,
+         "visible": {
+          "f": "jenis_perawatan",
+          "eq": "Rawat inap"
+         },
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_masuk"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "key": "tgl_pertama_berobat",
+       "label": "Tanggal pertama berobat",
+       "type": "auto",
+       "row": 56,
+       "required": true,
+       "visible": {
+        "f": "berobat",
+        "eq": "Ya"
+       },
+       "derive": {
+        "fn": "min_date",
+        "table": "riwayat_berobat",
+        "col": "tgl_masuk"
+       },
+       "col": "first_visit_date"
+      },
+      {
+       "key": "antiviral",
+       "label": "Apakah diberikan antiviral (oseltamivir)?",
+       "type": "select",
+       "row": 57,
+       "options": [
+        "Ya",
+        "Tidak",
+        "Tidak tahu"
+       ],
+       "required": true
+      },
+      {
+       "key": "antiviral_tgl",
+       "label": "Tanggal mulai antiviral",
+       "type": "date",
+       "row": 58,
+       "required": false,
+       "visible": {
+        "f": "antiviral",
+        "eq": "Ya"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "ket_klinis",
+       "label": "Keterangan klinis lainnya",
+       "type": "textarea",
+       "row": 59,
+       "required": false
+      }
+     ]
+    },
+    {
+     "id": "F",
+     "title": "F. Pemeriksaan Laboratorium",
+     "fields": [
+      {
+       "key": "spesimen",
+       "label": "Apakah diambil spesimen?",
+       "type": "select",
+       "row": 60,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "lab",
+       "type": "table",
+       "label": "Pengambilan Spesimen",
+       "visible": {
+        "f": "spesimen",
+        "eq": "Ya"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "jenis_spesimen",
+         "label": "Jenis spesimen",
+         "type": "select",
+         "row": 61,
+         "options": [
+          "Usap nasofaring",
+          "Usap tenggorok",
+          "Serum darah",
+          "Aspirat/bilasan bronkus",
+          "Lainnya"
+         ],
+         "required": true,
+         "other": {
+          "value": "Lainnya",
+          "key": "jenis_spesimen_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        },
+        {
+         "key": "nomor_spesimen",
+         "label": "Nomor spesimen",
+         "type": "text",
+         "row": 62,
+         "required": false
+        },
+        {
+         "key": "lab_pengambil",
+         "label": "Lab pengambil",
+         "type": "text",
+         "row": 63,
+         "required": false
+        },
+        {
+         "key": "tgl_ambil",
+         "label": "Tanggal ambil",
+         "type": "date",
+         "row": 64,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_mulai_sakit"
+          },
+          {
+           "op": "<=",
+           "ref": "tgl_periksa"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "lab_pemeriksa",
+         "label": "Lab pemeriksa",
+         "type": "text",
+         "row": 65,
+         "required": false
+        },
+        {
+         "key": "tgl_periksa",
+         "label": "Tanggal periksa/hasil",
+         "type": "date",
+         "row": 66,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_ambil"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ],
+         "requiredIf": {
+          "all": [
+           {
+            "f": "hasil",
+            "filled": true
+           },
+           {
+            "not": {
+             "f": "hasil",
+             "eq": "Belum keluar (pending)"
+            }
+           }
+          ]
+         }
+        },
+        {
+         "key": "jenis_pemeriksaan",
+         "label": "Jenis pemeriksaan",
+         "type": "select",
+         "row": 67,
+         "options": [
+          "RT-PCR influenza A/H5",
+          "Serologi (HI/mikronetralisasi)",
+          "Lainnya"
+         ],
+         "required": false,
+         "optionsIf": [
+          {
+           "when": {
+            "f": "jenis_spesimen",
+            "in": [
+             "Usap nasofaring",
+             "Usap tenggorok",
+             "Aspirat/bilasan bronkus"
+            ]
+           },
+           "options": [
+            "RT-PCR influenza A/H5",
+            "Lainnya"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_spesimen",
+            "eq": "Serum darah"
+           },
+           "options": [
+            "Serologi (HI/mikronetralisasi)",
+            "Lainnya"
+           ]
+          }
+         ],
+         "other": {
+          "value": "Lainnya",
+          "key": "jenis_pemeriksaan_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        },
+        {
+         "key": "hasil",
+         "label": "Hasil pemeriksaan",
+         "type": "select",
+         "row": 68,
+         "options": [
+          "Positif H5N1",
+          "Positif influenza A (bukan H5)",
+          "Negatif",
+          "Positif (serologi)",
+          "Belum keluar (pending)",
+          "Positif"
+         ],
+         "required": false,
+         "optionsIf": [
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "eq": "RT-PCR influenza A/H5"
+           },
+           "options": [
+            "Positif H5N1",
+            "Positif influenza A (bukan H5)",
+            "Negatif",
+            "Belum keluar (pending)"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "eq": "Serologi (HI/mikronetralisasi)"
+           },
+           "options": [
+            "Positif (serologi)",
+            "Negatif",
+            "Belum keluar (pending)"
+           ]
+          },
+          {
+           "when": {
+            "f": "jenis_pemeriksaan",
+            "eq": "Lainnya"
+           },
+           "options": [
+            "Positif",
+            "Negatif",
+            "Belum keluar (pending)"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p3",
+   "title": "Kontak dengan Unggas/Hewan dan Lingkungan Rumah",
+   "sections": [
+    {
+     "id": "G",
+     "title": "G. Kontak dengan Unggas/Hewan (7-14 hari sebelum sakit)",
+     "fields": [
+      {
+       "key": "kontak_hewan",
+       "label": "Dalam 7 hari terakhir sebelum sakit, apakah pasien pernah kontak dengan unggas/babi?",
+       "type": "select",
+       "row": 71,
+       "options": [
+        "Pernah",
+        "Tidak pernah",
+        "Tidak jelas"
+       ],
+       "required": true
+      },
+      {
+       "key": "kontak_hewan_list",
+       "type": "table",
+       "label": "Kontak dengan hewan (7 hari sebelum sakit)",
+       "visible": {
+        "f": "kontak_hewan",
+        "eq": "Pernah"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "jenis_hewan",
+         "label": "Jenis hewan",
+         "type": "select",
+         "row": 72,
+         "options": [
+          "Ayam",
+          "Bebek/itik",
+          "Puyuh",
+          "Burung (merpati, burung liar, dll)",
+          "Babi",
+          "Lainnya"
+         ],
+         "required": true,
+         "other": {
+          "value": "Lainnya",
+          "key": "jenis_hewan_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        },
+        {
+         "key": "kondisi",
+         "label": "Kondisi hewan",
+         "type": "select",
+         "row": 73,
+         "options": [
+          "Sehat",
+          "Sakit",
+          "Mati"
+         ],
+         "required": true
+        },
+        {
+         "key": "tingkat_kontak",
+         "label": "Tingkat kontak",
+         "type": "select",
+         "row": 74,
+         "options": [
+          "Kontak erat (menyentuh, memegang, menyembelih, mencabut bulu, membersihkan kandang, atau jarak ≤ 1 meter)",
+          "Kontak tidak erat (berada di sekitar tanpa menyentuh, jarak > 1 meter)"
+         ],
+         "required": true
+        },
+        {
+         "key": "tgl_kontak",
+         "label": "Tanggal kontak terakhir",
+         "type": "date",
+         "row": 75,
+         "required": true,
+         "rules": [
+          {
+           "op": "<=",
+           "ref": "tgl_mulai_sakit"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ],
+         "warn": [
+          {
+           "when": {
+            "f": "tgl_kontak",
+            "daysBeforeGt": {
+             "ref": "tgl_mulai_sakit",
+             "days": 7
+            }
+           },
+           "msg": "Kontak lebih dari 7 hari sebelum sakit, di luar masa inkubasi yang ditanyakan."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "key": "masa_inkubasi",
+       "label": "Perkiraan masa inkubasi (hari)",
+       "type": "auto",
+       "row": 76,
+       "required": false,
+       "visible": {
+        "f": "kontak_hewan",
+        "eq": "Pernah"
+       },
+       "derive": {
+        "fn": "days_since_latest",
+        "table": "kontak_hewan_list",
+        "col": "tgl_kontak",
+        "where": {
+         "f": "kondisi",
+         "in": [
+          "Sakit",
+          "Mati"
+         ]
+        },
+        "to": "tgl_mulai_sakit"
+       },
+       "hint": "Otomatis = Tanggal Mulai Sakit − tanggal kontak terakhir dengan hewan sakit/mati."
+      },
+      {
+       "key": "kontak_harian",
+       "label": "Apakah pasien sehari-hari berada/bekerja di tempat yang berhubungan dengan unggas/babi?",
+       "type": "select",
+       "row": 77,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "kontak_harian_list",
+       "type": "table",
+       "label": "Kontak sehari-hari",
+       "visible": {
+        "f": "kontak_harian",
+        "eq": "Ya"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "tempat",
+         "label": "Tempat/aktivitas",
+         "type": "select",
+         "row": 78,
+         "options": [
+          "Peternakan (komersial)",
+          "Peternakan rakyat/unggas halaman",
+          "Pasar unggas hidup",
+          "Pemotongan unggas",
+          "Proses memasak/mengolah unggas",
+          "Kegiatan veteriner",
+          "Lainnya"
+         ],
+         "required": true,
+         "other": {
+          "value": "Lainnya",
+          "key": "tempat_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        },
+        {
+         "key": "jenis_hewan",
+         "label": "Jenis hewan",
+         "type": "select",
+         "row": 79,
+         "options": [
+          "Ayam",
+          "Bebek/itik",
+          "Puyuh",
+          "Burung (merpati, burung liar, dll)",
+          "Babi",
+          "Lainnya"
+         ],
+         "required": true,
+         "other": {
+          "value": "Lainnya",
+          "key": "jenis_hewan_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        }
+       ]
+      },
+      {
+       "key": "kunjungi_wabah",
+       "label": "Dalam 14 hari terakhir sebelum sakit, apakah pernah mengunjungi atau tinggal di daerah tempat terjadinya banyak kematian unggas (wabah)?",
+       "type": "select",
+       "row": 80,
+       "options": [
+        "Pernah",
+        "Tidak pernah",
+        "Tidak jelas"
+       ],
+       "required": true
+      },
+      {
+       "key": "wabah_lokasi",
+       "label": "Lokasi daerah wabah",
+       "type": "text",
+       "row": 81,
+       "required": true,
+       "visible": {
+        "f": "kunjungi_wabah",
+        "eq": "Pernah"
+       }
+      },
+      {
+       "key": "wabah_tgl",
+       "label": "Tanggal kunjungan (mulai)",
+       "type": "date",
+       "row": 82,
+       "required": true,
+       "visible": {
+        "f": "kunjungi_wabah",
+        "eq": "Pernah"
+       },
+       "rules": [
+        {
+         "op": "<=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ]
+      },
+      {
+       "key": "wabah_lama",
+       "label": "Lama kunjungan (hari)",
+       "type": "number",
+       "row": 83,
+       "required": false,
+       "visible": {
+        "f": "kunjungi_wabah",
+        "eq": "Pernah"
+       },
+       "min": 1,
+       "max": 14,
+       "decimals": 0
+      },
+      {
+       "key": "wabah_sifat",
+       "label": "Sifat kunjungan",
+       "type": "select",
+       "row": 84,
+       "options": [
+        "Tinggal/menetap",
+        "Bekerja",
+        "Berkunjung (keluarga/wisata)",
+        "Membeli/menjual unggas",
+        "Lainnya"
+       ],
+       "required": false,
+       "visible": {
+        "f": "kunjungi_wabah",
+        "eq": "Pernah"
+       },
+       "other": {
+        "value": "Lainnya",
+        "key": "wabah_sifat_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      }
+     ]
+    },
+    {
+     "id": "H",
+     "title": "H. Pemeriksaan Lingkungan Rumah Tinggal",
+     "fields": [
+      {
+       "key": "hewan_rumah",
+       "label": "Hewan piaraan di rumah",
+       "type": "multiselect",
+       "row": 85,
+       "options": [
+        "Ayam",
+        "Bebek/itik",
+        "Puyuh",
+        "Burung",
+        "Babi",
+        "Tidak ada",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "exclusive": "Tidak ada",
+       "other": {
+        "value": "Lainnya",
+        "key": "hewan_rumah_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "peternakan_sekitar",
+       "label": "Peternakan di sekitar rumah",
+       "type": "multiselect",
+       "row": 86,
+       "options": [
+        "Ayam",
+        "Bebek/itik",
+        "Puyuh",
+        "Burung",
+        "Babi",
+        "Tidak ada",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "exclusive": "Tidak ada",
+       "other": {
+        "value": "Lainnya",
+        "key": "peternakan_sekitar_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "pasar_sekitar",
+       "label": "Pasar unggas di sekitar rumah",
+       "type": "multiselect",
+       "row": 87,
+       "options": [
+        "Ayam",
+        "Bebek/itik",
+        "Puyuh",
+        "Burung",
+        "Babi",
+        "Tidak ada",
+        "Lainnya"
+       ],
+       "required": true,
+       "minSelect": 1,
+       "exclusive": "Tidak ada",
+       "other": {
+        "value": "Lainnya",
+        "key": "pasar_sekitar_lainnya",
+        "label": "Jika lainnya, sebutkan"
+       }
+      },
+      {
+       "key": "ket_lingkungan",
+       "label": "Tambahan informasi lingkungan rumah tinggal, tempat kerja, atau tempat bermain yang diduga merupakan sumber penularan",
+       "type": "textarea",
+       "row": 88,
+       "required": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p4",
+   "title": "Kontak dengan Manusia dan Anggota Serumah",
+   "sections": [
+    {
+     "id": "I",
+     "title": "I. Kontak dengan Manusia (7 hari sebelum sakit)",
+     "fields": [
+      {
+       "key": "kontak_pneumonia",
+       "label": "Dalam 7 hari terakhir sebelum sakit, apakah pasien pernah kontak erat dengan seseorang atau penderita yang dirawat dengan pneumonia?",
+       "type": "select",
+       "row": 91,
+       "options": [
+        "Pernah",
+        "Tidak pernah",
+        "Tidak jelas"
+       ],
+       "required": true
+      },
+      {
+       "key": "kontak_pneumonia_list",
+       "type": "table",
+       "label": "Kontak dengan penderita pneumonia",
+       "visible": {
+        "f": "kontak_pneumonia",
+        "eq": "Pernah"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama dan kepala keluarga",
+         "type": "text",
+         "row": 92,
+         "required": true
+        },
+        {
+         "key": "umur",
+         "label": "Umur (tahun)",
+         "type": "number",
+         "row": 93,
+         "required": false,
+         "min": 0,
+         "max": 120,
+         "decimals": 0
+        },
+        {
+         "key": "alamat",
+         "label": "Alamat (jalan, RT/RW, pemukiman)",
+         "type": "text",
+         "row": 94,
+         "required": false
+        },
+        {
+         "key": "wilayah",
+         "label": "Kecamatan, kab/kota, dan provinsi",
+         "type": "text",
+         "row": 95,
+         "required": false
+        },
+        {
+         "key": "hubungan",
+         "label": "Hubungan dengan penderita",
+         "type": "text",
+         "row": 96,
+         "required": false
+        },
+        {
+         "key": "tgl_awal",
+         "label": "Tanggal kontak awal",
+         "type": "date",
+         "row": 97,
+         "required": false,
+         "rules": [
+          {
+           "op": "<=",
+           "ref": "tgl_akhir"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "tgl_akhir",
+         "label": "Tanggal kontak akhir",
+         "type": "date",
+         "row": 98,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_awal"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "status",
+         "label": "Status Flu Burung",
+         "type": "select",
+         "row": 99,
+         "options": [
+          "Bukan kasus",
+          "Suspek",
+          "Probable",
+          "Konfirmasi",
+          "Tidak tahu"
+         ],
+         "required": false
+        }
+       ]
+      },
+      {
+       "key": "gejala_sama",
+       "label": "Apakah ada penderita dengan gejala yang sama di rumah, tetangga, atau anggota keluarga yang lain?",
+       "type": "select",
+       "row": 100,
+       "options": [
+        "Ada",
+        "Tidak ada",
+        "Tidak jelas"
+       ],
+       "required": true
+      },
+      {
+       "key": "gejala_sama_list",
+       "type": "table",
+       "label": "Penderita dengan gejala sama",
+       "visible": {
+        "f": "gejala_sama",
+        "eq": "Ada"
+       },
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama dan kepala keluarga",
+         "type": "text",
+         "row": 101,
+         "required": true
+        },
+        {
+         "key": "umur",
+         "label": "Umur (tahun)",
+         "type": "number",
+         "row": 93,
+         "required": false,
+         "min": 0,
+         "max": 120,
+         "decimals": 0
+        },
+        {
+         "key": "alamat",
+         "label": "Alamat (jalan, RT/RW, pemukiman)",
+         "type": "text",
+         "row": 94,
+         "required": false
+        },
+        {
+         "key": "wilayah",
+         "label": "Kecamatan, kab/kota, dan provinsi",
+         "type": "text",
+         "row": 95,
+         "required": false
+        },
+        {
+         "key": "hubungan",
+         "label": "Hubungan dengan penderita",
+         "type": "text",
+         "row": 96,
+         "required": false
+        },
+        {
+         "key": "tgl_awal",
+         "label": "Tanggal kontak awal",
+         "type": "date",
+         "row": 97,
+         "required": false,
+         "rules": [
+          {
+           "op": "<=",
+           "ref": "tgl_akhir"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "tgl_akhir",
+         "label": "Tanggal kontak akhir",
+         "type": "date",
+         "row": 98,
+         "required": false,
+         "rules": [
+          {
+           "op": ">=",
+           "ref": "tgl_awal"
+          },
+          {
+           "op": "<=",
+           "ref": "today"
+          }
+         ]
+        },
+        {
+         "key": "status",
+         "label": "Status Flu Burung",
+         "type": "select",
+         "row": 99,
+         "options": [
+          "Bukan kasus",
+          "Suspek",
+          "Probable",
+          "Konfirmasi",
+          "Tidak tahu"
+         ],
+         "required": false
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "J",
+     "title": "J. Anggota Serumah",
+     "fields": [
+      {
+       "key": "jumlah_serumah",
+       "label": "Jumlah anggota keluarga serumah (orang)",
+       "type": "number",
+       "row": 103,
+       "required": true,
+       "min": 1,
+       "max": 50,
+       "decimals": 0
+      },
+      {
+       "key": "keluarga_berisiko",
+       "label": "Apakah ada anggota keluarga yang bekerja di RS/klinik, laboratorium, veteriner, peternakan unggas/babi, atau pasar unggas/babi?",
+       "type": "select",
+       "row": 104,
+       "options": [
+        "Ya",
+        "Tidak"
+       ],
+       "required": true
+      },
+      {
+       "key": "keluarga_berisiko_list",
+       "type": "table",
+       "label": "Anggota keluarga dengan pekerjaan berisiko",
+       "visible": {
+        "f": "keluarga_berisiko",
+        "eq": "Ya"
+       },
+       "required": true,
+       "minRows": 1,
+       "maxRowsRef": {
+        "ref": "jumlah_serumah",
+        "minus": 1
+       },
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama anggota keluarga",
+         "type": "text",
+         "row": 105,
+         "required": true
+        },
+        {
+         "key": "tempat_kerja",
+         "label": "Tempat kerja",
+         "type": "select",
+         "row": 106,
+         "options": [
+          "RS/Klinik",
+          "Laboratorium",
+          "Veterinarian",
+          "Peternakan unggas",
+          "Peternakan babi",
+          "Pasar unggas/babi",
+          "Lainnya"
+         ],
+         "required": true,
+         "other": {
+          "value": "Lainnya",
+          "key": "tempat_kerja_lainnya",
+          "label": "Jika lainnya, sebutkan"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p5",
+   "title": "Kontak Penyelidikan (Sumber Informasi)",
+   "sections": [
+    {
+     "id": "K",
+     "title": "K. Kontak Penyelidikan (Sumber Informasi)",
+     "fields": [
+      {
+       "key": "sumber_info",
+       "type": "table",
+       "label": "Pejabat, petugas, atau dokter yang menjadi sumber informasi",
+       "required": false,
+       "minRows": 0,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama",
+         "type": "text",
+         "row": 109,
+         "required": false
+        },
+        {
+         "key": "jabatan",
+         "label": "Jabatan/Kantor/Alamat",
+         "type": "text",
+         "row": 110,
+         "required": false
+        },
+        {
+         "key": "telp",
+         "label": "Telp",
+         "type": "text",
+         "row": 111,
+         "required": false,
+         "format": "digits",
+         "minLen": 10,
+         "maxLen": 13
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p6",
+   "title": "Kondisi akhir pasien dan Keterangan Lainnya",
+   "sections": [
+    {
+     "id": "L",
+     "title": "L. Kondisi akhir pasien dan Keterangan Lainnya",
+     "fields": [
+      {
+       "key": "kondisi_akhir",
+       "label": "Bagaimana kondisi akhir pasien?",
+       "type": "select",
+       "row": 114,
+       "options": [
+        "Sembuh",
+        "Meninggal",
+        "Tidak Diketahui"
+       ],
+       "required": true,
+       "col": "outcome"
+      },
+      {
+       "key": "tgl_meninggal",
+       "label": "Tanggal meninggal",
+       "type": "date",
+       "row": 115,
+       "required": true,
+       "visible": {
+        "f": "kondisi_akhir",
+        "eq": "Meninggal"
+       },
+       "rules": [
+        {
+         "op": ">=",
+         "ref": "tgl_mulai_sakit"
+        },
+        {
+         "op": ">=",
+         "ref": "tgl_lahir"
+        },
+        {
+         "op": "<=",
+         "ref": "today"
+        }
+       ],
+       "col": "death_date"
+      },
+      {
+       "key": "keterangan_lain",
+       "label": "Keterangan lainnya mengenai PE/kasus",
+       "type": "textarea",
+       "row": 116,
+       "required": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p7",
+   "title": "Tim Penyelidikan Epidemiologi",
+   "sections": [
+    {
+     "id": "M",
+     "title": "M. Tim Penyelidikan Epidemiologi",
+     "fields": [
+      {
+       "key": "tim_pe",
+       "type": "table",
+       "label": "Anggota tim PE yang terlibat dalam penyelidikan",
+       "required": true,
+       "minRows": 1,
+       "columns": [
+        {
+         "key": "nama",
+         "label": "Nama",
+         "type": "text",
+         "row": 119,
+         "required": true
+        },
+        {
+         "key": "instansi",
+         "label": "Instansi/kantor",
+         "type": "text",
+         "row": 120,
+         "required": true
+        },
+        {
+         "key": "jabatan",
+         "label": "Jabatan",
+         "type": "text",
+         "row": 121,
+         "required": true
+        },
+        {
+         "key": "hp",
+         "label": "No. HP/kontak",
+         "type": "text",
+         "row": 122,
+         "required": true,
+         "format": "digits",
+         "minLen": 10,
+         "maxLen": 13
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "classification": {
+  "needs": [
+   {
+    "f": "gejala",
+    "filled": true
+   }
+  ],
+  "rules": [
+   {
+    "code": "konfirmasi",
+    "label": "Konfirmasi Flu Burung (H5N1)",
+    "when": {
+     "all": [
+      {
+       "f": "spesimen",
+       "eq": "Ya"
+      },
+      {
+       "rows": "lab",
+       "any": {
+        "f": "hasil",
+        "in": [
+         "Positif H5N1",
+         "Positif (serologi)"
+        ]
+       }
+      }
+     ]
+    },
+    "basis": "Hasil lab positif H5N1 (RT-PCR) atau serologi positif."
+   },
+   {
+    "code": "probable",
+    "label": "Probable Flu Burung",
+    "when": {
+     "all": [
+      {
+       "all": [
+        {
+         "f": "gejala",
+         "has": "Demam (≥ 38°C)"
+        },
+        {
+         "f": "gejala",
+         "hasAny": [
+          "Batuk",
+          "Pilek",
+          "Sakit tenggorok",
+          "Napas pendek/sesak napas"
+         ]
+        }
+       ]
+      },
+      {
+       "any": [
+        {
+         "all": [
+          {
+           "f": "kontak_hewan",
+           "eq": "Pernah"
+          },
+          {
+           "rows": "kontak_hewan_list",
+           "any": {
+            "f": "kondisi",
+            "in": [
+             "Sakit",
+             "Mati"
+            ]
+           }
+          }
+         ]
+        },
+        {
+         "f": "kunjungi_wabah",
+         "eq": "Pernah"
+        },
+        {
+         "f": "kontak_pneumonia",
+         "eq": "Pernah"
+        },
+        {
+         "f": "kontak_harian",
+         "eq": "Ya"
+        },
+        {
+         "rows": "kontak_pneumonia_list",
+         "any": {
+          "f": "status",
+          "in": [
+           "Probable",
+           "Konfirmasi"
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "any": [
+        {
+         "f": "foto_paru",
+         "eq": "Abnormal (infiltrat/pneumonia)"
+        },
+        {
+         "f": "kondisi_akhir",
+         "eq": "Meninggal"
+        }
+       ]
+      }
+     ]
+    },
+    "basis": "Kriteria suspek + foto paru abnormal (infiltrat/pneumonia) atau meninggal."
+   },
+   {
+    "code": "suspek",
+    "label": "Suspek Flu Burung",
+    "when": {
+     "all": [
+      {
+       "all": [
+        {
+         "f": "gejala",
+         "has": "Demam (≥ 38°C)"
+        },
+        {
+         "f": "gejala",
+         "hasAny": [
+          "Batuk",
+          "Pilek",
+          "Sakit tenggorok",
+          "Napas pendek/sesak napas"
+         ]
+        }
+       ]
+      },
+      {
+       "any": [
+        {
+         "all": [
+          {
+           "f": "kontak_hewan",
+           "eq": "Pernah"
+          },
+          {
+           "rows": "kontak_hewan_list",
+           "any": {
+            "f": "kondisi",
+            "in": [
+             "Sakit",
+             "Mati"
+            ]
+           }
+          }
+         ]
+        },
+        {
+         "f": "kunjungi_wabah",
+         "eq": "Pernah"
+        },
+        {
+         "f": "kontak_pneumonia",
+         "eq": "Pernah"
+        },
+        {
+         "f": "kontak_harian",
+         "eq": "Ya"
+        },
+        {
+         "rows": "kontak_pneumonia_list",
+         "any": {
+          "f": "status",
+          "in": [
+           "Probable",
+           "Konfirmasi"
+          ]
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "basis": "Demam ≥ 38°C + ≥ 1 gejala pernapasan + pajanan (unggas/babi sakit/mati, kunjungan daerah wabah, kontak pneumonia, atau kontak sehari-hari dengan unggas/babi)."
+   }
+  ],
+  "fallback": {
+   "code": "tidak_memenuhi",
+   "label": "Tidak memenuhi definisi kasus"
+  },
+  "manual_field": "status_laporan",
+  "manual_map": {
+   "Suspek Flu Burung": "suspek",
+   "Probable Flu Burung": "probable",
+   "Konfirmasi Flu Burung (H5N1)": "konfirmasi"
+  }
+ },
+ "finish_message": "Terima kasih, laporan PE anda telah tersimpan di SKDR"
+}

@@ -90,6 +90,12 @@ OVERRIDES = {
               'status_laporan': 'Suspek Leptospirosis'},
     'rabies': {'digigit': 'Ya', 'tgl_digigit': str(O - _dt.timedelta(days=2)), 'tipe_luka': 'Gigitan tembus kulit', 'jenis_hpr': 'Anjing',
                'gejala_neurologis': ['Hidrofobia (takut air)'], 'status_laporan': 'Rabies Klinis', 'var': 'Ya', 'sar': 'Tidak'},
+    'antraks': {'kulit': 'Ya', 'kontak_hewan': 'Ya', 'tgl_kontak': str(O - _dt.timedelta(days=2)), 'status_laporan': 'Probabel Antraks'},
+    'ai': {'gejala': ['Demam (≥ 38°C)', 'Batuk'], 'kontak_hewan': 'Pernah',
+           'kontak_hewan_list': [{'jenis_hewan': 'Ayam', 'kondisi': 'Mati',
+                                  'tingkat_kontak': 'Kontak erat (menyentuh, memegang, menyembelih, mencabut bulu, membersihkan kandang, atau jarak ≤ 1 meter)',
+                                  'tgl_kontak': str(O - _dt.timedelta(days=3))}],
+           'kunjungi_wabah': 'Tidak pernah', 'kontak_pneumonia': 'Tidak pernah', 'gejala_sama': 'Tidak ada', 'status_laporan': 'Suspek Flu Burung'},
 }
 data.update(OVERRIDES.get(FORM, {}))
 st, c = call('PUT', f'/api/v1/pe/cases/{cid}', {'data': data})
@@ -97,9 +103,11 @@ d = c.get('data', {})
 check('autosave update OK', st == 200, st)
 check('complete data has 0 errors', st == 200 and d['errors'] == [], json.dumps(d.get('errors', [])[:5], ensure_ascii=False))
 check('age stored (years)', d.get('data', {}).get('umur_tahun') is not None, d.get('data', {}).get('umur_tahun'))
-EXPECT = {'lepto': 'konfirmasi', 'rabies': 'klinis'}
+EXPECT = {'lepto': 'konfirmasi', 'rabies': 'klinis', 'antraks': 'probabel', 'ai': 'suspek'}
 if FORM == 'rabies':
     check('wound category derived (Kategori 3)', d.get('data', {}).get('kategori_luka') == 'Kategori 3', d.get('data', {}).get('kategori_luka'))
+if FORM == 'ai':
+    check('incubation derived (3 days)', d.get('data', {}).get('masa_inkubasi') == 3, d.get('data', {}).get('masa_inkubasi'))
 check('classification computed', d.get('classification') == EXPECT.get(FORM, d.get('classification')), d.get('classification'))
 check('manual status vs system warning', FORM != 'lepto' or any('berbeda' in w['msg'] for w in d.get('warnings', [])))
 
