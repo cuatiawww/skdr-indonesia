@@ -405,10 +405,10 @@ export default function DashboardPage() {
       ) : null}
 
       {/* PR 010: kartu ringkasan eksekutif (sheet "Spesifikasi Dashboard Executive"); kartu pipeline NLP dihapus. */}
-      <ExecutiveSummary query={dashboardApiFilters(applied)} />
-
-
-      <section className="w-full bg-[#f8fafc] pb-5">
+      <ExecutiveSummary
+        query={dashboardApiFilters(applied)}
+        afterCards={
+      <section className="w-full">
         <div className="w-full">
           <article
             className="flex flex-col border border-[#cfe0f1] bg-white p-4 xl:h-[700px] 2xl:h-[760px]"
@@ -443,6 +443,11 @@ export default function DashboardPage() {
           </article>
         </div>
       </section>
+        }
+      />
+
+
+
 
     </div>
   );

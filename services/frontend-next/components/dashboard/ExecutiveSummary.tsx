@@ -54,7 +54,7 @@ function Shell({ children, color, className = '' }: { children: React.ReactNode;
   )
 }
 
-export default function ExecutiveSummary({ query }: { query: Record<string, string | number | undefined | null> }) {
+export default function ExecutiveSummary({ query, afterCards }: { query: Record<string, string | number | undefined | null>; afterCards?: React.ReactNode }) {
   const [d, setD] = useState<Exec | null>(null)
   const [err, setErr] = useState('')
   const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'all').map(([k, v]) => [k, String(v)])).toString()
@@ -143,6 +143,9 @@ export default function ExecutiveSummary({ query }: { query: Record<string, stri
         })}
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">{t.footnote} {t.individual_def} {t.alert_def}</p>
+
+      {/* PR 011: peta lebar penuh langsung di bawah 4 kartu ringkasan */}
+      {afterCards}
 
       {/* No. 21–35 — CFR */}
       {d.cfr.groups.length ? (

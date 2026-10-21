@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/pe/forms", get(pe::forms))
         .route("/api/v1/pe/forms/:key", get(pe::form))
         .route("/api/v1/pe/cases", get(pe::cases).post(pe::case_create))
-        .route("/api/v1/pe/cases/:id", get(pe::case_get).put(pe::case_update))
+        .route("/api/v1/pe/cases/:id", get(pe::case_get).put(pe::case_update).delete(pe::case_delete))
         .route("/api/v1/pe/cases/:id/status", post(pe::case_status))
         .route("/api/v1/pe/cases/:id/classification", put(pe::case_classification))
         .route("/api/v1/pe/clusters", get(pe::clusters).post(pe::cluster_create))

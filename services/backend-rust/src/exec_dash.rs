@@ -122,7 +122,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                 "SELECT form_key, COALESCE(classification_override, classification, 'belum') cls, status, outcome,
                         (nik IS NOT NULL AND nik <> '') has_nik, COUNT(*)::bigint
                  FROM pe_cases
-                 WHERE ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1)
+                 WHERE deleted_at IS NULL AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
                    AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR kabkota_id = $4)
                  GROUP BY 1, 2, 3, 4, 5",
@@ -234,7 +234,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                   AND ($3::int IS NULL OR e.province_id = $3) AND ($4::int IS NULL OR e.kabkota_id = $4)
                UNION ALL
                SELECT province_id, kabkota_id FROM pe_cases
-                WHERE $6 AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1) AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
+                WHERE $6 AND deleted_at IS NULL AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1) AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
                   AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR kabkota_id = $4)
                UNION ALL
                SELECT location_id, kabkota_id FROM case_reports

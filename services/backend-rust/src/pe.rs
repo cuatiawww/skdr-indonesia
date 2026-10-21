@@ -66,7 +66,7 @@ pub async fn forms(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
     let rows = c
         .query(
             "SELECT DISTINCT ON (d.form_key) d.form_key, d.version, d.title, d.disease_id,
-               (SELECT count(*) FROM pe_cases p WHERE p.form_key = d.form_key) AS n
+               (SELECT count(*) FROM pe_cases p WHERE p.form_key = d.form_key AND p.deleted_at IS NULL) AS n
              FROM pe_form_definitions d WHERE d.is_active ORDER BY d.form_key, d.version DESC",
             &[],
         )
@@ -125,7 +125,7 @@ pub async fn cases(State(s): State<AppState>, Query(q): Query<CaseQuery>) -> Res
              LEFT JOIN master_locations l ON l.id = p.province_id
              LEFT JOIN master_kabkota k ON k.id = p.kabkota_id
              LEFT JOIN pe_clusters cl ON cl.id = p.cluster_id
-             WHERE ($1::text IS NULL OR p.form_key = $1) AND ($2::text IS NULL OR p.status = $2)
+             WHERE p.deleted_at IS NULL AND ($1::text IS NULL OR p.form_key = $1) AND ($2::text IS NULL OR p.status = $2)
                AND ($3::text IS NULL OR COALESCE(p.classification_override, p.classification, 'belum') = $3)
                AND ($4::text IS NULL OR p.no_pe ILIKE $4 OR p.patient_name ILIKE $4 OR k.name ILIKE $4)
                AND ($5::int IS NULL OR p.province_id = $5) AND ($6::int IS NULL OR p.kabkota_id = $6)
@@ -149,7 +149,7 @@ pub async fn cases(State(s): State<AppState>, Query(q): Query<CaseQuery>) -> Res
         .collect();
     // per-status counts for the list header
     let counts = c
-        .query("SELECT status, count(*) FROM pe_cases WHERE ($1::text IS NULL OR form_key = $1) GROUP BY status", &[&q.form])
+        .query("SELECT status, count(*) FROM pe_cases WHERE deleted_at IS NULL AND ($1::text IS NULL OR form_key = $1) GROUP BY status", &[&q.form])
         .await
         .map_err(internal)?;
     let mut by_status = Map::new();
@@ -327,7 +327,7 @@ pub async fn case_create(State(s): State<AppState>, headers: HeaderMap, Json(b):
 
 pub async fn case_update(State(s): State<AppState>, Path(id): Path<i64>, Json(b): Json<CaseBody>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
-    let r = c.query_opt("SELECT definition_id, status, no_pe, form_key FROM pe_cases WHERE id = $1", &[&id]).await.map_err(internal)?
+    let r = c.query_opt("SELECT definition_id, status, no_pe, form_key FROM pe_cases WHERE id = $1 AND deleted_at IS NULL", &[&id]).await.map_err(internal)?
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "PE tidak ditemukan"))?;
     let wf = workflow(&c).await?;
     let status: String = r.get(1);
@@ -347,7 +347,7 @@ async fn case_json(c: &deadpool_postgres::Object, id: i64) -> Result<Value, ApiE
             "SELECT p.id, p.no_pe, p.form_key, p.form_version, p.definition_id, p.status, p.data, p.errors, p.warnings, p.classification,
                     p.classification_basis, p.classification_override, p.override_reason, p.cluster_id,
                     to_char(p.created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI'), to_char(p.updated_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS')
-             FROM pe_cases p WHERE p.id = $1",
+             FROM pe_cases p WHERE p.id = $1 AND p.deleted_at IS NULL",
             &[&id],
         )
         .await
@@ -378,6 +378,34 @@ async fn case_json(c: &deadpool_postgres::Object, id: i64) -> Result<Value, ApiE
     }))
 }
 
+#[derive(Deserialize, Default)]
+pub struct DeleteBody {
+    reason: Option<String>,
+}
+
+/// PR 011: soft delete (sets deleted_at). Only Draf records; logged in pe_case_events (audit trail).
+pub async fn case_delete(State(s): State<AppState>, headers: HeaderMap, Path(id): Path<i64>, body: Option<Json<DeleteBody>>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let wf = workflow(&c).await?;
+    let r = c.query_opt("SELECT status, no_pe FROM pe_cases WHERE id = $1 AND deleted_at IS NULL", &[&id]).await.map_err(internal)?
+        .ok_or_else(|| err(StatusCode::NOT_FOUND, "PE tidak ditemukan"))?;
+    let status: String = r.get(0);
+    if status != "draf" {
+        return Err(err(StatusCode::CONFLICT, "Hanya PE berstatus Draf yang dapat dihapus."));
+    }
+    let actor = role(&headers, &wf);
+    let deleted_by = headers.get("x-user").and_then(|v| v.to_str().ok()).map(|s| s.chars().take(120).collect::<String>()).unwrap_or_else(|| actor.clone());
+    let n = c.execute("UPDATE pe_cases SET deleted_at = now(), deleted_by = $2 WHERE id = $1 AND deleted_at IS NULL AND status = 'draf'", &[&id, &deleted_by])
+        .await.map_err(internal)?;
+    if n == 0 {
+        return Err(err(StatusCode::CONFLICT, "Hanya PE berstatus Draf yang dapat dihapus."));
+    }
+    let note = body.and_then(|b| b.0.reason).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    c.execute("INSERT INTO pe_case_events (case_id, event, from_value, to_value, note, actor_role) VALUES ($1, 'dihapus', $2, 'dihapus', $3, $4)",
+        &[&id, &status, &note, &actor]).await.map_err(internal)?;
+    Ok(Json(json!({ "success": true, "data": { "id": id, "no_pe": r.get::<_, String>(1), "deleted": true } })))
+}
+
 pub async fn case_get(State(s): State<AppState>, Path(id): Path<i64>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
     Ok(Json(json!({ "success": true, "data": case_json(&c, id).await? })))
@@ -392,7 +420,7 @@ pub struct StatusBody {
 pub async fn case_status(State(s): State<AppState>, headers: HeaderMap, Path(id): Path<i64>, Json(b): Json<StatusBody>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
     let wf = workflow(&c).await?;
-    let r = c.query_opt("SELECT status, jsonb_array_length(errors) FROM pe_cases WHERE id = $1", &[&id]).await.map_err(internal)?
+    let r = c.query_opt("SELECT status, jsonb_array_length(errors) FROM pe_cases WHERE id = $1 AND deleted_at IS NULL", &[&id]).await.map_err(internal)?
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "PE tidak ditemukan"))?;
     let from: String = r.get(0);
     let n_err: i32 = r.get(1);
@@ -431,7 +459,7 @@ pub struct OverrideBody {
 pub async fn case_classification(State(s): State<AppState>, headers: HeaderMap, Path(id): Path<i64>, Json(b): Json<OverrideBody>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
     let wf = workflow(&c).await?;
-    let r = c.query_opt("SELECT definition_id, status, classification_override FROM pe_cases WHERE id = $1", &[&id]).await.map_err(internal)?
+    let r = c.query_opt("SELECT definition_id, status, classification_override FROM pe_cases WHERE id = $1 AND deleted_at IS NULL", &[&id]).await.map_err(internal)?
         .ok_or_else(|| err(StatusCode::NOT_FOUND, "PE tidak ditemukan"))?;
     if r.get::<_, String>(1) == "final" {
         return Err(err(StatusCode::CONFLICT, "PE final tidak dapat diubah"));
@@ -465,7 +493,7 @@ pub struct ClusterQuery {
 }
 
 const CLUSTER_SQL: &str = "SELECT cl.id, cl.code, cl.form_key, cl.name, cl.province_id, l.name, cl.kabkota_id, k.name, cl.kecamatan,
-    cl.tgl_rumor::text, cl.lokasi, cl.status, cl.monitoring, (SELECT count(*) FROM pe_cases p WHERE p.cluster_id = cl.id),
+    cl.tgl_rumor::text, cl.lokasi, cl.status, cl.monitoring, (SELECT count(*) FROM pe_cases p WHERE p.cluster_id = cl.id AND p.deleted_at IS NULL),
     to_char(cl.updated_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI')
     FROM pe_clusters cl LEFT JOIN master_locations l ON l.id = cl.province_id LEFT JOIN master_kabkota k ON k.id = cl.kabkota_id";
 

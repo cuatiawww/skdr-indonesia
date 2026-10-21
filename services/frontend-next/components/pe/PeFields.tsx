@@ -71,15 +71,18 @@ export function FieldView({ f, value, onChange, setOther, ctx, path }: {
         const next = o === ex ? (cur.includes(o) ? [] : [o]) : cur.includes(o) ? cur.filter((x) => x !== o) : [...cur.filter((x) => x !== ex), o]
         onChange(next); ctx.touch(path)
       }
+      // PR 011: checkbox group (real checkbox + label) in a responsive 2–4 column grid
       input = (
-        <div className={`flex flex-wrap gap-2 rounded-xl border p-2 ${bad ? 'border-red-400' : 'border-slate-200'}`}>
+        <div role="group" aria-label={f.label}
+          className={`grid grid-cols-1 gap-x-4 gap-y-2 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${bad ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200'}`}>
           {opts.map((o) => {
             const on = cur.includes(o)
             return (
-              <button type="button" key={o} disabled={ctx.disabled} onClick={() => toggle(o)} aria-pressed={on}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${on ? 'border-[#0060A9] bg-[#0060A9] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#0060A9]/50'} disabled:opacity-60`}>
-                {o}
-              </button>
+              <label key={o} className={`flex cursor-pointer items-start gap-2 text-sm leading-snug ${ctx.disabled ? 'cursor-not-allowed opacity-60' : ''} ${on ? 'font-medium text-slate-900' : 'text-slate-700'}`}>
+                <input type="checkbox" checked={on} disabled={ctx.disabled} onChange={() => toggle(o)} onBlur={blur}
+                  className={`mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-[#0060A9] ${bad ? 'outline outline-1 outline-red-400' : ''}`} />
+                <span>{o}{o === f.exclusive ? <span className="ml-1 text-[11px] text-slate-400">(tidak bisa digabung)</span> : null}</span>
+              </label>
             )
           })}
         </div>

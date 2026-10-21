@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, ClipboardList, Loader2, Save, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronsRight, Eye, Pencil, CircleAlert, ClipboardList, Loader2, Save, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import Modal from '@/components/Modal'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
@@ -40,7 +40,7 @@ function useMasters(): Masters {
   return { provinces, kabkota, loadKab }
 }
 
-export default function PeFormEditor({ formKey, caseId }: { formKey: string; caseId: number | null }) {
+export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { formKey: string; caseId: number | null; viewOnly?: boolean }) {
   const { t } = useTranslation()
   const router = useRouter()
   const masters = useMasters()
@@ -56,6 +56,10 @@ export default function PeFormEditor({ formKey, caseId }: { formKey: string; cas
   const [clusterModal, setClusterModal] = useState(false)
   const [overrideOpen, setOverrideOpen] = useState(false)
   const [transition, setTransition] = useState<Transition | null>(null)
+  // PR 011: stepper — scrollspy on the current step's sections + "jump to next invalid"
+  const [activeSec, setActiveSec] = useState<string | null>(null)
+  const lastJump = useRef<string | null>(null)
+  const pendingFocus = useRef<string | null>(null)
   const idRef = useRef<number | null>(caseId)
   const dataRef = useRef<Data>({})
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -80,7 +84,8 @@ export default function PeFormEditor({ formKey, caseId }: { formKey: string; cas
   useEffect(() => { ['lapor_provinsi', 'dom_provinsi'].forEach((k) => data[k] && masters.loadKab(String(data[k]))) }, [data.lapor_provinsi, data.dom_provinsi]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const schema = def?.schema
-  const editable = !rec || (def?.workflow.editable_status || ['draf']).includes(rec.status)
+  const statusEditable = !rec || (def?.workflow.editable_status || ['draf']).includes(rec.status)
+  const editable = statusEditable && !viewOnly // PR 011: mode Lihat = hanya baca
   const today = def?.today || new Date().toISOString().slice(0, 10)
   const issues = useMemo(() => (schema ? validateAll(schema, data, today) : []), [schema, data, today])
   const warnings = useMemo(() => (schema ? warningsAll(schema, data) : []), [schema, data])
@@ -91,6 +96,30 @@ export default function PeFormEditor({ formKey, caseId }: { formKey: string; cas
     ;(rec?.errors || []).filter((e) => /tidak sesuai|tidak ditemukan/.test(e.msg)).forEach(add) // DB-backed checks (server only)
     return m
   }, [issues, rec?.errors])
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-pe-section]'))
+    if (!els.length) return
+    setActiveSec(els[0].dataset.peSection || null)
+    const io = new IntersectionObserver((ents) => {
+      const vis = ents.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+      if (vis[0]) setActiveSec((vis[0].target as HTMLElement).dataset.peSection || null)
+    }, { rootMargin: '-220px 0px -55% 0px', threshold: 0 })
+    els.forEach((e) => io.observe(e))
+    return () => io.disconnect()
+  }, [stepIdx, schema, data])
+  useEffect(() => {
+    const key = pendingFocus.current
+    if (!key) return
+    const id = window.setTimeout(() => {
+      pendingFocus.current = null
+      const el = document.querySelector<HTMLElement>(`[data-field="${CSS.escape(key)}"]`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.querySelector<HTMLElement>('input,select,textarea,button')?.focus({ preventScroll: true })
+      el.classList.add('pe-flash'); window.setTimeout(() => el.classList.remove('pe-flash'), 1400)
+    }, 120)
+    return () => clearTimeout(id)
+  })
 
   const save = useCallback(async () => {
     if (!schema) return
@@ -148,12 +177,39 @@ export default function PeFormEditor({ formKey, caseId }: { formKey: string; cas
     })))
     return { total, done, pct: total ? Math.round((done / total) * 100) : 0 }
   })()
+  const stepStats = steps.map((st) => {
+    let total = 0, done = 0
+    st.sections.forEach((se) => { if (se.visible && !cond(se.visible, data)) return; se.fields.forEach((f) => {
+      if (!f.required || ['auto', 'info'].includes(f.type) || (f.visible && !cond(f.visible, data))) return
+      total++; if (f.type === 'cluster_monitoring' ? isFilled(data.cluster_id) : isFilled(data[f.key])) done++
+    }) })
+    const errs = stepErrors(st.id)
+    return { total, done, errs, pct: total ? done / total : errs.length ? 0 : 1 }
+  })
+  const fieldKey = (k: string) => k.split(/[.[]/)[0]
+  const jumpNext = () => {
+    if (!issues.length) { toast.success('Semua isian sudah valid'); return }
+    const order = issues.map((i) => ({ ...i, si: steps.findIndex((s) => s.id === i.step) }))
+    const last = order.findIndex((i) => i.key === lastJump.current)
+    const after = order.filter((i, n) => (last >= 0 ? n > last : i.si >= stepIdx))
+    const target = after.find((i) => i.key !== lastJump.current) || order[0]
+    lastJump.current = target.key
+    setShownSteps((s) => new Set(s).add(target.step))
+    pendingFocus.current = fieldKey(target.key)
+    if (target.si !== stepIdx && target.si >= 0) setStepIdx(target.si)
+    else setTouched((s) => new Set(s)) // re-render so the focus effect runs
+  }
+  const scrollToSec = (id: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-pe-section="${CSS.escape(id)}"]`)
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActiveSec(id) }
+  }
   const show = (path: string) => touched.has(path) || shownSteps.has(step.id) || shownSteps.has('*')
   const touch = (path: string) => setTouched((s) => (s.has(path) ? s : new Set(s).add(path)))
   const goto = async (i: number) => {
     setShownSteps((s) => new Set(s).add(step.id))
     if (saveState === 'dirty') { if (timer.current) clearTimeout(timer.current); await save() }
-    setStepIdx(i); window.scrollTo({ top: 0, behavior: 'smooth' })
+    setStepIdx(i); lastJump.current = null
+    window.requestAnimationFrame(() => document.getElementById('pe-form-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
   const cluster = clusters.find((c) => c.id === Number(data.cluster_id)) || null
@@ -210,39 +266,108 @@ export default function PeFormEditor({ formKey, caseId }: { formKey: string; cas
         </div>
       </div>
 
-      {/* stepper + progress */}
-      <div className={`${card} p-4`}>
-        <div className="mb-3 flex items-center justify-between text-xs">
-          <span className="font-bold uppercase tracking-wider text-slate-500">{t('skdr.pe.progress')}</span>
-          <span className="font-semibold text-slate-600">{t('skdr.pe.progressText', { done: reqStats.done, total: reqStats.total, pct: reqStats.pct })}</span>
+      {viewOnly && rec && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-[#0060A9]">
+          <span className="inline-flex items-center gap-2 font-semibold"><Eye className="h-4 w-4" /> Mode lihat (hanya baca)</span>
+          {statusEditable ? (
+            <Link href={`/pe/${formKey}/${rec.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#004b85]"><Pencil className="h-3.5 w-3.5" /> Edit</Link>
+          ) : <span className="text-slate-500">PE berstatus {statusLabel(rec.status)} tidak dapat diedit.</span>}
         </div>
-        <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0060A9] transition-all" style={{ width: `${reqStats.pct}%` }} /></div>
-        <ol className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+      )}
+
+      {/* PR 011: stepper interaktif (sticky, scrollspy, tooltip, lompat ke isian belum valid) */}
+      <style>{`
+        @keyframes peShine { 0% { background-position: 0% 50% } 100% { background-position: 200% 50% } }
+        .pe-bar { background: linear-gradient(90deg, #0060A9, #00A3AD, #10b981, #00A3AD, #0060A9); background-size: 200% 100%; animation: peShine 6s linear infinite; }
+        @media (prefers-reduced-motion: reduce) { .pe-bar { animation: none } }
+        .pe-flash { animation: peFlash 1.4s ease-out } @keyframes peFlash { 0%,40% { box-shadow: 0 0 0 4px rgba(245,158,11,.35); border-radius: 12px } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0) } }
+        [data-pe-section] { scroll-margin-top: 230px }
+      `}</style>
+      <div id="pe-form-top" className="scroll-mt-4" />
+      <div className={`${card} sticky top-0 z-30 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/95`} data-testid="pe-stepper">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="font-bold uppercase tracking-wider text-slate-500">{t('skdr.pe.progress')}</span>
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-slate-600">{t('skdr.pe.progressText', { done: reqStats.done, total: reqStats.total, pct: reqStats.pct })}</span>
+            {editable && (
+              <button type="button" onClick={jumpNext} data-testid="pe-jump-invalid" disabled={!issues.length}
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-700">
+                {issues.length ? <><ChevronsRight className="h-3.5 w-3.5" /> Lompat ke isian berikutnya yang belum valid ({issues.length})</> : <><Check className="h-3.5 w-3.5" /> Semua isian valid</>}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="mb-4 flex items-center gap-3">
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={reqStats.pct} aria-valuemin={0} aria-valuemax={100} aria-label="Kemajuan pengisian">
+            <div className="pe-bar h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${reqStats.pct}%` }} />
+          </div>
+          <span className="w-10 text-right font-mono text-xs font-bold text-slate-700">{reqStats.pct}%</span>
+        </div>
+        <ol className="-mx-1 flex snap-x gap-0 overflow-x-auto px-1 pb-1 pt-1 xl:overflow-visible">
           {steps.map((s, i) => {
-            const n = stepErrors(s.id).length
+            const st = stepStats[i]; const n = st.errs.length; const done = n === 0
             const active = i === stepIdx
+            const R = 9, C = 2 * Math.PI * R
             return (
-              <li key={s.id}>
-                <button onClick={() => goto(i)} className={`flex w-full items-start gap-2 rounded-xl border px-3 py-2 text-left transition ${active ? 'border-[#0060A9] bg-[#0060A9]/5' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${n === 0 ? 'bg-emerald-500 text-white' : active ? 'bg-[#0060A9] text-white' : 'bg-slate-200 text-slate-600'}`}>
-                    {n === 0 ? '✓' : i + 1}
+              <li key={s.id} className="group relative flex min-w-[150px] flex-1 snap-start items-start">
+                {i > 0 && (
+                  <span aria-hidden className="absolute right-1/2 top-[24px] h-0.5 w-full overflow-hidden bg-slate-200">
+                    <span className="block h-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${Math.round(stepStats[i - 1].pct * 100)}%` }} />
                   </span>
-                  <span className="min-w-0">
-                    <span className={`block text-[11px] font-semibold leading-tight ${active ? 'text-[#0060A9]' : 'text-slate-700'}`}>{s.title}</span>
-                    <span className={`text-[10px] ${n ? 'text-amber-600' : 'text-emerald-600'}`}>{n ? t('skdr.pe.stepIssues', { n }) : t('skdr.pe.stepComplete')}</span>
+                )}
+                <button type="button" onClick={() => goto(i)} aria-current={active ? 'step' : undefined}
+                  aria-label={`Langkah ${i + 1}: ${s.title}. ${done ? 'Lengkap' : `${n} isian belum valid`}`}
+                  className={`relative z-10 mx-auto flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-1.5 text-center transition duration-200 ${active ? 'scale-[1.04] bg-[#0060A9]/5 ring-1 ring-[#0060A9]/40' : 'hover:bg-slate-50'}`}>
+                  <span className="relative flex h-9 w-9 items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="absolute inset-0 h-9 w-9 -rotate-90" aria-hidden>
+                      <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2.5" className="stroke-slate-200" />
+                      <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - st.pct)}
+                        className={`transition-[stroke-dashoffset] duration-500 ${done ? 'stroke-emerald-500' : 'stroke-[#0060A9]'}`} />
+                    </svg>
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${done ? 'bg-emerald-500 text-white' : active ? 'bg-[#0060A9] text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>
+                      {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+                    </span>
+                    {!done && (
+                      <span className="absolute -right-1.5 -top-1 inline-flex items-center gap-0.5 rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-4 text-white shadow" title={`${n} isian belum valid`}>
+                        <TriangleAlert className="h-2.5 w-2.5" />{n}
+                      </span>
+                    )}
                   </span>
+                  <span className={`line-clamp-2 text-[11px] font-semibold leading-tight ${active ? 'text-[#0060A9]' : 'text-slate-700'}`}>{s.title}</span>
+                  <span className={`text-[10px] ${done ? 'text-emerald-600' : 'text-amber-600'}`}>{st.total ? `${st.done}/${st.total} wajib` : 'tanpa isian wajib'}</span>
                 </button>
+                {/* tooltip: ringkasan isian yang belum valid */}
+                <div role="tooltip" className="pointer-events-none invisible absolute left-1/2 top-full z-40 mt-1 w-64 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] opacity-0 shadow-lg transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                  <p className="mb-1 font-bold text-slate-800">{s.title}</p>
+                  {done ? <p className="text-emerald-600">Semua isian di bagian ini sudah valid.</p> : (
+                    <ul className="space-y-0.5 text-slate-600">
+                      {st.errs.slice(0, 6).map((e) => <li key={e.key + e.msg} className="flex gap-1"><span className="text-amber-500">•</span><span>{e.msg}</span></li>)}
+                      {n > 6 && <li className="text-slate-400">+{n - 6} isian lainnya</li>}
+                    </ul>
+                  )}
+                </div>
               </li>
             )
           })}
         </ol>
+        {/* scrollspy: bagian (section) pada langkah aktif */}
+        {step.sections.filter((se) => !se.visible || cond(se.visible, data)).length > 1 && (
+          <div className="mt-3 flex gap-1.5 overflow-x-auto border-t border-slate-100 pt-3" data-testid="pe-sections-nav">
+            {step.sections.filter((se) => !se.visible || cond(se.visible, data)).map((se) => (
+              <button key={se.id} type="button" onClick={() => scrollToSec(se.id)} aria-current={activeSec === se.id ? 'location' : undefined}
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${activeSec === se.id ? 'bg-[#0060A9] text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
+                {se.title}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         {/* main form */}
         <div className="space-y-5 xl:col-span-9">
           {step.sections.filter((se) => !se.visible || cond(se.visible, data)).map((se) => (
-            <section key={se.id} className={`${card} p-5`}>
+            <section key={se.id} data-pe-section={se.id} className={`${card} p-5`}>
               <h2 className="mb-4 border-b border-slate-100 pb-2 text-sm font-bold text-slate-800">{se.title}</h2>
               <div className="grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2 xl:grid-cols-3">
                 {se.fields.map((f) => (
