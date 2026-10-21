@@ -673,36 +673,12 @@ export type FireHotspotsResponse = {
   error?: string;
 } & MapLayerCacheFlags;
 
-export type WorldPopMeta = {
-  status: string;
-  source: string;
-  iso3: string;
-  country?: string;
-  year?: string;
-  title?: string;
-  tif_url?: string;
-  summary_url?: string;
-  error?: string;
-} & MapLayerCacheFlags;
-
-export type NasaGibsLayers = {
-  viirsTrueColor?: boolean;
-  modisTrueColor?: boolean;
-  aerosol?: boolean;
-  ndvi?: boolean;
-  nightLights?: boolean;
-  landSurfaceTemp?: boolean;
-};
-
 export type ExternalIntelLayers = {
   vectors?: boolean;
   flights?: boolean;
   /** PR 111: Flight Connection route map (airports + non-stop routes). */
   flightRoutes?: boolean;
   fires?: boolean;
-  population?: boolean;
-  weather?: boolean;
-  airQuality?: boolean;
   wildlife?: boolean;
 };
 
@@ -734,31 +710,6 @@ export type MapLayerStatus = {
   source?: string;
 };
 
-export type EnvironmentMarker = {
-  country: string;
-  display_name: string;
-  capital: string;
-  latitude: number;
-  longitude: number;
-  temperature_c?: number | null;
-  relative_humidity_pct?: number | null;
-  precipitation_mm?: number | null;
-  wind_speed_kmh?: number | null;
-  weather_observed_at?: string | null;
-  european_aqi?: number | null;
-  us_aqi?: number | null;
-  aqi_label?: string | null;
-  pm2_5?: number | null;
-  pm10?: number | null;
-  so2?: number | null;
-  air_observed_at?: string | null;
-  weather_status?: string | null;
-  air_status?: string | null;
-  weather_error?: string | null;
-  air_error?: string | null;
-  partial?: boolean;
-};
-
 export type MapHazardsResponse = {
   status: string;
   source: string;
@@ -778,10 +729,3 @@ export type MapHazardsResponse = {
   error?: string | null;
 } & MapLayerCacheFlags;
 
-export type MapEnvironmentResponse = {
-  status: string;
-  source: string;
-  total?: number;
-  markers: EnvironmentMarker[];
-  error?: string | null;
-} & MapLayerCacheFlags;

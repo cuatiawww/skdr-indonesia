@@ -3,11 +3,9 @@
  *
  * Cache TTLs (must stay in sync with backend `external_layers.rs`):
  *   flights      45s
- *   environment  3 min
  *   fires        3 min
  *   hazards      3 min
  *   vectors      5 min
- *   population   5 min
  *   wildlife     5 min (GBIF)
  *
  * Heavy upstreams are queued (max 2 in flight). Toggling a layer OFF should
@@ -17,11 +15,9 @@
 
 export const LAYER_TTL_MS = {
   flights: 45_000,
-  environment: 180_000,
   fires: 180_000,
   hazards: 180_000,
   vectors: 300_000,
-  population: 300_000,
   wildlife: 300_000,
 }
 

@@ -1,8 +1,8 @@
 'use client'
 
 import { tr } from "@/lib/i18n/LanguageContext";
-import { Layers, MapPin, Settings, Wind, X, Plane, Flame, Users, Globe, Sun, CloudRain, CloudSun, Droplets, Bird } from "lucide-react";
-import type { NasaGibsLayers, ExternalIntelLayers, MapLayerStatus } from "@/types";
+import { Layers, MapPin, Settings, Wind, X, Plane, Flame, Bird } from "lucide-react";
+import type { ExternalIntelLayers, MapLayerStatus } from "@/types";
 import { useEffect, useState } from "react";
 import AseanMap, { type BorderNeighborShape, type HazardEvent, type RegionBorderLink } from "./AseanMap";
 import type { OutbreakLocation } from "@/types";
@@ -28,6 +28,7 @@ export default function SpatialOutbreakMap({
   prototypeMode = false,
   ebsOnly,
   hideSpreadRoute,
+  sourceMode = "all",
 }: {
   countries: { name: string; cases: number; deaths?: number }[];
   locations: OutbreakLocation[];
@@ -44,6 +45,8 @@ export default function SpatialOutbreakMap({
   prototypeMode?: boolean;
   ebsOnly?: boolean;
   hideSpreadRoute?: boolean;
+  /** PR 016: global Sumber filter; shown in the map legend and region popup. */
+  sourceMode?: "all" | "ebs" | "pe";
 }) {
   const { t } = useTranslation();
   const [settings, setSettings] = useState(false),
@@ -62,22 +65,11 @@ export default function SpatialOutbreakMap({
       hillshade: false,
       population: false,
     }),
-    [gibs, setGibs] = useState<NasaGibsLayers>({
-      viirsTrueColor: false,
-      modisTrueColor: false,
-      aerosol: false,
-      ndvi: false,
-      nightLights: false,
-      landSurfaceTemp: false,
-    }),
     [intel, setIntel] = useState<ExternalIntelLayers>({
       vectors: false,
       flights: false,
       flightRoutes: false,
       fires: false,
-      population: false,
-      weather: false,
-      airQuality: false,
       wildlife: false,
     });
   const [layerStatus, setLayerStatus] = useState<Record<string, MapLayerStatus>>({});
@@ -98,22 +90,11 @@ export default function SpatialOutbreakMap({
       hillshade: false,
       population: false,
     });
-    setGibs({
-      viirsTrueColor: false,
-      modisTrueColor: false,
-      aerosol: false,
-      ndvi: false,
-      nightLights: false,
-      landSurfaceTemp: false,
-    });
     setIntel({
       vectors: false,
       flights: false,
       flightRoutes: false,
       fires: false,
-      population: false,
-      weather: false,
-      airQuality: false,
       wildlife: false,
     });
   };
@@ -127,6 +108,7 @@ export default function SpatialOutbreakMap({
         prototypeMode={prototypeMode}
         ebsOnly={ebsOnly ?? prototypeMode}
         hideSpreadRoute={hideSpreadRoute ?? prototypeMode}
+        sourceMode={sourceMode}
         baseMap={base}
         showMarkers={markers}
         showAdmin={admin}
@@ -140,7 +122,6 @@ export default function SpatialOutbreakMap({
         regionLinks={regionLinks}
         hazardEvents={hazardEvents}
         showHazards={false}
-        gibsLayers={gibs}
         intelLayers={intel}
         initialCenter={initialCenter}
         initialZoom={initialZoom}
@@ -153,20 +134,27 @@ export default function SpatialOutbreakMap({
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
         <button
           onClick={() => setSettings(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-slate-700 shadow-md transition hover:border-blue-300 hover:bg-blue-50 hover:text-[#0060A9]"
+          className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-slate-700 shadow-md transition hover:border-blue-300 hover:bg-blue-50 hover:text-primary"
         >
-          <Settings className="h-3.5 w-3.5 text-[#0060A9]" />
+          <Settings className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-black tracking-wide">
             {t("map.spatialControls")}
           </span>
         </button>
       </div>
 
+      {/* PR 016: single map legend — symbol shape + colour per source, choropleth meaning labelled. */}
+      <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-md" data-testid="map-legend">
+        {sourceMode !== "pe" ? <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full border-2 border-white bg-ebs shadow" />{tr("skdr.map.legendEbs")}</span> : null}
+        {sourceMode !== "ebs" ? <span className="flex items-center gap-1.5"><span className="mx-0.5 h-2.5 w-2.5 rotate-45 border border-white bg-pe shadow" />{tr("skdr.map.legendPe")}</span> : null}
+        {choropleth ? <span className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-6 rounded-sm bg-gradient-to-r from-slate-200 to-slate-500" />{tr(sourceMode === "all" ? "skdr.map.legendChoroAll" : sourceMode === "ebs" ? "skdr.map.legendChoroEbs" : "skdr.map.legendChoroPe")}</span> : null}
+      </div>
+
       {windLegend && wind && !prototypeMode && (
-        <div className="absolute bottom-4 left-4 z-10 max-w-[320px] space-y-3 rounded-2xl border border-blue-200/90 bg-white/95 p-3.5 shadow-[0_8px_30px_rgba(0,96,169,.12)] backdrop-blur-md">
+        <div className="absolute bottom-4 left-4 z-10 max-w-[320px] space-y-3 rounded-2xl border border-blue-200/90 bg-white/95 p-3.5 shadow-[0_8px_30px_rgb(var(--brand-700)/.12)] backdrop-blur-md">
           <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
             <div className="flex items-center gap-1.5">
-              <Wind className="h-3.5 w-3.5 text-[#0060A9]" />
+              <Wind className="h-3.5 w-3.5 text-primary" />
               <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">
                 {t("map.windFlow")} (GFS)
               </span>
@@ -203,7 +191,7 @@ export default function SpatialOutbreakMap({
           <aside className="absolute right-0 top-0 z-30 flex h-full w-[min(360px,100%)] flex-col border-l border-slate-200 bg-white/95 shadow-[-8px_0_40px_rgba(0,0,0,.08)] backdrop-blur-md">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4 text-[#0060A9]" />
+                <Settings className="h-4 w-4 text-primary" />
                 <span className="text-sm font-bold text-slate-800">
                   {t("map.spatialControls")}
                 </span>
@@ -234,7 +222,7 @@ export default function SpatialOutbreakMap({
                           key={days}
                           type="button"
                           onClick={() => setMarkerLookbackDays(days)}
-                          className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition ${markerLookbackDays === days ? "border-[#0060A9] bg-blue-50 text-[#0060A9]" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200"}`}
+                          className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition ${markerLookbackDays === days ? "border-primary bg-blue-50 text-primary" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200"}`}
                         >
                           {days === 90 ? tr("skdr.map.3months") : tr("skdr.map.days", { days })}
                         </button>
@@ -277,7 +265,7 @@ export default function SpatialOutbreakMap({
                     <button
                       key={x}
                       onClick={() => setBase(x)}
-                      className={`rounded-xl border px-3 py-2 text-left text-[11px] font-bold capitalize ${base === x ? "border-[#0060A9] bg-blue-50 text-[#0060A9]" : "border-slate-100 bg-slate-50 text-slate-600"}`}
+                      className={`rounded-xl border px-3 py-2 text-left text-[11px] font-bold capitalize ${base === x ? "border-primary bg-blue-50 text-primary" : "border-slate-100 bg-slate-50 text-slate-600"}`}
                     >
                       {tr(`skdr.map.base_${x}`)}
                     </button>
@@ -290,7 +278,7 @@ export default function SpatialOutbreakMap({
                   {/* ── Surveillance & Vector Intelligence ── */}
                   <Group title={tr("skdr.map.intelGroup")}>
                     <Row
-                      icon={<Plane className="h-4 w-4 text-[#0060A9]" />}
+                      icon={<Plane className="h-4 w-4 text-primary" />}
                       title={tr("skdr.map.flightsTitle")}
                       sub={tr("skdr.map.flightsSub")}
                       value={Boolean(intel.flightRoutes)}
@@ -312,76 +300,6 @@ export default function SpatialOutbreakMap({
                       value={Boolean(intel.wildlife)}
                       set={(v) => setIntel((p) => ({ ...p, wildlife: v }))}
                       status={layerStatus.wildlife}
-                    />
-                    <Row
-                      icon={<Users className="h-4 w-4 text-indigo-600" />}
-                      title={tr("skdr.map.populationTitle")}
-                      sub={tr("skdr.map.populationSub")}
-                      value={Boolean(intel.population)}
-                      set={(v) => setIntel((p) => ({ ...p, population: v }))}
-                      status={layerStatus.population}
-                    />
-                    <Row
-                      icon={<CloudSun className="h-4 w-4 text-sky-600" />}
-                      title={tr("skdr.map.weatherTitle")}
-                      sub={tr("skdr.map.weatherSub")}
-                      value={Boolean(intel.weather)}
-                      set={(v) => setIntel((p) => ({ ...p, weather: v }))}
-                      status={layerStatus.weather}
-                    />
-                    <Row
-                      icon={<Droplets className="h-4 w-4 text-emerald-700" />}
-                      title={tr("skdr.map.airTitle")}
-                      sub={tr("skdr.map.airSub")}
-                      value={Boolean(intel.airQuality)}
-                      set={(v) => setIntel((p) => ({ ...p, airQuality: v }))}
-                      status={layerStatus.airQuality}
-                    />
-                  </Group>
-
-                  {/* ── NASA GIBS Satellite Imagery ── */}
-                  <Group title={tr("skdr.map.gibsGroup")}>
-                    <Row
-                      icon={<Globe className="h-4 w-4 text-blue-500" />}
-                      title={tr("skdr.map.viirsTitle")}
-                      sub={tr("skdr.map.viirsSub")}
-                      value={Boolean(gibs.viirsTrueColor)}
-                      set={(v) => setGibs((p) => ({ ...p, viirsTrueColor: v }))}
-                    />
-                    <Row
-                      icon={<Globe className="h-4 w-4 text-teal-500" />}
-                      title={tr("skdr.map.modisTitle")}
-                      sub={tr("skdr.map.modisSub")}
-                      value={Boolean(gibs.modisTrueColor)}
-                      set={(v) => setGibs((p) => ({ ...p, modisTrueColor: v }))}
-                    />
-                    <Row
-                      icon={<CloudRain className="h-4 w-4 text-amber-500" />}
-                      title={tr("skdr.map.aerosolTitle")}
-                      sub={tr("skdr.map.aerosolSub")}
-                      value={Boolean(gibs.aerosol)}
-                      set={(v) => setGibs((p) => ({ ...p, aerosol: v }))}
-                    />
-                    <Row
-                      icon={<Layers className="h-4 w-4 text-emerald-500" />}
-                      title={tr("skdr.map.ndviTitle")}
-                      sub={tr("skdr.map.ndviSub")}
-                      value={Boolean(gibs.ndvi)}
-                      set={(v) => setGibs((p) => ({ ...p, ndvi: v }))}
-                    />
-                    <Row
-                      icon={<Sun className="h-4 w-4 text-yellow-500" />}
-                      title={tr("skdr.map.nightTitle")}
-                      sub={tr("skdr.map.nightSub")}
-                      value={Boolean(gibs.nightLights)}
-                      set={(v) => setGibs((p) => ({ ...p, nightLights: v }))}
-                    />
-                    <Row
-                      icon={<Flame className="h-4 w-4 text-orange-500" />}
-                      title={tr("skdr.map.lstTitle")}
-                      sub={tr("skdr.map.lstSub")}
-                      value={Boolean(gibs.landSurfaceTemp)}
-                      set={(v) => setGibs((p) => ({ ...p, landSurfaceTemp: v }))}
                     />
                   </Group>
 
@@ -413,7 +331,7 @@ export default function SpatialOutbreakMap({
             <div className="border-t border-slate-100 p-3">
               <button
                 onClick={reset}
-                className="w-full rounded-xl bg-[#0060A9] py-2 text-xs font-bold text-white transition hover:bg-[#004b85]"
+                className="w-full rounded-xl bg-primary py-2 text-xs font-bold text-white transition hover:bg-primary-dark"
               >
                 {t("map.resetLayers")}
               </button>
@@ -485,7 +403,7 @@ function Row({
           : status?.state === "empty"
             ? "text-amber-600"
             : status?.state === "loading"
-              ? "text-[#0060A9]"
+              ? "text-primary"
               : status?.state === "cached"
                 ? "text-teal-700"
                 : "text-emerald-700";
@@ -506,7 +424,7 @@ function Row({
         type="checkbox"
         checked={value}
         onChange={(e) => set(e.target.checked)}
-        className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 accent-[#0060A9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0060A9] focus-visible:ring-offset-2"
+        className="mt-1.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       />
     </label>
   );

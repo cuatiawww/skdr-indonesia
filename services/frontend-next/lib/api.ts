@@ -18,9 +18,7 @@ import type {
   VectorSightingsResponse,
   LiveFlightsResponse,
   FireHotspotsResponse,
-  WorldPopMeta,
   MapHazardsResponse,
-  MapEnvironmentResponse,
 } from "@/types";
 
 // Client-side: proxy via Next.js rewrites /nlp/api/* → backend-rust:8081/api/*
@@ -1874,30 +1872,11 @@ export const fetchWildlifeOccurrences = (
   );
 };
 
-export const fetchWorldPopMeta = (iso3?: string, init?: LayerInit) => {
-  const q = iso3 ? `?iso3=${encodeURIComponent(iso3)}` : "";
-  const key = `population:${(iso3 || "IDN").toUpperCase()}`;
-  return fetchCachedLayer<WorldPopMeta>(
-    `/api/v1/map-layers/population${q}`,
-    key,
-    LAYER_TTL_MS.population,
-    init,
-  );
-};
-
 export const fetchMapHazards = (init?: LayerInit) =>
   fetchCachedLayer<MapHazardsResponse>(
     "/api/v1/map-layers/hazards",
     "hazards",
     LAYER_TTL_MS.hazards,
-    init,
-  );
-
-export const fetchMapEnvironment = (init?: LayerInit) =>
-  fetchCachedLayer<MapEnvironmentResponse>(
-    "/api/v1/map-layers/environment",
-    "environment",
-    LAYER_TTL_MS.environment,
     init,
   );
 
