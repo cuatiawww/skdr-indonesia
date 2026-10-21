@@ -2,8 +2,9 @@ mod case_reports;
 mod dashboard;
 mod db;
 mod master;
+mod master_admin;
 
-use axum::{http::StatusCode, routing::get, Json, Router};
+use axum::{http::StatusCode, routing::{get, patch, put}, Json, Router};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
 use tower_http::cors::{Any, CorsLayer};
@@ -47,6 +48,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/master/provinces", get(master::provinces))
         .route("/api/v1/master/kabkota", get(master::kabkota))
         .route("/api/v1/disease-concepts", get(master::disease_concepts))
+        // master data CRUD (PR 004, soft delete via status)
+        .route("/api/v1/admin/master/provinces", get(master_admin::provinces_list).post(master_admin::province_create))
+        .route("/api/v1/admin/master/provinces/:id", put(master_admin::province_update))
+        .route("/api/v1/admin/master/provinces/:id/status", patch(master_admin::province_status))
+        .route("/api/v1/admin/master/kabkota", get(master_admin::kabkota_list).post(master_admin::kabkota_create))
+        .route("/api/v1/admin/master/kabkota/:id", put(master_admin::kabkota_update))
+        .route("/api/v1/admin/master/kabkota/:id/status", patch(master_admin::kabkota_status))
+        .route("/api/v1/admin/master/diseases", get(master_admin::diseases_list).post(master_admin::disease_create))
+        .route("/api/v1/admin/master/diseases/:id", put(master_admin::disease_update))
+        .route("/api/v1/admin/master/diseases/:id/status", patch(master_admin::disease_status))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
         // main dashboard (NLP shapes, form data only)
