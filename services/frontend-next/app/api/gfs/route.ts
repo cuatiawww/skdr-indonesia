@@ -1,56 +1,7 @@
 import { NextResponse } from "next/server";
 
-function fallbackWind() {
-  const nx = 49,
-    ny = 23,
-    count = nx * ny,
-    u = new Array(count),
-    v = new Array(count);
-  for (let y = 0; y < ny; y++) {
-    const lat = 10 - y;
-    for (let x = 0; x < nx; x++) {
-      const lon = 94 + x,
-        i = y * nx + x;
-      u[i] = Number(
-        (Math.sin(lat * 0.2) * 4.5 + Math.cos(lon * 0.1) * 2 + 3.5).toFixed(2),
-      );
-      v[i] = Number(
-        (Math.cos(lat * 0.15) * 3 + Math.sin(lon * 0.2) * 1.5 + 1.8).toFixed(2),
-      );
-    }
-  }
-  const header = {
-    parameterCategory: 2,
-    parameterUnit: "m.s-1",
-    refTime: new Date().toISOString(),
-    nx,
-    ny,
-    lo1: 94,
-    la1: 10,
-    lo2: 142,
-    la2: -12,
-    dx: 1,
-    dy: 1,
-  };
-  return [
-    {
-      header: {
-        ...header,
-        parameterNumber: 2,
-        parameterNumberName: "U-component_of_wind",
-      },
-      data: u,
-    },
-    {
-      header: {
-        ...header,
-        parameterNumber: 3,
-        parameterNumberName: "V-component_of_wind",
-      },
-      data: v,
-    },
-  ];
-}
+// PR 016: no synthetic wind field. When the upstream GFS feed fails the route answers 503 and the map simply
+// does not draw the wind layer (previously a sine-wave "fallbackWind" grid was shown as if it were real data).
 
 export async function GET() {
   try {
@@ -86,5 +37,5 @@ export async function GET() {
       }
     }
   } catch {}
-  return NextResponse.json(fallbackWind());
+  return NextResponse.json({ error: "gfs_unavailable" }, { status: 503 });
 }

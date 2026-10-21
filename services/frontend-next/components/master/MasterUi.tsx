@@ -5,9 +5,10 @@ import { CheckCircle2, Plus, RefreshCw, Search, XCircle, Pencil } from 'lucide-r
 import SearchInput from '@/components/SearchInput'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import type { StatusFilter } from '@/lib/skdr-master-api'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 
 export const inputCls =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-2xs focus:border-[#0060A9] focus:outline-none focus:ring-2 focus:ring-blue-100'
+  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-2xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-blue-100'
 
 /** PR 012: text-only header (icon prop kept for compatibility, not rendered). */
 export function MasterHeader({ title, subtitle, loading, onRefresh, onAdd, addLabel }: {
@@ -29,7 +30,7 @@ export function MasterHeader({ title, subtitle, loading, onRefresh, onAdd, addLa
           <span>{t('skdr.master.refresh')}</span>
         </button>
         <button onClick={onAdd}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition hover:bg-[#004b85]">
+          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition hover:bg-primary-dark">
           <Plus className="h-4 w-4 stroke-[2.5]" />
           <span>{addLabel}</span>
         </button>
@@ -53,7 +54,7 @@ export function MasterToolbar({ search, setSearch, placeholder, status, setStatu
       <label className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         <span>{t('skdr.master.status')}</span>
         <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}
-          className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold normal-case text-slate-700 focus:border-[#0060A9] focus:outline-none">
+          className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold normal-case text-slate-700 focus:border-primary focus:outline-none">
           <option value="all">{t('skdr.master.statusAll')}</option>
           <option value="active">{t('skdr.master.statusActive')}</option>
           <option value="inactive">{t('skdr.master.statusInactive')}</option>
@@ -94,7 +95,7 @@ export function StatusToggle({ active, onToggle, name }: { active: boolean; onTo
 export function EditButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button onClick={onClick} title={label} aria-label={label}
-      className="rounded-lg p-1.5 text-slate-500 transition hover:bg-blue-50 hover:text-[#0060A9]">
+      className="rounded-lg p-1.5 text-slate-500 transition hover:bg-blue-50 hover:text-primary">
       <Pencil className="h-3.5 w-3.5" />
     </button>
   )
@@ -104,10 +105,7 @@ export function TableState({ loading, error, empty }: { loading: boolean; error:
   const { t } = useTranslation()
   if (loading && empty)
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-slate-400">
-        <RefreshCw className="mb-2 h-6 w-6 animate-spin text-[#0060A9]" />
-        <p className="text-xs font-medium">{t('skdr.master.loading')}</p>
-      </div>
+      <div className="p-4"><SkeletonTable /></div>
     )
   if (error) return <div className="p-12 text-center text-xs font-medium text-red-600">{t('skdr.master.loadFailed')}: {error}</div>
   if (empty) return <div className="p-12 text-center text-xs font-medium text-slate-400">{t('skdr.master.empty')}</div>
@@ -133,7 +131,7 @@ export function FormActions({ saving, onCancel }: { saving: boolean; onCancel: (
       <button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
         {t('common.cancel')}
       </button>
-      <button type="submit" disabled={saving} className="rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#004b85] disabled:opacity-50">
+      <button type="submit" disabled={saving} className="rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-primary-dark disabled:opacity-50">
         {saving ? t('skdr.master.saving') : t('common.save')}
       </button>
     </div>

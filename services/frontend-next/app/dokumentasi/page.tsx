@@ -7,6 +7,7 @@ import Markdown from '@/components/docs/Markdown'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
 import { peFetch } from '@/lib/pe-api'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 
 const TABS = [
   { id: 'alur', file: 'alur-bisnis.md' },
@@ -25,7 +26,7 @@ function Indicators() {
   const [f, setF] = useState('all')
   useEffect(() => { peFetch<{ data: { config: { indicators: Indicator[] } } }>('/api/v1/dashboard/executive').then((j) => setRows(j.data.config.indicators || [])).catch((e) => setErr(e.message)) }, [])
   if (err) return <p className="text-sm text-red-600">{t('skdr.docs.loadFailed')}: {err}</p>
-  if (!rows) return <p className="text-sm text-[#0060A9]">{t('skdr.docs.loading')}</p>
+  if (!rows) return <SkeletonTable rows={6} cols={4} />
   const counts = rows.reduce<Record<string, number>>((a, r) => ({ ...a, [r.status]: (a[r.status] || 0) + 1 }), {})
   const list = rows.filter((r) => f === 'all' || r.status === f)
   return (
@@ -33,7 +34,7 @@ function Indicators() {
       <p className="mb-3 text-sm text-slate-700">{t('skdr.docs.indicatorIntro')}</p>
       <div className="mb-3 flex flex-wrap gap-1" role="radiogroup" aria-label={t('skdr.docs.statusFilter')}>
         {['all', 'tersedia', 'sebagian', 'tertunda'].map((s) => (
-          <button key={s} role="radio" aria-checked={f === s} onClick={() => setF(s)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${f === s ? 'border-[#0060A9] bg-[#0060A9] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+          <button key={s} role="radio" aria-checked={f === s} onClick={() => setF(s)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${f === s ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
             {t(`skdr.docs.status.${s}`)} {s === 'all' ? rows.length : counts[s] || 0}
           </button>
         ))}
@@ -75,13 +76,13 @@ export default function DokumentasiPage() {
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
         {TABS.map((x) => (
           <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => { setTab(x.id); history.replaceState(null, '', `#${x.id}`) }}
-            className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider ${tab === x.id ? 'border-[#0060A9] text-[#0060A9]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider ${tab === x.id ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
             {t(`skdr.docs.tab.${x.id}`)}
           </button>
         ))}
       </div>
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" role="tabpanel" data-testid={`doc-${tab}`}>
-        {cur.file ? (err ? <p className="text-sm text-red-600">{t('skdr.docs.loadFailed')}: {err}</p> : md[cur.file] ? <Markdown text={md[cur.file]} /> : <p className="text-sm text-[#0060A9]">{t('skdr.docs.loading')}</p>) : <Indicators />}
+        {cur.file ? (err ? <p className="text-sm text-red-600">{t('skdr.docs.loadFailed')}: {err}</p> : md[cur.file] ? <Markdown text={md[cur.file]} /> : <p className="text-sm text-primary">{t('skdr.docs.loading')}</p>) : <Indicators />}
       </section>
     </div>
   )

@@ -101,7 +101,7 @@ export default function PeListPage() {
           <button onClick={load} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('skdr.master.refresh')}
           </button>
-          <Link href={`/pe/${form}/baru`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#004b85]">
+          <Link href={`/pe/${form}/baru`} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-primary-dark">
             <FilePlus2 className="h-4 w-4" /> {t('skdr.pe.addPe')}
           </Link>
         </div>
@@ -109,7 +109,7 @@ export default function PeListPage() {
 
       <div className="flex gap-2 border-b border-slate-200">
         {(['pe', 'klaster'] as const).map((k) => (
-          <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider ${tab === k ? 'border-[#0060A9] text-[#0060A9]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider ${tab === k ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
             {k === 'pe' ? t('skdr.pe.tabPe', { n: allCount }) : t('skdr.pe.tabCluster', { n: clusters.length })}
           </button>
         ))}
@@ -125,7 +125,7 @@ export default function PeListPage() {
             <div className="flex flex-wrap gap-1">
               {STATUSES.map((s) => (
                 <button key={s} onClick={() => { setStatus(s); setPage(1) }}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${status === s ? 'border-[#0060A9] bg-[#0060A9] text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${status === s ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
                   {statusLabel(s)} {s === 'all' ? allCount : byStatus[s] || 0}
                 </button>
               ))}
@@ -162,7 +162,7 @@ export default function PeListPage() {
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((r) => (
                     <tr key={r.id} className="hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/pe/${form}/${r.id}`} className="font-mono font-semibold text-[#0060A9] hover:underline">{r.no_pe}</Link></td>
+                      <td className="px-4 py-2.5"><Link href={`/pe/${form}/${r.id}`} className="font-mono font-semibold text-primary hover:underline">{r.no_pe}</Link></td>
                       <td className="px-4 py-2.5 text-slate-700">{r.patient_initials || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-600">{r.kabkota || '—'}{r.province ? <span className="text-slate-400"> · {r.province}</span> : ''}</td>
                       <td className="px-4 py-2.5 font-mono text-slate-600">{r.tgl_laporan || '—'}</td>
@@ -177,7 +177,7 @@ export default function PeListPage() {
                         <div className="flex justify-end gap-1.5">
                           <Link href={`/pe/${form}/${r.id}?mode=lihat`} title="Lihat (hanya baca)" aria-label={`Lihat ${r.no_pe}`} className={`${actBtn} border-slate-200 text-slate-600 hover:bg-slate-50`}><Eye className="h-3.5 w-3.5" /></Link>
                           {editableSt.includes(r.status) ? (
-                            <Link href={`/pe/${form}/${r.id}`} title="Edit" aria-label={`Edit ${r.no_pe}`} className={`${actBtn} border-[#0060A9]/30 text-[#0060A9] hover:bg-[#0060A9]/5`}><Pencil className="h-3.5 w-3.5" /></Link>
+                            <Link href={`/pe/${form}/${r.id}`} title="Edit" aria-label={`Edit ${r.no_pe}`} className={`${actBtn} border-primary/30 text-primary hover:bg-primary/5`}><Pencil className="h-3.5 w-3.5" /></Link>
                           ) : (
                             <span title={`Tidak dapat diedit: status ${statusLabel(r.status)}. Minta verifikator mengembalikan PE untuk revisi.`} aria-label={`Edit ${r.no_pe} tidak tersedia`} aria-disabled="true"
                               className={`${actBtn} cursor-not-allowed border-slate-100 text-slate-300`}><Pencil className="h-3.5 w-3.5" /></span>

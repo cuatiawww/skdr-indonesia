@@ -50,11 +50,13 @@ import CountryFlag from "@/components/CountryFlag";
 import { caseDateText, caseDateTitle, countText, signalDate, takeUniqueSignals } from "@/lib/signal-feed.mjs";
 import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
 import SkdrFilterBar, { type SkdrFilterState as EpiFilterState } from "@/components/SkdrFilterBar";
-import SourceBadge from "@/components/analytics/SourceBadge";
+import { UkuranFilter } from "@/components/analytics/SourceBadge";
+import { useSumber } from "@/lib/use-sumber";
 import { getCurrentEpiWeek } from "@/lib/epi-week";
 
 import type { OutbreakLocation, PublicDashboard } from "@/types";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
+import { ErrorState, SkeletonMap } from "@/components/ui/Skeleton";
 
 const SpatialOutbreakMap = dynamic(
   () => import("@/components/SpatialOutbreakMap"),
@@ -62,10 +64,10 @@ const SpatialOutbreakMap = dynamic(
 );
 
 const colors = [
-  "#0060A9",
+  "rgb(var(--brand-700))",
   "#ED2939",
   "#B49B58",
-  "#0284c7",
+  "rgb(var(--brand-600))",
   "#6366f1",
   "#8b5cf6",
 ];
@@ -74,7 +76,7 @@ const severityClass = {
   AWAS: "bg-[#ED2939] text-white",
   SIAGA: "bg-[#B49B58] text-white",
   WASPADA: "bg-amber-400 text-slate-900",
-  NORMAL: "bg-blue-100 text-[#0060A9]",
+  NORMAL: "bg-blue-100 text-primary",
 };
 
 function cleanArticleContent(value?: string | null, fallback = tr("skdr.dash.noSourceContent")): string {
@@ -291,6 +293,18 @@ export default function DashboardPage() {
     }
   }, []);
   const [applied, setApplied] = useState<EpiFilterState>(filters);
+  // PR 016: the epi-week range is the single period control; applied filters are mirrored into the URL
+  // (startYear/startWeek/endYear/endWeek, disease, province_id, kabkota_id) so links and reloads keep the same view.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const set = (k: string, v: string | number | null | undefined) => (v === null || v === undefined || v === "" || v === "all" ? url.searchParams.delete(k) : url.searchParams.set(k, String(v)));
+    set("startYear", applied.startYear); set("startWeek", applied.startWeek); set("endYear", applied.endYear); set("endWeek", applied.endWeek);
+    set("disease", applied.disease); set("province_id", applied.provinceId); set("kabkota_id", applied.kabkotaId);
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [applied]);
+  // PR 016: one global Sumber filter (Semua/EBS/Kasus PE, in the URL) drives the whole dashboard; default Semua.
+  const { sumber, setSumber, ukuran, setUkuran, ready: sumberReady } = useSumber();
   const [data, setData] = useState<PublicDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -303,52 +317,52 @@ export default function DashboardPage() {
   const dashboardApiFilters = useCallback((active: EpiFilterState) => ({
     province_id: active.provinceId ?? undefined,
     kabkota_id: active.kabkotaId ?? undefined,
-    source: active.source && active.source !== "all" ? active.source : undefined,
+    source: sumber === "all" ? undefined : sumber,
     disease: active.disease,
     start_year: active.startYear,
     start_week: active.startWeek,
     end_year: active.endYear,
     end_week: active.endWeek,
     year: active.endYear,
-  }), []);
+  }), [sumber]);
 
   const refreshKpis = useCallback(async () => {
-    const kpiData = await fetchKpiSnapshot({ ...dashboardApiFilters(filters), source: filters.source === "pe" ? "pe" : "ebs" }).catch(() => null);
+    const kpiData = await fetchKpiSnapshot(dashboardApiFilters(applied)).catch(() => null);
     if (!kpiData?.kpis) return;
     setData((prev) => (prev ? { ...prev, kpis: { ...prev.kpis, ...kpiData.kpis } } : prev));
-  }, [dashboardApiFilters, filters]);
+  }, [dashboardApiFilters, applied]);
 
   const load = useCallback(async (customFilters?: EpiFilterState) => {
-    const active = customFilters || filters;
+    // PR 016: only the APPLIED filters trigger a fetch; editing the filter bar (before "Terapkan") no longer refetches.
+    const active = customFilters || applied;
     try {
       setError("");
-      // PR 012: the map shows one source at a time (EBS by default, Kasus PE when Sumber = Kasus PE) so totals are never summed.
-      const dashboardFilters = { ...dashboardApiFilters(active), source: active.source === "pe" ? "pe" : "ebs" };
-      const [dashData, kpiData] = await Promise.all([
-        fetchPublicDashboard(dashboardFilters),
-        fetchKpiSnapshot(dashboardFilters).catch(() => null),
-      ]);
-      if (kpiData?.kpis) {
-        dashData.kpis = { ...dashData.kpis, ...kpiData.kpis };
-      }
+      setLoading(true);
+      // PR 016: Semua = EBS and Kasus PE together; the API returns one marker per (location, disease, source), never merged.
+      const dashboardFilters = dashboardApiFilters(active);
+      // PR 016: public-dashboard already carries the same live KPIs, so the duplicate kpi-snapshot call on load is gone
+      // (kpi-snapshot is still used for the 2-minute background refresh).
+      const dashData = await fetchPublicDashboard(dashboardFilters);
       setData(dashData);
     } catch {
       setError(t("common.error"));
     } finally {
       setLoading(false);
     }
-  }, [dashboardApiFilters, filters, t]);
+  }, [dashboardApiFilters, applied, t]);
 
   useEffect(() => {
+    if (!sumberReady) return;
     load();
     const id = window.setInterval(() => void refreshKpis(), 120_000);
     return () => window.clearInterval(id);
-  }, [load, refreshKpis]);
+  }, [load, refreshKpis, sumberReady]);
 
   useEffect(() => {
     const available = data?.available_years;
     if (available?.length && !available.includes(filters.endYear)) {
       setFilters(prev => ({ ...prev, endYear: available[0], startYear: available[0] }));
+      setApplied(prev => ({ ...prev, endYear: available[0], startYear: available[0] }));
     }
   }, [data?.available_years, filters.endYear]);
 
@@ -360,13 +374,8 @@ export default function DashboardPage() {
   );
   const provinceData = data?.by_province ?? [];
 
-  if (loading)
-    return (
-      <div className="grid min-h-[60vh] place-items-center text-sm font-semibold text-[#0060A9]">
-        {t("common.loading")}
-      </div>
-    );
-
+  // PR 016: no full-page block. The header, filter bar and ExecutiveSummary render (and fetch) immediately in parallel
+  // with public-dashboard; only the map waits for its data and shows a map-shaped skeleton meanwhile.
   return (
     <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
       <section className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
@@ -378,10 +387,11 @@ export default function DashboardPage() {
             {t("dashboard.pageSubtitle")}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {sumber !== "pe" ? <UkuranFilter value={ukuran} onChange={setUkuran} /> : null}
           <button
             onClick={() => void load()}
-            className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#0060A9] transition hover:bg-blue-100"
+            className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary transition hover:bg-blue-100"
           >
             <RefreshCw className="h-4 w-4" />
             {t("dashboard.refresh")}
@@ -398,58 +408,56 @@ export default function DashboardPage() {
         onChange={(newFilters) => setFilters(newFilters)}
         onApply={(newFilters) => {
           setFilters(newFilters);
-          setApplied(newFilters);
-          load(newFilters);
+          setApplied(newFilters); // the load effect follows `applied`
         }}
         isLoading={loading}
+        sumber={sumber}
+        onSumberChange={setSumber}
       />
 
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-700">
-          {error}
-        </div>
+        <ErrorState onRetry={() => void load()} />
       ) : null}
 
       {/* PR 010: kartu ringkasan eksekutif (sheet "Spesifikasi Dashboard Executive"); kartu pipeline NLP dihapus. */}
       <ExecutiveSummary
         query={dashboardApiFilters(applied)}
+        sumber={sumber}
+        ukuran={ukuran}
         afterCards={
       <section className="w-full">
         <div className="w-full">
           <article
-            className="flex flex-col border border-[#cfe0f1] bg-white p-4 xl:h-[700px] 2xl:h-[760px]"
+            className="flex flex-col border border-brand-200 bg-white p-4 xl:h-[700px] 2xl:h-[760px]"
             style={{ borderRadius: "17px 17px 22px 17px" }}
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex-1">
                 <h3 className="flex flex-wrap items-center gap-2 text-xl font-black uppercase leading-tight text-slate-900 sm:text-2xl">
                   {t("dashboard.spatialTitle")}
-                  <SourceBadge source={applied.source === "pe" ? "pe" : "ebs"} />
                 </h3>
-                {applied.source !== "pe" && applied.source !== "ebs" ? (
-                  <p className="mt-1 text-xs text-slate-500">{t("skdr.source.mapAllNote")}</p>
-                ) : null}
                 <p className="mt-1.5 text-sm font-normal leading-relaxed text-slate-600 sm:text-base">
                   {t("dashboard.spatialDesc")}
                 </p>
-                <div className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#0060A9]">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-[#0060A9]" />
+                {data ? <div className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold text-primary">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
                   <span className="truncate">
                     {t("skdr.mapScopeLocations", { scope: data?.filters?.scope || "Indonesia", count: data?.kpis.locations ?? 0 })}
                   </span>
-                </div>
+                </div> : null}
               </div>
             </div>
             <div className="mt-4 min-h-[460px] w-full flex-1 overflow-hidden rounded-xl">
-              <SpatialOutbreakMap
+              {!data ? (error ? null : <SkeletonMap height={520} />) : <SpatialOutbreakMap
                 countries={countryData}
                 locations={mapLocations}
                 highlightCountry="Indonesia"
                 boundaryScope="indonesia"
                 initialCenter={[118, -2.5]}
                 initialZoom={5}
-              />
+                sourceMode={sumber}
+              />}
             </div>
           </article>
         </div>

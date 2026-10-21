@@ -337,10 +337,10 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
   const radius = data?.outbreak_radius_km;
 
   return (
-    <div className="absolute right-4 top-16 z-30 w-[min(300px,calc(100%-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white/95 text-slate-700 shadow-[0_16px_45px_rgba(0,96,169,0.22)] backdrop-blur">
+    <div className="absolute right-4 top-16 z-30 w-[min(300px,calc(100%-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white/95 text-slate-700 shadow-[0_16px_45px_rgb(var(--brand-700)/0.22)] backdrop-blur">
       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
         <div className="flex items-center gap-1.5">
-          <Plane className="h-3.5 w-3.5 text-[#0060A9]" />
+          <Plane className="h-3.5 w-3.5 text-primary" />
           <span className="text-[12px] font-bold text-slate-800">Flight Connection — Routes</span>
         </div>
         <button
@@ -363,7 +363,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
                   setSelectedIata(null);
                   setRegion(r);
                 }}
-                className={`flex-1 rounded-lg border px-2 py-1 font-bold ${region === r ? "border-[#0060A9] bg-blue-50 text-[#0060A9]" : "border-slate-200 bg-slate-50 text-slate-600"}`}
+                className={`flex-1 rounded-lg border px-2 py-1 font-bold ${region === r ? "border-primary bg-blue-50 text-primary" : "border-slate-200 bg-slate-50 text-slate-600"}`}
               >
                 {REGION_LABELS[r] || r}
               </button>
@@ -409,7 +409,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
                     {routes.origin.iata} · {routes.origin.city || routes.origin.name}
                   </div>
                   <div className="text-slate-500">{routes.origin.name}, {routes.origin.country_iso2}</div>
-                  <div className="font-semibold text-[#0060A9]">
+                  <div className="font-semibold text-primary">
                     {routes.total} destinations in {REGION_LABELS[routes.region] || routes.region}
                     {routes.total_all_regions !== routes.total ? ` (${routes.total_all_regions} worldwide)` : ""}
                   </div>
@@ -432,7 +432,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={tr("skdr.flights.search_destinations")}
-                className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-[#0060A9]"
+                className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-primary"
               />
               <ul className="divide-y divide-slate-100">
                 {filteredDests.map((d) => (

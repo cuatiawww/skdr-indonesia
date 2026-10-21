@@ -36,10 +36,5 @@ export function rateText(r?: Rate | null) {
 }
 export const ciText = (r?: Rate | null) => (!r || r.den === 0 || r.ci_low === null || r.ci_high === null ? '—' : `${pct1(r.ci_low)}–${pct1(r.ci_high)}%`)
 export const qs = (o: Record<string, unknown>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'all').map(([k, v]) => [k, String(v)])).toString()
-/** Sequential palette (light → dark) for heatmap / choropleth; 0 stays neutral. */
-export function shade(v: number, max: number, hue: 'ebs' | 'pe') {
-  if (!v || max <= 0) return '#f1f5f9'
-  const t = Math.sqrt(v / max)
-  const pal = hue === 'ebs' ? ['#fff1e6', '#fdba74', '#f97316', '#c2410c', '#7c2d12'] : ['#e0f2fe', '#7dd3fc', '#0ea5e9', '#0060A9', '#0b3a66']
-  return pal[Math.min(pal.length - 1, Math.floor(t * (pal.length - 0.001)))]
-}
+/** Sequential palette (light → dark) for heatmap / choropleth; 0 stays neutral. PR 016: theme tokens (lib/theme.ts). */
+export { shadeVar as shade } from '@/lib/theme'

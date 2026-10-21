@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Construction, ArrowLeft, LayoutDashboard } from 'lucide-react'
 
-export default function UnderDevelopment() {
+export default function UnderDevelopment({ description }: { description?: string } = {}) {
   const router = useRouter()
 
   return (
@@ -14,11 +14,11 @@ export default function UnderDevelopment() {
       <div className="w-full max-w-lg text-center">
         <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5 sm:p-12">
           {/* Decorative Backdrops */}
-          <div className="pointer-events-none absolute -right-16 -top-16 h-60 w-60 rounded-full bg-blue-500/5 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-sky-500/5 blur-2xl" />
+          <div className="pointer-events-none absolute -right-16 -top-16 h-60 w-60 rounded-full bg-brand-500/5 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-16 -left-16 h-60 w-60 rounded-full bg-brand-300/10 blur-2xl" />
 
           {/* Icon Badge */}
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0060A9] to-sky-600 text-white shadow-lg shadow-blue-600/20 ring-8 ring-blue-50">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-brand-500 text-white shadow-lg shadow-brand-700/20 ring-8 ring-brand-50">
             <Construction className="h-10 w-10 animate-pulse" />
           </div>
 
@@ -29,25 +29,25 @@ export default function UnderDevelopment() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
               </span>
-              <span>COMING SOON</span>
+              <span>{tr("skdr.layout.comingSoon")}</span>
             </div>
 
             <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">
-              Under Development
+              {tr("skdr.layout.underDevTitle")}
             </h1>
 
             <p className="mx-auto max-w-sm text-sm leading-relaxed text-slate-600">
-              {tr("skdr.layout.this_page_is_currently_under_development")}</p>
+              {description || tr("skdr.layout.this_page_is_currently_under_development")}</p>
           </div>
 
           {/* Action Buttons */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 border-t border-slate-100 pt-6">
             <Link
               href="/main-dashboard"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#0060A9] px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-[#004b85]"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-700/20 transition hover:bg-primary-dark"
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span>{tr("skdr.layout.back_to_dashboard")}</span>
+              <span>{tr("skdr.layout.back_to_dashboard")}</span>
             </Link>
 
             <button
@@ -56,7 +56,7 @@ export default function UnderDevelopment() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>{tr("skdr.layout.go_back")}</span>
+              <span>{tr("skdr.layout.go_back")}</span>
             </button>
           </div>
         </div>

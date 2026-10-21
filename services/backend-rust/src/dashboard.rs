@@ -150,7 +150,8 @@ fn outbreak(
     country: String, loc: String, province: Option<String>, disease: String, lat: Option<f64>, lng: Option<f64>,
     cases: i64, deaths: i64, events: i64, case_date: String, created: String, reviewed: bool, detail: Value, src: String,
 ) -> Value {
-    let (sname, stype) = if src == "ebs" { ("EBS SKDR Kemenkes", "ebs") } else { ("Formulir Laporan Kasus", "form") };
+    // PR 016: one marker per (location, disease, source) so EBS signals and Kasus PE are never merged on the map.
+    let (sname, stype) = match src.as_str() { "ebs" => ("EBS SKDR Kemenkes", "ebs"), "pe" => ("Penyelidikan Epidemiologi (Kasus PE)", "pe"), _ => ("Formulir Laporan Kasus", "form") };
     json!({
         "location_name": loc, "disease": disease, "country": country, "province": province, "city": null,
         "latitude": lat, "longitude": lng, "cases": cases, "deaths": deaths,
@@ -183,8 +184,8 @@ async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
                 (array_agg(r.latitude ORDER BY r.created_at DESC) FILTER (WHERE r.latitude IS NOT NULL))[1],
                 (array_agg(r.longitude ORDER BY r.created_at DESC) FILTER (WHERE r.longitude IS NOT NULL))[1],
                 SUM(r.cases)::bigint, SUM(r.deaths)::bigint, COUNT(*)::bigint, MAX(r.report_date)::text,
-                {}, BOOL_AND(r.is_reviewed), MIN(r.source)
-         {} GROUP BY 2, 4 ORDER BY 7 DESC LIMIT 1000",
+                {}, BOOL_AND(r.is_reviewed), r.source
+         {} GROUP BY 2, 4, r.source ORDER BY 7 DESC LIMIT 1000",
         iso("MAX(r.created_at)"),
         base()
     );
@@ -283,20 +284,37 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
     let c = s.pool.get().await.map_err(internal)?;
     let f = resolve(&c, &q).await?;
     let (ey, ew) = current_mmwr(chrono::Local::now().date_naive());
-    let years: Vec<i32> = c
-        .query("SELECT DISTINCT EXTRACT(YEAR FROM report_date)::int FROM surveillance_reports ORDER BY 1 DESC", &[])
-        .await
-        .map_err(internal)?
-        .iter()
-        .map(|r| r.get(0))
-        .collect();
-    let diseases: Vec<String> = c
-        .query("SELECT name FROM master_diseases WHERE is_active ORDER BY name", &[])
-        .await
-        .map_err(internal)?
-        .iter()
-        .map(|r| r.get(0))
-        .collect();
+    // PR 016: the independent aggregates run in parallel, each on its own pooled connection (was 8 sequential queries).
+    let conn = || async { s.pool.get().await.map_err(internal) };
+    let (c1, c2, c3, c4, c5, c6) = tokio::try_join!(conn(), conn(), conn(), conn(), conn(), conn())?;
+    let years_q = async {
+        Ok::<Vec<i32>, ApiError>(c
+            .query("SELECT DISTINCT EXTRACT(YEAR FROM report_date)::int FROM surveillance_reports ORDER BY 1 DESC", &[])
+            .await
+            .map_err(internal)?
+            .iter()
+            .map(|r| r.get(0))
+            .collect())
+    };
+    let diseases_q = async {
+        Ok::<Vec<String>, ApiError>(c6
+            .query("SELECT name FROM master_diseases WHERE is_active ORDER BY name", &[])
+            .await
+            .map_err(internal)?
+            .iter()
+            .map(|r| r.get(0))
+            .collect())
+    };
+    let (years, diseases, kpis_v, feed, locs, by_dis, by_prov) = tokio::try_join!(
+        years_q,
+        diseases_q,
+        kpis(&c1, &f),
+        signal_feed(&c2, &f),
+        locations(&c3, &f),
+        grouped(&c4, &f, DN),
+        by_province(&c5, &f),
+    )?;
+    let trends_v = trends(&c1, &f).await?;
     Ok(Json(json!({
         "success": true,
         "data": {
@@ -308,16 +326,16 @@ pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQue
                 "start_date": f.start.map(|d| d.to_string()), "end_date": f.end.map(|d| d.to_string()),
                 "start_year": q.start_year, "start_week": q.start_week, "end_year": q.end_year, "end_week": q.end_week, "year": q.end_year,
             },
-            "kpis": kpis(&c, &f).await?,
+            "kpis": kpis_v,
             "alerts": [],
-            "signal_feed": signal_feed(&c, &f).await?,
+            "signal_feed": feed,
             "signal_feed_page_size": 20,
-            "locations": locations(&c, &f).await?,
+            "locations": locs,
             "map_locations_limit": 1000,
-            "by_disease": grouped(&c, &f, DN).await?,
-            "by_province": by_province(&c, &f).await?,
+            "by_disease": by_dis,
+            "by_province": by_prov,
             "ai_summary": { "text": "", "provider": "unavailable", "cached": false, "mode": "disabled" },
-            "trends": trends(&c, &f).await?,
+            "trends": trends_v,
             "weekly_trend": [],
         }
     })))

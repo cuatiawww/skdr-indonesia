@@ -41,7 +41,7 @@ export default function MasterKabupatenPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
   }
 
-  const selCls = 'rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold normal-case text-slate-700 focus:border-[#0060A9] focus:outline-none'
+  const selCls = 'rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold normal-case text-slate-700 focus:border-primary focus:outline-none'
   return (
     <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
       <MasterHeader icon={<MapPin className="h-5 w-5" />} title={t('skdr.master.kab.title')} subtitle={t('skdr.master.kab.subtitle')}
@@ -83,7 +83,7 @@ export default function MasterKabupatenPage() {
               <tbody className="divide-y divide-slate-100">
                 {list.data.map((r) => (
                   <tr key={r.id} className={`transition hover:bg-blue-50/30 ${r.is_active ? '' : 'opacity-60'}`}>
-                    <td className="px-4 py-3 font-mono"><span className="rounded border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-[#0060A9]">{r.kemendagri_code}</span></td>
+                    <td className="px-4 py-3 font-mono"><span className="rounded border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-primary">{r.kemendagri_code}</span></td>
                     <td className="px-4 py-3 font-mono"><span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{r.code}</span></td>
                     <td className="px-4 py-3 font-semibold text-slate-800">{r.name}</td>
                     <td className="px-4 py-3">

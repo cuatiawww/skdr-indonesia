@@ -1,4 +1,4 @@
-//! PR 010: executive dashboard summary (sheet "Spesifikasi Dashboard Executive", sections 1-2 + coverage).
+//! PR 010: executive dashboard summary (sheet "Spesifikasi Dashboard Executive", sections 1-2).
 //! Indicator definitions (disease groups, EBS diagnosa matching, PE status codes, CFR rows, thresholds and the
 //! implemented/pending list) live in app_settings.dashboard_executive (migration 019), not in code.
 //! Rules from the sheet: EBS alerts and individual reports are labelled by source and never summed;
@@ -115,7 +115,6 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
     // ---- individual reports (Form PE): per form, effective class (override > computed), workflow status, outcome
     let counted = strs(cfg.get("pe_count_statuses"));
     let mut pe: HashMap<String, Vec<(String, String, Option<String>, bool, i64)>> = HashMap::new();
-    let mut pe_status: HashMap<String, HashMap<String, i64>> = HashMap::new();
     if show_ind {
         let rows = c
             .query(
@@ -133,7 +132,6 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         for r in rows {
             let (form, cls, st, out, nik, n): (String, String, String, Option<String>, bool, i64) =
                 (r.get(0), r.get(1), r.get(2), r.get(3), r.get(4), r.get(5));
-            *pe_status.entry(form.clone()).or_default().entry(st.clone()).or_default() += n;
             if counted.is_empty() || counted.contains(&st) {
                 pe.entry(form).or_default().push((cls, st, out, nik, n));
             }
@@ -144,9 +142,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
 
     let mut cards = vec![];
     let mut cfr_groups = vec![];
-    let mut status_cards = vec![];
     let mut star_deaths: Vec<Value> = vec![];
-    let (mut nik_num, mut nik_den) = (0i64, 0i64);
     let mut ind_total: i64 = 0;
     for g in &groups {
         let form = g.get("pe_form").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -182,9 +178,6 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         let other_cls: i64 = rows.iter().filter(|r| !by_cls.contains_key(&r.0)).map(|r| r.4).sum();
         let death_codes = strs(g.get("death_codes"));
         let deaths: i64 = rows.iter().filter(|r| r.2.as_deref() == Some(&dead_v) && (death_codes.is_empty() || death_codes.contains(&r.0))).map(|r| r.4).sum();
-        let nik_ex = strs(g.get("nik_exclude"));
-        nik_den += rows.iter().filter(|r| !nik_ex.contains(&r.0)).map(|r| r.4).sum::<i64>();
-        nik_num += rows.iter().filter(|r| !nik_ex.contains(&r.0) && r.3).map(|r| r.4).sum::<i64>();
         cards.push(json!({
             "code": g.get("code"), "label": g.get("label"), "color": g.get("color"), "pe_form": form, "link": g.get("link"), "disease_code": strs(g.get("disease_codes")).first().cloned(),
             "ebs": ebs_subs, "individual": { "total": total, "by_status": by_cls, "unclassified": other_cls, "deaths": deaths,
@@ -211,7 +204,6 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
             crow.push(json!({"label": st.get("label"), "star": true, "known": k, "deaths": d, "unknown": u}));
         }
         cfr_groups.push(json!({"code": g.get("code"), "label": g.get("label"), "color": g.get("color"), "rows": crow}));
-        status_cards.push(json!({"code": g.get("code"), "label": g.get("label"), "pe_form": form, "by_status": pe_status.get(&form).cloned().unwrap_or_default()}));
     }
 
     // ---- case reports (Formulir Laporan Kasus) — shown separately, never summed with EBS/PE
@@ -225,43 +217,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         ).await.map_err(internal)?.get(0)
     } else { 0 };
 
-    // ---- coverage: provinces / kab-kota with at least one report from any source (filters applied)
-    let cov = c
-        .query_one(
-            "WITH u AS (
-               SELECT e.province_id p, e.kabkota_id k FROM ebs_reports e
-                WHERE $5 AND ($1::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) >= $1) AND ($2::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) <= $2)
-                  AND ($3::int IS NULL OR e.province_id = $3) AND ($4::int IS NULL OR e.kabkota_id = $4)
-               UNION ALL
-               SELECT province_id, kabkota_id FROM pe_cases
-                WHERE $6 AND deleted_at IS NULL AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1) AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
-                  AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR kabkota_id = $4)
-               UNION ALL
-               SELECT location_id, kabkota_id FROM case_reports
-                WHERE $6 AND ($1::date IS NULL OR report_date >= $1) AND ($2::date IS NULL OR report_date <= $2)
-                  AND ($3::int IS NULL OR location_id = $3) AND ($4::int IS NULL OR kabkota_id = $4))
-             SELECT (SELECT COUNT(DISTINCT p) FROM u WHERE p IS NOT NULL)::bigint, (SELECT COUNT(DISTINCT k) FROM u WHERE k IS NOT NULL)::bigint,
-                    (SELECT COUNT(*) FROM master_locations WHERE is_active AND ($3::int IS NULL OR id = $3))::bigint,
-                    (SELECT COUNT(*) FROM master_kabkota WHERE is_active AND ($3::int IS NULL OR province_id = $3) AND ($4::int IS NULL OR id = $4))::bigint,
-                    -- PR 013: names of active provinces without any report (shown on the coverage card)
-                    ARRAY(SELECT l.name FROM master_locations l WHERE l.is_active AND ($3::int IS NULL OR l.id = $3)
-                           AND NOT EXISTS (SELECT 1 FROM u WHERE u.p = l.id) ORDER BY l.name),
-                    -- PR 013: 5 provinces with the lowest kab/kota reporting coverage
-                    (SELECT COALESCE(json_agg(x ORDER BY x.ratio, x.name), '[]'::json)::text FROM (
-                       SELECT l.name, COUNT(DISTINCT u.k) FILTER (WHERE u.k IS NOT NULL)::int AS num, kt.n::int AS den,
-                              COUNT(DISTINCT u.k) FILTER (WHERE u.k IS NOT NULL)::float / kt.n AS ratio
-                         FROM master_locations l
-                         JOIN LATERAL (SELECT COUNT(*) n FROM master_kabkota mk WHERE mk.is_active AND mk.province_id = l.id) kt ON kt.n > 0
-                         LEFT JOIN u ON u.p = l.id AND u.k IN (SELECT id FROM master_kabkota WHERE province_id = l.id)
-                        WHERE l.is_active AND ($3::int IS NULL OR l.id = $3)
-                        GROUP BY l.name, kt.n ORDER BY ratio, l.name LIMIT 5) x)",
-            &[&f.start, &f.end, &f.province, &f.kabkota, &show_ebs, &show_ind],
-        )
-        .await
-        .map_err(internal)?;
-    let (cp, ck, tp, tk): (i64, i64, i64, i64) = (cov.get(0), cov.get(1), cov.get(2), cov.get(3));
-    let missing_prov: Vec<String> = cov.get(4);
-    let kab_low: Value = serde_json::from_str(&cov.get::<_, String>(5)).unwrap_or(json!([]));
+    // PR 016: coverage / PE workflow status / NIK cards removed from the dashboard (not in the sheet) — queries dropped.
     let zoonosis_ebs: i64 = cards.iter().flat_map(|c| c["ebs"].as_array().cloned().unwrap_or_default()).map(|s| s["alerts"].as_i64().unwrap_or(0)).sum();
 
     Ok(Json(json!({
@@ -274,9 +230,6 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
             "no_group_for_disease": f.disease.is_some() && groups.is_empty(),
             "cards": cards,
             "cfr": {"groups": cfr_groups, "star_deaths": star_deaths},
-            "pe_status": status_cards,
-            "nik": rate(nik_num, nik_den, &cfg),
-            "coverage": {"provinces": rate(cp, tp, &cfg), "kabkota": rate(ck, tk, &cfg), "provinces_missing": missing_prov, "kab_by_province": kab_low},
             "config": {"indicators": cfg.get("indicators"), "status_labels": cfg.get("pe_status_labels"), "texts": cfg.get("texts"),
                        "pe_count_statuses": cfg.get("pe_count_statuses"), "fraction_below": cfg.get("fraction_below")},
             "updated_at": chrono::Utc::now().to_rfc3339(),

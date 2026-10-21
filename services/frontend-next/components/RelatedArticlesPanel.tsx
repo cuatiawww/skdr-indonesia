@@ -2,8 +2,9 @@
 
 import { tr } from "@/lib/i18n/LanguageContext";
 import React, { useEffect, useState } from 'react'
-import { ExternalLink, Loader2, Newspaper, ShieldCheck } from 'lucide-react'
+import { ExternalLink, Newspaper, ShieldCheck } from 'lucide-react'
 import { fetchRelatedArticles, type RelatedArticle, type RelatedArticles } from '@/lib/api'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 interface RelatedArticlesPanelProps {
   /** Internal review views only (Admin/Analyst); public views omit it. */
@@ -61,7 +62,7 @@ export default function RelatedArticlesPanel({ eventId, compact = false, include
     <div className={compact ? 'mt-2 border-t border-slate-100 pt-2' : 'rounded-xl border border-slate-200 bg-white p-4'}>
       <div className="flex items-center justify-between gap-2">
         <p className={`flex items-center gap-1.5 font-black uppercase tracking-wide ${compact ? 'text-[9px] text-slate-400' : 'text-xs text-slate-700'}`}>
-          <Newspaper className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5 text-[#0060A9]'} />
+          <Newspaper className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5 text-primary'} />
           Related articles
           {data ? ` (${data.related_count})` : ''}
         </p>
@@ -73,8 +74,9 @@ export default function RelatedArticlesPanel({ eventId, compact = false, include
       </div>
 
       {loading && (
-        <p className={`mt-2 flex items-center gap-1.5 ${text} font-semibold text-slate-400`}>
-          <Loader2 className="h-3 w-3 animate-spin" /> {tr("skdr.related.loading_related_articles")}</p>
+        <div className="mt-2 space-y-2" role="status" aria-label={tr("skdr.related.loading_related_articles")}>
+          {[0, 1, 2].map((i) => <div key={i} className="space-y-1"><Skeleton className="h-3 w-4/5" /><Skeleton className="h-2.5 w-2/5" /></div>)}
+        </div>
       )}
       {error && <p className={`mt-2 ${text} font-semibold text-rose-600`}>{error}</p>}
 

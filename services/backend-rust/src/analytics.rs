@@ -142,7 +142,7 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
 
 const DIS_COLS: &str = "d.id, d.code, d.name, d.english_name, d.category, d.is_zoonotic, d.description, d.icd10, d.symptoms, d.transmission";
 fn dis_json(r: &tokio_postgres::Row) -> Value {
-    json!({ "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2), "english_name": r.get::<_, Option<String>>(3),
+    json!({ "id": r.get::<_, i32>(0), "code": r.get::<_, Option<String>>(1), "name": r.get::<_, String>(2), "english_name": r.get::<_, Option<String>>(3),
             "category": r.get::<_, Option<String>>(4), "is_zoonotic": r.get::<_, bool>(5), "description": r.get::<_, Option<String>>(6),
             "icd10": r.get::<_, Option<String>>(7), "symptoms": r.get::<_, Option<String>>(8), "transmission": r.get::<_, Option<String>>(9) })
 }
@@ -279,5 +279,321 @@ pub async fn disease(State(s): State<AppState>, Path(code): Path<String>, Query(
             "ebs": { "rate": rate(ebs_vd, ebs_vc, &conf), "basis": "alert terverifikasi (jml_kematian / jml_kasus)" },
         },
         "latest": { "ebs": latest_ebs, "pe": latest_pe }, "pe_form": group.as_ref().and_then(|g| g.get("pe_form").cloned()),
+    }})))
+}
+
+/// PR 016: GET /api/v1/analytics/summary — one payload for the main dashboard, following the global Sumber filter:
+/// KPI totals per source, a registry-driven disease table (master_diseases + pe_form_definitions) with weekly
+/// sparklines, and per-province figures for the map popup. EBS (sinyal) and Kasus PE are always separate fields.
+pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let f = resolve(&c, &q).await?;
+    let conf = cfg(&c).await?;
+    let counted = strs(conf.get("pe_count_statuses"));
+    let ws = weeks(&f);
+    let (w0, w1) = (ws[0], *ws.last().unwrap() + Duration::days(6));
+    let n = ws.len();
+    let idx: HashMap<NaiveDate, usize> = ws.iter().enumerate().map(|(i, w)| (*w, i)).collect();
+    let (show_ebs, show_pe) = src(&f);
+    let dis: Option<i32> = match &f.disease {
+        Some(d) => c.query_opt("SELECT id FROM master_diseases WHERE code = $1 OR name = $1", &[d]).await.map_err(internal)?.map(|r| r.get(0)),
+        None => None,
+    };
+    let dis_missing = f.disease.is_some() && dis.is_none();
+    let ebs_where = format!("{EBS_DATE} BETWEEN $1 AND $2 AND ($3::int IS NULL OR e.province_id = $3) AND ($4::int IS NULL OR e.kabkota_id = $4) AND ($5::int IS NULL OR e.disease_id = $5)");
+    let pe_where = format!("c.deleted_at IS NULL AND c.status = ANY($6) AND {PE_DATE} BETWEEN $1 AND $2 AND ($3::int IS NULL OR c.province_id = $3) AND ($4::int IS NULL OR c.kabkota_id = $4) AND ($5::int IS NULL OR c.disease_id = $5)");
+    let ep: [&(dyn tokio_postgres::types::ToSql + Sync); 5] = [&w0, &w1, &f.province, &f.kabkota, &dis];
+    let pp: [&(dyn tokio_postgres::types::ToSql + Sync); 6] = [&w0, &w1, &f.province, &f.kabkota, &dis, &counted];
+    let on_ebs = show_ebs && !dis_missing;
+    let on_pe = show_pe && !dis_missing;
+
+    // KPI totals (EBS: alerts = reports, cases = jml_kasus; PE: individual reports)
+    let mut kpi_ebs = Value::Null;
+    let mut kpi_pe = Value::Null;
+    if on_ebs {
+        let r = c.query_one(&format!("SELECT COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint,
+                COUNT(DISTINCT e.province_id)::bigint, COUNT(DISTINCT e.kabkota_id)::bigint, COUNT(*) FILTER (WHERE e.sts_rumor ILIKE 'Terverifikasi%')::bigint
+              FROM ebs_reports e WHERE {ebs_where}"), &ep).await.map_err(internal)?;
+        kpi_ebs = json!({ "alerts": r.get::<_, i64>(0), "cases": r.get::<_, i64>(1), "deaths": r.get::<_, i64>(2), "provinces": r.get::<_, i64>(3), "kabkota": r.get::<_, i64>(4), "verified": r.get::<_, i64>(5) });
+    }
+    if on_pe {
+        let r = c.query_one(&format!("SELECT COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint,
+                COUNT(DISTINCT c.province_id)::bigint, COUNT(DISTINCT c.kabkota_id)::bigint, COUNT(*) FILTER (WHERE c.status IN ('terverifikasi','final'))::bigint
+              FROM pe_cases c WHERE {pe_where}"), &pp).await.map_err(internal)?;
+        kpi_pe = json!({ "cases": r.get::<_, i64>(0), "deaths": r.get::<_, i64>(1), "provinces": r.get::<_, i64>(2), "kabkota": r.get::<_, i64>(3), "verified": r.get::<_, i64>(4) });
+    }
+
+    // disease registry rows (active master diseases; has_pe_form from pe_form_definitions)
+    let reg = c.query("SELECT d.id, d.code, d.name, d.category, d.is_zoonotic,
+            (SELECT p.form_key FROM pe_form_definitions p WHERE p.disease_id = d.id AND p.is_active ORDER BY p.version DESC LIMIT 1)
+         FROM master_diseases d WHERE d.is_active AND ($1::int IS NULL OR d.id = $1) ORDER BY d.name", &[&dis]).await.map_err(internal)?;
+    // per disease × week
+    let mut ebs_w: HashMap<i32, (Vec<i64>, Vec<i64>, i64)> = HashMap::new(); // alerts, cases, deaths
+    let mut pe_w: HashMap<i32, (Vec<i64>, i64)> = HashMap::new(); // cases, deaths
+    let mut regs: HashMap<i32, (i64, i64)> = HashMap::new(); // disease -> (ebs provinces, pe provinces)
+    let mut ebs_unmapped = 0i64;
+    if on_ebs {
+        for r in c.query(&format!("SELECT {w}, e.disease_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint
+                FROM ebs_reports e WHERE {ebs_where} GROUP BY 1, 2", w = week_of(EBS_DATE)), &ep).await.map_err(internal)? {
+            let Some(&i) = idx.get(&r.get::<_, NaiveDate>(0)) else { continue };
+            match r.get::<_, Option<i32>>(1) {
+                Some(d) => { let e = ebs_w.entry(d).or_insert_with(|| (vec![0; n], vec![0; n], 0)); e.0[i] += r.get::<_, i64>(2); e.1[i] += r.get::<_, i64>(3); e.2 += r.get::<_, i64>(4); }
+                None => ebs_unmapped += r.get::<_, i64>(2),
+            }
+        }
+        for r in c.query(&format!("SELECT e.disease_id, COUNT(DISTINCT e.province_id)::bigint FROM ebs_reports e WHERE {ebs_where} AND e.disease_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
+            regs.entry(r.get(0)).or_default().0 = r.get(1);
+        }
+    }
+    if on_pe {
+        for r in c.query(&format!("SELECT {w}, c.disease_id, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint
+                FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1, 2", w = week_of(PE_DATE)), &pp).await.map_err(internal)? {
+            let Some(&i) = idx.get(&r.get::<_, NaiveDate>(0)) else { continue };
+            let e = pe_w.entry(r.get(1)).or_insert_with(|| (vec![0; n], 0)); e.0[i] += r.get::<_, i64>(2); e.1 += r.get::<_, i64>(3);
+        }
+        for r in c.query(&format!("SELECT c.disease_id, COUNT(DISTINCT c.province_id)::bigint FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1"), &pp).await.map_err(internal)? {
+            regs.entry(r.get(0)).or_default().1 = r.get(1);
+        }
+    }
+    // PR 016 (sheet No. 17): Kasus PE per case status, labels/order from the registry (dashboard_executive.groups[].pe_status)
+    let mut cls: HashMap<(i32, String), i64> = HashMap::new();
+    if on_pe {
+        for r in c.query(&format!("SELECT c.disease_id, COALESCE(NULLIF(COALESCE(c.classification_override, c.classification), ''), '') , COUNT(*)::bigint
+                FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1, 2"), &pp).await.map_err(internal)? {
+            cls.insert((r.get(0), r.get(1)), r.get(2));
+        }
+    }
+    let status_defs: HashMap<String, Vec<(String, String)>> = conf.get("groups").and_then(|g| g.as_array()).map(|a| a.iter().flat_map(|g| {
+        let defs: Vec<(String, String)> = g.get("pe_status").and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|s| Some((s.get("code")?.as_str()?.to_string(), s.get("label")?.as_str()?.to_string()))).collect()).unwrap_or_default();
+        strs(g.get("disease_codes")).into_iter().map(move |code| (code, defs.clone()))
+    }).collect()).unwrap_or_default();
+    let status_of = |id: i32, code: &str| -> Value {
+        let Some(defs) = status_defs.get(code) else { return Value::Null };
+        let known: Vec<&str> = defs.iter().map(|d| d.0.as_str()).collect();
+        let other: i64 = cls.iter().filter(|((d, k), _)| *d == id && !known.contains(&k.as_str())).map(|(_, v)| *v).sum();
+        json!({ "classes": defs.iter().map(|(k, l)| json!({ "code": k, "label": l, "n": cls.get(&(id, k.clone())).copied().unwrap_or(0) })).collect::<Vec<_>>(), "unclassified": other })
+    };
+    // change = last 4 weeks vs previous 4 weeks (per source, never combined)
+    let delta = |v: &Vec<i64>| -> Value {
+        if v.len() < 8 { return Value::Null }
+        let l = v.len();
+        let (a, b): (i64, i64) = (v[l - 4..].iter().sum(), v[l - 8..l - 4].iter().sum());
+        json!({ "last4": a, "prev4": b })
+    };
+    let diseases: Vec<Value> = reg.iter().map(|r| {
+        let id: i32 = r.get(0);
+        let e = ebs_w.get(&id);
+        let p = pe_w.get(&id);
+        let rg = regs.get(&id).copied().unwrap_or((0, 0));
+        json!({
+            "id": id, "code": r.get::<_, String>(1), "name": r.get::<_, String>(2), "category": r.get::<_, Option<String>>(3),
+            "is_zoonotic": r.get::<_, bool>(4), "pe_form": r.get::<_, Option<String>>(5),
+            "ebs": if on_ebs { json!({ "alerts": e.map(|x| x.0.iter().sum::<i64>()).unwrap_or(0), "cases": e.map(|x| x.1.iter().sum::<i64>()).unwrap_or(0),
+                    "deaths": e.map(|x| x.2).unwrap_or(0), "provinces": rg.0,
+                    "spark_alerts": e.map(|x| x.0.clone()).unwrap_or_else(|| vec![0; n]), "spark_cases": e.map(|x| x.1.clone()).unwrap_or_else(|| vec![0; n]),
+                    "delta_alerts": e.map(|x| delta(&x.0)).unwrap_or(Value::Null), "delta_cases": e.map(|x| delta(&x.1)).unwrap_or(Value::Null) }) } else { Value::Null },
+            "pe": if on_pe { json!({ "cases": p.map(|x| x.0.iter().sum::<i64>()).unwrap_or(0), "deaths": p.map(|x| x.1).unwrap_or(0), "provinces": rg.1,
+                    "spark": p.map(|x| x.0.clone()).unwrap_or_else(|| vec![0; n]), "delta": p.map(|x| delta(&x.0)).unwrap_or(Value::Null),
+                    "status": status_of(id, &r.get::<_, String>(1)) }) } else { Value::Null },
+        })
+    }).collect();
+
+    // per province (map popup / choropleth); keyed by master_locations
+    let mut prov: HashMap<i32, [i64; 5]> = HashMap::new(); // ebs alerts, ebs cases, ebs deaths, pe cases, pe deaths
+    if on_ebs {
+        for r in c.query(&format!("SELECT e.province_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint
+                FROM ebs_reports e WHERE {ebs_where} AND e.province_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
+            let v = prov.entry(r.get(0)).or_default(); v[0] = r.get(1); v[1] = r.get(2); v[2] = r.get(3);
+        }
+    }
+    if on_pe {
+        for r in c.query(&format!("SELECT c.province_id, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint
+                FROM pe_cases c WHERE {pe_where} AND c.province_id IS NOT NULL GROUP BY 1"), &pp).await.map_err(internal)? {
+            let v = prov.entry(r.get(0)).or_default(); v[3] = r.get(1); v[4] = r.get(2);
+        }
+    }
+    let provinces: Vec<Value> = c.query("SELECT id, code, name FROM master_locations WHERE is_active ORDER BY code", &[]).await.map_err(internal)?
+        .iter().filter_map(|r| {
+            let id: i32 = r.get(0);
+            prov.get(&id).map(|v| json!({ "id": id, "code": r.get::<_, String>(1), "name": r.get::<_, String>(2),
+                "ebs_alerts": v[0], "ebs_cases": v[1], "ebs_deaths": v[2], "pe_cases": v[3], "pe_deaths": v[4] }))
+        }).collect();
+
+    // PR 016: KPI card trend — daily series for the last 30 days of the period (by report date) and the change over the
+    // last 24 hours vs the 24 hours before, by real arrival timestamps (EBS create_date in WIB, PE created_at).
+    // d24 = null when the source has no rows older than 24 h for this filter (UI shows "—"); never synthesised.
+    let today = chrono::Local::now().date_naive();
+    let cap = if w1 < today { w1 } else { today };
+    // The sparkline spans exactly the selected epi-week range (global filter): daily buckets when the range is
+    // ≤ 56 days, otherwise epi weeks. "until" = latest report date with data (UI note "data s.d. …"); no private window.
+    let fe = "($3::int IS NULL OR e.province_id = $3) AND ($4::int IS NULL OR e.kabkota_id = $4) AND ($5::int IS NULL OR e.disease_id = $5)";
+    let fpe = "c.deleted_at IS NULL AND c.status = ANY($6) AND ($3::int IS NULL OR c.province_id = $3) AND ($4::int IS NULL OR c.kabkota_id = $4) AND ($5::int IS NULL OR c.disease_id = $5)";
+    let ebs_latest: Option<NaiveDate> = if on_ebs { c.query_one(&format!("SELECT MAX({EBS_DATE}) FROM ebs_reports e WHERE {EBS_DATE} BETWEEN $1 AND $2 AND {fe}"), &ep).await.map_err(internal)?.get(0) } else { None };
+    let pe_latest: Option<NaiveDate> = if on_pe { c.query_one(&format!("SELECT MAX({PE_DATE}) FROM pe_cases c WHERE {PE_DATE} BETWEEN $1 AND $2 AND {fpe}"), &pp).await.map_err(internal)?.get(0) } else { None };
+    let latest = [ebs_latest, pe_latest].into_iter().flatten().max();
+    let d0 = w0;
+    let d1 = cap;
+    let daily = (d1 - d0).num_days() < 56;
+    let days: Vec<NaiveDate> = if daily { (0..=(d1 - d0).num_days().max(0)).map(|i| d0 + Duration::days(i)).collect() } else { ws.iter().copied().filter(|w| *w <= d1).collect() };
+    let nb = days.len();
+    let didx: HashMap<NaiveDate, usize> = days.iter().enumerate().map(|(i, d)| (*d, i)).collect();
+    let bucket_e = if daily { EBS_DATE.to_string() } else { week_of(EBS_DATE) };
+    let bucket_p = if daily { PE_DATE.to_string() } else { week_of(PE_DATE) };
+    let rp: [&(dyn tokio_postgres::types::ToSql + Sync); 5] = [&d0, &d1, &f.province, &f.kabkota, &dis];
+    let rpp: [&(dyn tokio_postgres::types::ToSql + Sync); 6] = [&d0, &d1, &f.province, &f.kabkota, &dis, &counted];
+    let pair = |cur: i64, prev: i64| json!({ "cur": cur, "prev": prev });
+    let mut trend_ebs = Value::Null;
+    let mut trend_pe = Value::Null;
+    if on_ebs {
+        let mut a = [vec![0i64; nb], vec![0i64; nb], vec![0i64; nb], vec![0i64; nb]];
+        for r in c.query(&format!("SELECT {bucket_e} d, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint, COUNT(DISTINCT e.province_id)::bigint
+                FROM ebs_reports e WHERE {ebs_where} GROUP BY 1"), &rp).await.map_err(internal)? {
+            let Some(&i) = didx.get(&r.get::<_, NaiveDate>(0)) else { continue };
+            for k in 0..4 { a[k][i] = r.get::<_, i64>(k + 1); }
+        }
+        let fl = "($1::int IS NULL OR e.province_id = $1) AND ($2::int IS NULL OR e.kabkota_id = $2) AND ($3::int IS NULL OR e.disease_id = $3)";
+        let fp: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&f.province, &f.kabkota, &dis];
+        let r = c.query_one(&format!("WITH x AS (SELECT e.jml_kasus k, LEAST(e.jml_kematian, e.jml_kasus) m, e.province_id p,
+                    CASE WHEN (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
+                  FROM ebs_reports e WHERE {fl} AND e.create_date IS NOT NULL
+                    AND (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '48 hours' AND (e.create_date AT TIME ZONE 'Asia/Jakarta') <= now())
+             SELECT COUNT(*) FILTER (WHERE cur = 1)::bigint, COUNT(*) FILTER (WHERE cur = 0)::bigint,
+                    COALESCE(SUM(k) FILTER (WHERE cur = 1),0)::bigint, COALESCE(SUM(k) FILTER (WHERE cur = 0),0)::bigint,
+                    COALESCE(SUM(m) FILTER (WHERE cur = 1),0)::bigint, COALESCE(SUM(m) FILTER (WHERE cur = 0),0)::bigint,
+                    COUNT(DISTINCT p) FILTER (WHERE cur = 1)::bigint, COUNT(DISTINCT p) FILTER (WHERE cur = 0)::bigint,
+                    EXISTS (SELECT 1 FROM ebs_reports e WHERE {fl} AND (e.create_date AT TIME ZONE 'Asia/Jakarta') < now() - interval '24 hours')
+             FROM x"), &fp).await.map_err(internal)?;
+        let g = |i: usize| r.get::<_, i64>(i);
+        let d24 = if r.get::<_, bool>(8) { json!({ "alerts": pair(g(0), g(1)), "cases": pair(g(2), g(3)), "deaths": pair(g(4), g(5)), "provinces": pair(g(6), g(7)) }) } else { Value::Null };
+        let [al, ca, de, pr] = a;
+        trend_ebs = json!({ "alerts": al, "cases": ca, "deaths": de, "provinces": pr, "d24": d24 });
+    }
+    if on_pe {
+        let mut a = [vec![0i64; nb], vec![0i64; nb], vec![0i64; nb]];
+        for r in c.query(&format!("SELECT {bucket_p} d, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint, COUNT(DISTINCT c.province_id)::bigint
+                FROM pe_cases c WHERE {pe_where} GROUP BY 1"), &rpp).await.map_err(internal)? {
+            let Some(&i) = didx.get(&r.get::<_, NaiveDate>(0)) else { continue };
+            for k in 0..3 { a[k][i] = r.get::<_, i64>(k + 1); }
+        }
+        let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND ($1::int IS NULL OR c.province_id = $1) AND ($2::int IS NULL OR c.kabkota_id = $2) AND ($3::int IS NULL OR c.disease_id = $3)";
+        let fp: [&(dyn tokio_postgres::types::ToSql + Sync); 4] = [&f.province, &f.kabkota, &dis, &counted];
+        let r = c.query_one(&format!("WITH x AS (SELECT c.outcome o, c.province_id p, CASE WHEN c.created_at >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
+                  FROM pe_cases c WHERE {fl} AND c.created_at >= now() - interval '48 hours' AND c.created_at <= now())
+             SELECT COUNT(*) FILTER (WHERE cur = 1)::bigint, COUNT(*) FILTER (WHERE cur = 0)::bigint,
+                    COUNT(*) FILTER (WHERE cur = 1 AND o = 'Meninggal')::bigint, COUNT(*) FILTER (WHERE cur = 0 AND o = 'Meninggal')::bigint,
+                    COUNT(DISTINCT p) FILTER (WHERE cur = 1)::bigint, COUNT(DISTINCT p) FILTER (WHERE cur = 0)::bigint,
+                    EXISTS (SELECT 1 FROM pe_cases c WHERE {fl} AND c.created_at < now() - interval '24 hours')
+             FROM x"), &fp).await.map_err(internal)?;
+        let g = |i: usize| r.get::<_, i64>(i);
+        let d24 = if r.get::<_, bool>(6) { json!({ "cases": pair(g(0), g(1)), "deaths": pair(g(2), g(3)), "provinces": pair(g(4), g(5)) }) } else { Value::Null };
+        let [ca, de, pr] = a;
+        trend_pe = json!({ "cases": ca, "deaths": de, "provinces": pr, "d24": d24 });
+    }
+    // PR 016: 7-1-7 (sheet "Spesifikasi Dashboard Executive" No. 41–45), Alert EBS only, denominator = all alerts except
+    // discarded. Notification = Tanggal dibuat (create_date) − Tanggal (A.2, tgl_laporan) ≤ 1 day. Detection needs
+    // Tanggal Rumor Diketahui (A.11) and Response needs the response-action dates (B.20/B.28/B.30/B.34/B.37/B.39);
+    // the EBS API feed does not deliver those fields, so both are reported as unavailable (never estimated).
+    let mut t717 = Value::Null;
+    if on_ebs {
+        let ecfg = cfg(&c).await?;
+        let discarded = strs(ecfg.pointer("/ebs/discarded"));
+        let mut ep2: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = ep.to_vec();
+        ep2.push(&discarded);
+        let lag = "(e.create_date::date - e.tgl_laporan)";
+        let q = format!("SELECT e.disease_id, COUNT(*)::bigint,
+                COUNT(*) FILTER (WHERE {lag} <= 1)::bigint, COUNT(*) FILTER (WHERE {lag} > 1)::bigint,
+                COUNT(*) FILTER (WHERE e.create_date IS NULL OR e.tgl_laporan IS NULL)::bigint,
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY {lag})::float8, GROUPING(e.disease_id)::int
+              FROM ebs_reports e WHERE {ebs_where} AND NOT (COALESCE(e.sts_rumor, '') = ANY($6))
+              GROUP BY ROLLUP (e.disease_id)");
+        let mut overall = Value::Null;
+        let mut per: HashMap<i32, Value> = HashMap::new();
+        for r in c.query(&q, &ep2).await.map_err(internal)? {
+            let (den, ok, late, miss): (i64, i64, i64, i64) = (r.get(1), r.get(2), r.get(3), r.get(4));
+            let v = json!({ "den": den, "on_time": ok, "late": late, "missing": miss, "median_days": r.get::<_, Option<f64>>(5),
+                "pct": if den > 0 { Some((ok as f64) * 100.0 / den as f64) } else { None } });
+            if r.get::<_, i32>(6) == 1 { overall = v; } else if let Some(d) = r.get::<_, Option<i32>>(0) { per.insert(d, v); }
+        }
+        let rows: Vec<Value> = reg.iter().filter_map(|r| { let id: i32 = r.get(0); per.get(&id).map(|v| json!({ "id": id, "code": r.get::<_, String>(1), "name": r.get::<_, String>(2), "notification": v })) }).collect();
+        let missing_fields = json!({
+            "detection": ["Tanggal Rumor Diketahui (A.11)"],
+            "response": ["Tanggal Tatalaksana Kasus (B.20)", "Tanggal PE (B.28)", "Tanggal Mobilisasi TGC (B.30)", "Tanggal pengendalian faktor risiko (B.34)", "Tanggal Penyuluhan/Komunikasi Risiko (B.37)", "Tanggal Koordinasi Rapat LP/LS (B.39)"],
+        });
+        t717 = json!({ "notification": overall, "detection": null, "response": null, "missing_fields": missing_fields, "diseases": rows,
+            "thresholds": ecfg.pointer("/t717/thresholds").cloned().unwrap_or(Value::Null) });
+    }
+
+    let kpi_trend = json!({ "days": days.iter().map(|d| d.to_string()).collect::<Vec<_>>(), "bucket": if daily { "day" } else { "week" }, "until": latest.map(|d| d.to_string()), "period_start": d0.to_string(), "period_end": cap.to_string(),
+        "ebs_latest": ebs_latest.map(|d| d.to_string()), "pe_latest": pe_latest.map(|d| d.to_string()), "ebs": trend_ebs, "pe": trend_pe });
+
+    Ok(Json(json!({ "success": true, "data": {
+        "weeks": week_json(&ws), "sources": { "ebs": show_ebs, "pe": show_pe }, "disease_not_found": dis_missing, "scope": f.scope,
+        "kpi": { "ebs": kpi_ebs, "pe": kpi_pe }, "kpi_trend": kpi_trend, "t717": t717, "ebs_unmapped_alerts": ebs_unmapped,
+        "diseases": diseases, "provinces": provinces,
+    }})))
+}
+
+/// PR 016: GET /api/v1/analytics/latest — "Rilis data terkini" on Beranda: the latest report date per province and per
+/// disease, per source (EBS / Kasus PE), plus the latest date overall. Counted PE statuses come from app_settings.
+pub async fn latest(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let counted = strs(cfg(&c).await?.get("pe_count_statuses"));
+    let base = format!("WITH x AS (
+            SELECT 'ebs'::text s, e.province_id p, e.disease_id d, {EBS_DATE} dt FROM ebs_reports e WHERE {EBS_DATE} <= current_date
+            UNION ALL
+            SELECT 'pe', c.province_id, c.disease_id, {PE_DATE} FROM pe_cases c WHERE c.deleted_at IS NULL AND c.status = ANY($1) AND {PE_DATE} <= current_date)");
+    let prov = c.query(&format!("{base} SELECT l.name, x.s, MAX(x.dt)::text FROM x JOIN master_locations l ON l.id = x.p GROUP BY 1, 2 ORDER BY MAX(x.dt) DESC, 1 LIMIT 8"), &[&counted]).await.map_err(internal)?;
+    let dis = c.query(&format!("{base} SELECT d.name, d.code, x.s, MAX(x.dt)::text FROM x JOIN master_diseases d ON d.id = x.d WHERE d.is_active GROUP BY 1, 2, 3 ORDER BY MAX(x.dt) DESC, 1 LIMIT 8"), &[&counted]).await.map_err(internal)?;
+    let tot = c.query_one(&format!("{base} SELECT MAX(dt) FILTER (WHERE s = 'ebs')::text, MAX(dt) FILTER (WHERE s = 'pe')::text FROM x"), &[&counted]).await.map_err(internal)?;
+    let monitored: i64 = c.query_one("SELECT COUNT(*)::bigint FROM master_diseases WHERE is_active", &[]).await.map_err(internal)?.get(0);
+    Ok(Json(json!({ "success": true, "data": {
+        "ebs_latest": tot.get::<_, Option<String>>(0), "pe_latest": tot.get::<_, Option<String>>(1), "diseases_monitored": monitored,
+        "provinces": prov.iter().map(|r| json!({ "name": r.get::<_, String>(0), "source": r.get::<_, String>(1), "last_date": r.get::<_, String>(2) })).collect::<Vec<_>>(),
+        "diseases": dis.iter().map(|r| json!({ "name": r.get::<_, String>(0), "code": r.get::<_, String>(1), "source": r.get::<_, String>(2), "last_date": r.get::<_, String>(3) })).collect::<Vec<_>>(),
+    }})))
+}
+
+/// PR 016: Beranda — one aggregated call (cached by the analytics/ prefix of the response cache).
+/// "Minggu terakhir" = the 7 days ending at each source's own latest data date (sources lag differently).
+/// EBS and PE figures are always returned separately; nothing is summed across sources.
+pub async fn home(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let conf = cfg(&c).await?;
+    let counted = strs(conf.get("pe_count_statuses"));
+    let dead = conf.pointer("/outcome/dead").and_then(|v| v.as_str()).unwrap_or("Meninggal").to_string();
+    let x = format!("WITH x AS (
+            SELECT 'ebs'::text s, e.province_id p, e.disease_id d, {EBS_DATE} dt, COALESCE(e.jml_kasus,0)::bigint k, COALESCE(LEAST(e.jml_kematian, e.jml_kasus),0)::bigint m
+              FROM ebs_reports e WHERE {EBS_DATE} <= current_date
+            UNION ALL
+            SELECT 'pe', c.province_id, c.disease_id, {PE_DATE}, 1::bigint, (c.outcome = $2)::int::bigint
+              FROM pe_cases c WHERE c.deleted_at IS NULL AND c.status = ANY($1) AND {PE_DATE} <= current_date),
+          lt AS (SELECT s, MAX(dt) mx FROM x GROUP BY s)");
+    let p: [&(dyn tokio_postgres::types::ToSql + Sync); 2] = [&counted, &dead];
+    // last-7-days snapshot per source
+    let wk = c.query(&format!("{x} SELECT x.s, lt.mx::text, COUNT(*)::bigint, COALESCE(SUM(x.k),0)::bigint, COUNT(DISTINCT x.p)::bigint
+        FROM x JOIN lt ON lt.s = x.s WHERE x.dt > lt.mx - 7 GROUP BY 1, 2"), &p).await.map_err(internal)?;
+    let mut week = serde_json::Map::new();
+    for r in &wk { week.insert(r.get::<_, String>(0), json!({ "until": r.get::<_, String>(1), "records": r.get::<_, i64>(2), "cases": r.get::<_, i64>(3), "provinces": r.get::<_, i64>(4) })); }
+    let reviewed: i64 = c.query_one(&format!("{x} SELECT COUNT(DISTINCT x.p)::bigint FROM x JOIN lt ON lt.s = x.s WHERE x.dt > lt.mx - 7 AND x.p IS NOT NULL"), &p).await.map_err(internal)?.get(0);
+    // provinces ranked by coverage (number of diseases, then records)
+    let pr = c.query(&format!("{x} SELECT l.id, l.code, l.name, COUNT(DISTINCT x.d)::bigint,
+            COALESCE(SUM(x.k) FILTER (WHERE x.s='ebs'),0)::bigint, COALESCE(SUM(x.m) FILTER (WHERE x.s='ebs'),0)::bigint, COUNT(*) FILTER (WHERE x.s='ebs')::bigint,
+            COALESCE(SUM(x.k) FILTER (WHERE x.s='pe'),0)::bigint, COALESCE(SUM(x.m) FILTER (WHERE x.s='pe'),0)::bigint,
+            MIN(x.dt)::text, MAX(x.dt)::text, COUNT(*)::bigint
+        FROM x JOIN master_locations l ON l.id = x.p WHERE l.is_active GROUP BY 1, 2, 3 ORDER BY 4 DESC, 12 DESC, 3 LIMIT 6"), &p).await.map_err(internal)?;
+    let ds = c.query(&format!("{x} SELECT d.code, d.name, d.category, COUNT(*) FILTER (WHERE x.s='ebs')::bigint, COUNT(*) FILTER (WHERE x.s='pe')::bigint
+        FROM master_diseases d LEFT JOIN x ON x.d = d.id WHERE d.is_active GROUP BY 1, 2, 3 ORDER BY COUNT(x.d) DESC, 2 LIMIT 8"), &p).await.map_err(internal)?;
+    let cnt = c.query_one(&format!("{x} SELECT (SELECT COUNT(*) FROM master_locations WHERE is_active)::bigint, (SELECT COUNT(*) FROM master_diseases WHERE is_active)::bigint,
+            COUNT(DISTINCT x.p)::bigint, COUNT(DISTINCT x.d)::bigint, COUNT(*) FILTER (WHERE x.s='ebs')::bigint, COUNT(*) FILTER (WHERE x.s='pe')::bigint FROM x"), &p).await.map_err(internal)?;
+    let indicators = conf.pointer("/indicators").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+    Ok(Json(json!({ "success": true, "data": {
+        "week": week, "provinces_reviewed": reviewed,
+        "counts": { "provinces_total": cnt.get::<_, i64>(0), "diseases_total": cnt.get::<_, i64>(1), "provinces_with_data": cnt.get::<_, i64>(2),
+                    "diseases_with_data": cnt.get::<_, i64>(3), "ebs_records": cnt.get::<_, i64>(4), "pe_records": cnt.get::<_, i64>(5), "indicators": indicators },
+        "top_provinces": pr.iter().map(|r| json!({ "id": r.get::<_, i32>(0), "code": r.get::<_, Option<String>>(1), "name": r.get::<_, String>(2), "diseases": r.get::<_, i64>(3),
+            "ebs": { "cases": r.get::<_, i64>(4), "deaths": r.get::<_, i64>(5), "alerts": r.get::<_, i64>(6) }, "pe": { "cases": r.get::<_, i64>(7), "deaths": r.get::<_, i64>(8) },
+            "first": r.get::<_, String>(9), "last": r.get::<_, String>(10) })).collect::<Vec<_>>(),
+        "top_diseases": ds.iter().map(|r| json!({ "code": r.get::<_, String>(0), "name": r.get::<_, String>(1), "category": r.get::<_, Option<String>>(2),
+            "ebs": r.get::<_, i64>(3), "pe": r.get::<_, i64>(4) })).collect::<Vec<_>>(),
     }})))
 }

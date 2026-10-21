@@ -21,7 +21,7 @@ export const PE_FORMS: Record<string, { label: string }> = {
 
 export const STATUS_STYLE: Record<string, string> = {
   draf: 'border-slate-200 bg-slate-50 text-slate-600',
-  dikirim: 'border-blue-200/60 bg-blue-50 text-[#0060A9]',
+  dikirim: 'border-blue-200/60 bg-blue-50 text-primary',
   terverifikasi: 'border-emerald-200/60 bg-emerald-50 text-emerald-700',
   final: 'border-violet-200/60 bg-violet-50 text-violet-700',
   dikembalikan: 'border-amber-200/60 bg-amber-50 text-amber-700',

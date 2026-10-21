@@ -1,17 +1,20 @@
 'use client'
 // PR 010/012: executive summary (sheet "Spesifikasi Dashboard Executive"). Order (PR 011/012): 4 summary cards → map
-// (afterCards) → charts: trend + heatmap (No. 50–64), CFR with 95% CI, 7-1-7 gauges, PE status donut, coverage.
+// (afterCards) → charts: trend + heatmap (No. 50–64), disease table (No. 17 case status), CFR with 95% CI, Kinerja 7-1-7.
 // Indicator definitions come from app_settings.dashboard_executive via /api/v1/dashboard/executive; UI text from locale keys.
 // Spec rule: EBS alerts and Kasus PE are always labelled by source and never summed. The indicator status table moved to /dokumentasi.
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, Pie, PieChart, PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { peFetch } from '@/lib/pe-api'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { ciText, fmt as n, pct1, rateText, type Rate } from '@/lib/analytics-api'
-import SourceBadge, { Empty, Panel } from '@/components/analytics/SourceBadge'
+import { Empty, Panel, SourceKey } from '@/components/analytics/SourceBadge'
+import DiseaseTable, { type SummaryDisease } from '@/components/dashboard/DiseaseTable'
+import type { Sumber, UkuranEbs } from '@/lib/use-sumber'
 import TrendHeatmap from '@/components/analytics/TrendHeatmap'
+import T717, { type T717Data } from '@/components/dashboard/T717'
+import { ErrorState, SkeletonChart, SkeletonKpiRow, SkeletonTable } from '@/components/ui/Skeleton'
 
 export { rateText }
 type EbsSub = { code: string; label: string; alerts: number; verified: number; discarded: number; verified_rate: Rate; cases: number; deaths: number | null; notification: Rate; notification_missing: number }
@@ -26,19 +29,14 @@ type Exec = {
   no_group_for_disease: boolean
   cards: Card[]
   cfr: { groups: { code: string; label: string; color: string; rows: CfrRow[] }[]; star_deaths: { label: string; deaths: number }[] }
-  pe_status: { code: string; label: string; pe_form: string; by_status: Record<string, number> }[]
-  nik: Rate
-  coverage: { provinces: Rate; kabkota: Rate; provinces_missing?: string[]; kab_by_province?: { name: string; num: number; den: number }[] }
   config: { status_labels: Record<string, string>; texts: Record<string, string>; pe_count_statuses: string[] }
 }
 
 const dmy = (s: string | null) => (s ? s.split('-').reverse().join('/') : '—')
-const PE_STATUSES = ['draf', 'dikirim', 'dikembalikan', 'terverifikasi', 'final']
-const STATUS_COLOR: Record<string, string> = { draf: '#94a3b8', dikirim: '#0060A9', dikembalikan: '#f59e0b', terverifikasi: '#10b981', final: '#0f766e' }
 
-function Shell({ children, color, className = '' }: { children: React.ReactNode; color?: string; className?: string }) {
+function Shell({ children, color, className = '', testId }: { children: React.ReactNode; color?: string; className?: string; testId?: string }) {
   return (
-    <article className={`relative overflow-hidden border border-slate-200 bg-white p-4 shadow-sm ${className}`} style={{ borderRadius: '17px 17px 22px 17px' }}>
+    <article data-testid={testId} className={`relative overflow-hidden border border-slate-200 bg-white p-4 shadow-sm ${className}`} style={{ borderRadius: '17px 17px 22px 17px' }}>
       {color ? <div className="absolute inset-x-0 top-0 h-1" style={{ background: color }} /> : null}
       {children}
     </article>
@@ -81,22 +79,168 @@ function CfrTick(props: any) {
 }
 const fmt = (v: number) => (v ?? 0).toLocaleString('id-ID')
 
-export default function ExecutiveSummary({ query, afterCards }: { query: Record<string, string | number | undefined | null>; afterCards?: React.ReactNode }) {
+type Pair = { cur: number; prev: number }
+type TrendEbs = { alerts: number[]; cases: number[]; deaths: number[]; provinces: number[]; d24: { alerts: Pair; cases: Pair; deaths: Pair; provinces: Pair } | null }
+type TrendPe = { cases: number[]; deaths: number[]; provinces: number[]; d24: { cases: Pair; deaths: Pair; provinces: Pair } | null }
+type Summary = {
+  sources: { ebs: boolean; pe: boolean }; ebs_unmapped_alerts: number
+  kpi: { ebs: { alerts: number; cases: number; deaths: number; provinces: number; kabkota: number; verified: number } | null; pe: { cases: number; deaths: number; provinces: number; kabkota: number; verified: number } | null }
+  kpi_trend?: { days: string[]; bucket: 'day' | 'week'; until: string | null; period_start: string; period_end: string; ebs_latest: string | null; pe_latest: string | null; ebs: TrendEbs | null; pe: TrendPe | null }
+  t717?: T717Data | null
+  diseases: SummaryDisease[]
+}
+
+const SRC_VAR = { ebs: 'src-ebs', pe: 'src-pe' } as const
+type KpiRow = { src?: 'ebs' | 'pe'; label: string; value: string; sub?: string; tone?: string; d24?: Pair | null; spark?: number[] }
+
+/** PR 016: change over the last 24 h vs the 24 h before (real arrival timestamps). Up = red, down = green, 0 = grey "tetap". */
+function Delta24({ p }: { p: Pair | null | undefined }) {
+  const { t } = useTranslation()
+  const hint = t('skdr.kpi.d24Hint')
+  if (p === undefined) return null
+  if (p === null) return <span title={t('skdr.kpi.d24None')} data-testid="kpi-d24" className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-400">—</span>
+  const d = p.cur - p.prev
+  if (d === 0) return <span title={hint} data-testid="kpi-d24" className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{t('skdr.kpi.d24Same')}</span>
+  const up = d > 0
+  const pct = p.prev > 0 ? ` (${up ? '+' : '−'}${pct1((Math.abs(d) / p.prev) * 100)}%)` : ''
+  return (
+    <span title={`${hint}: ${n(p.cur)} vs ${n(p.prev)}`} data-testid="kpi-d24"
+      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${up ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+      {up ? '▲' : '▼'} {up ? '+' : '−'}{n(Math.abs(d))}{pct}
+    </span>
+  )
+}
+
+/** Smooth path through points (Catmull-Rom → cubic Bézier). */
+function smooth(pts: number[][]) {
+  if (pts.length < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : ''
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`
+  }
+  return d
+}
+const dm = (iso?: string) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : '')
+
+/** PR 016: daily area sparkline that fills its container — gradient fill, end-point dot, per-day tooltip on hover.
+ *  Each source has its own scale (EBS and Kasus PE are never added up). */
+function KpiSpark({ src, values, days, className = 'h-16' }: { src: 'ebs' | 'pe'; values: number[]; days: string[]; className?: string }) {
+  const { t } = useTranslation()
+  const [hi, setHi] = useState<number | null>(null)
+  if (!values.length) return null
+  const W = 200, H = 60, P = 3
+  const max = Math.max(1, ...values)
+  const pts = values.map((v, i) => [P + (i / Math.max(1, values.length - 1)) * (W - 2 * P), H - P - (v / max) * (H - 2 * P - 6)])
+  const line = smooth(pts)
+  const gid = `kpi-grad-${src}-${Math.round(max)}-${values.length}`
+  const color = `rgb(var(--${SRC_VAR[src]}))`
+  const k = hi ?? values.length - 1
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const fx = (e.clientX - r.left) / r.width
+    setHi(Math.max(0, Math.min(values.length - 1, Math.round(fx * (values.length - 1)))))
+  }
+  return (
+    <div className="relative min-w-0 flex-1" data-testid="kpi-spark">
+      <div className={`relative w-full ${className}`} onMouseMove={onMove} onMouseLeave={() => setHi(null)} role="img" aria-label={t('skdr.kpi.sparkHint', { n: days.length })}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
+          <defs>
+            <linearGradient id={gid} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <path d={`${line} L${pts[pts.length - 1][0]},${H} L${pts[0][0]},${H} Z`} fill={`url(#${gid})`} />
+          <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          {hi !== null ? <line x1={pts[k][0]} x2={pts[k][0]} y1={0} y2={H} stroke="#cbd5e1" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" /> : null}
+        </svg>
+        {/* dot as HTML so it stays round while the SVG stretches */}
+        <span className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          style={{ left: `${(pts[k][0] / W) * 100}%`, top: `${(pts[k][1] / H) * 100}%`, background: color }} />
+        {hi !== null ? (
+          <div className="pointer-events-none absolute -top-7 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white shadow" data-testid="kpi-spark-tip"
+            style={{ left: `${Math.min(85, Math.max(15, (pts[k][0] / W) * 100))}%` }}>
+            {dm(days[hi])}: {n(values[hi])}
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-0.5 flex justify-between text-[10px] text-slate-400"><span>{dm(days[0])}</span><span>{dm(days[days.length - 1])}</span></div>
+    </div>
+  )
+}
+
+function KpiNumber({ r, size }: { r: KpiRow; size: string }) {
+  return (
+    <div className="min-w-0">
+      {r.src ? <SourceKey source={r.src} label={r.label} /> : <span className="text-xs font-semibold text-slate-600">{r.label}</span>}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span data-testid="kpi-value" className={`font-black leading-none tracking-tight ${size} ${r.tone || 'text-slate-900'}`}>{r.value}</span>
+        <Delta24 p={r.d24} />
+      </div>
+      {r.sub ? <div className="mt-1 truncate text-xs text-slate-500" title={r.sub}>{r.sub}</div> : null}
+    </div>
+  )
+}
+
+/** PR 016: KPI card. One metric: number column left + sparkline filling the right. Two metrics (EBS vs Kasus PE):
+ *  two mini-columns side by side with a divider, each with its own delta and mini sparkline — no dead space. */
+function Kpi({ title, rows, testId, days = [], until, bucket = 'day' }: { title: string; testId?: string; rows: KpiRow[]; days?: string[]; until?: string | null; bucket?: string }) {
+  const { t } = useTranslation()
+  const dual = rows.length > 1
+  return (
+    <Shell className="flex h-full flex-col" testId={testId}>
+      <div className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</div>
+      {dual ? (
+        <div className="mt-2 grid flex-1 grid-cols-2 divide-x divide-slate-200">
+          {rows.map((r, i) => (
+            <div key={r.label} className={`flex min-w-0 flex-col gap-2 ${i ? 'pl-3' : 'pr-3'}`}>
+              <KpiNumber r={r} size="text-3xl xl:text-4xl" />
+              {r.src && r.spark?.length ? <KpiSpark src={r.src} values={r.spark} days={days} className="h-10" /> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-1 items-center gap-4">
+          {rows.map((r) => (
+            <div key={r.label} className="contents">
+              <div className="shrink-0"><KpiNumber r={r} size="text-5xl" /></div>
+              {r.src && r.spark?.length ? <KpiSpark src={r.src} values={r.spark} days={days} className="h-20" /> : null}
+            </div>
+          ))}
+        </div>
+      )}
+      {days.length ? <div className="mt-2 text-[10px] text-slate-400" data-testid="kpi-until">{t(bucket === 'week' ? 'skdr.kpi.sparkWeekly' : 'skdr.kpi.sparkDaily')}{until ? ` · ${t('skdr.kpi.dataUntil', { date: until.split('-').reverse().join('/') })}` : ''}</div> : null}
+    </Shell>
+  )
+}
+
+export default function ExecutiveSummary({ query, afterCards, sumber = 'all', ukuran = 'alert' }: { query: Record<string, string | number | undefined | null>; afterCards?: React.ReactNode; sumber?: Sumber; ukuran?: UkuranEbs }) {
   const { t } = useTranslation()
   const [d, setD] = useState<Exec | null>(null)
   const [err, setErr] = useState('')
+  const [sm, setSm] = useState<Summary | null>(null)
+  const [smErr, setSmErr] = useState('')
+  const [tick, setTick] = useState(0)
   const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'all').map(([k, v]) => [k, String(v)])).toString()
   useEffect(() => {
     let alive = true
-    setErr('')
+    setErr(''); setSmErr(''); setD(null); setSm(null)
     peFetch<{ data: Exec }>(`/api/v1/dashboard/executive?${qs}`).then((j) => alive && setD(j.data)).catch((e) => alive && setErr(e.message || t('skdr.exec.loadFailed')))
+    peFetch<{ data: Summary }>(`/api/v1/analytics/summary?${qs}`).then((j) => alive && setSm(j.data)).catch((e) => alive && setSmErr(e.message || 'error'))
     return () => { alive = false }
-  }, [qs]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qs, tick]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (err) return <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-700">{t('skdr.exec.loadFailed')}: {err}</div>
-  if (!d) return <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-[#0060A9]">{t('skdr.exec.loading')}</div>
+  if (err) return <ErrorState message={err} onRetry={() => setTick((x) => x + 1)} />
+  if (!d) return <div className="space-y-4"><SkeletonKpiRow /><SkeletonChart /><SkeletonTable /></div>
 
   const src = d.filters.source
+  const te = sm?.kpi_trend?.ebs ?? null
+  const tp = sm?.kpi_trend?.pe ?? null
+  const days = sm?.kpi_trend?.days ?? []
+  const until = sm?.kpi_trend?.until ?? null
+  const bucket = sm?.kpi_trend?.bucket ?? 'day'
   const showEbs = src !== 'pe' && src !== 'form'
   const showPe = src !== 'ebs'
   const h = d.header
@@ -117,70 +261,35 @@ export default function ExecutiveSummary({ query, afterCards }: { query: Record<
   const cfrStep = cfrPeak > 50 ? 20 : cfrPeak > 20 ? 10 : cfrPeak > 8 ? 5 : cfrPeak > 4 ? 2 : 1
   const cfrMax = Math.min(100, Math.max(cfrStep * 2, Math.ceil((cfrPeak * 1.15) / cfrStep) * cfrStep))
   const cfrTicks = Array.from({ length: Math.floor(cfrMax / cfrStep) + 1 }, (_, i) => i * cfrStep)
-  const statusTotals = PE_STATUSES.map((s) => ({ code: s, name: d.config.status_labels?.[s] ?? s, value: d.pe_status.reduce((a, p) => a + (p.by_status[s] ?? 0), 0) }))
-  const peTotal = statusTotals.reduce((a, s) => a + s.value, 0)
-  const cov = [{ name: t('skdr.exec.province'), r: d.coverage.provinces }, { name: t('skdr.exec.kabkota'), r: d.coverage.kabkota }].map((x) => ({ ...x, pct: x.r.pct ?? 0 }))
 
+  // sheet No. 9: header sentence includes the epi-week range of the global period filter
+  const qq = query as Record<string, unknown>
+  const epiLabel = qq.start_week && qq.end_week ? t('skdr.exec.epiRange', { sw: String(qq.start_week), sy: String(qq.start_year), ew: String(qq.end_week), ey: String(qq.end_year) }) : ''
   return (
     <section className="w-full space-y-4" aria-label={t('skdr.exec.aria')}>
-      <p className="rounded-xl border border-[#cfe0f1] bg-white px-4 py-2.5 text-sm text-slate-700">
-        {t('skdr.exec.showing')} {parts.join(` ${t('skdr.exec.and')} `)} · {dmy(d.filters.start_date)} – {dmy(d.filters.end_date)} · {d.filters.scope} · {d.filters.disease || t('skdr.exec.allDiseases')}
+      <p className="rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm text-slate-700">
+        {t('skdr.exec.showing')} {parts.join(` ${t('skdr.exec.and')} `)} · {dmy(d.filters.start_date)} – {dmy(d.filters.end_date)} {epiLabel ? `(${epiLabel})` : ''} · {d.filters.scope} · {d.filters.disease || t('skdr.exec.allDiseases')}
         {showEbs && h.ebs_alerts_all !== null ? <span className="text-slate-500"> ({t('skdr.exec.allEbs', { n: n(h.ebs_alerts_all) })})</span> : null}
       </p>
       {d.no_group_for_disease ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">{t('skdr.exec.notZoonosis')}</div> : null}
 
-      {/* No. 12–20 — ringkasan per penyakit (EBS dan Kasus PE dipisah) */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4" data-testid="summary-cards">
-        {d.cards.map((c) => {
-          const ind = c.individual
-          return (
-            <Shell key={c.code} color={c.color}>
-              <span className="rounded px-2 py-0.5 text-xs font-black uppercase tracking-wide text-white" style={{ background: c.color }}>{c.label}</span>
-              {showEbs ? (
-                <div className="mt-3 border-l-2 pl-3" style={{ borderColor: c.color }}>
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">{t('skdr.exec.ebsAlerts')}* <SourceBadge source="ebs" /></div>
-                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-2">
-                    {c.ebs.map((s) => (
-                      <div key={s.code}>
-                        <div className="text-2xl font-black text-slate-900">{n(s.alerts)}</div>
-                        {c.ebs.length > 1 ? <div className="text-[11px] font-semibold text-slate-600">{t('skdr.exec.alertOf', { label: s.label })}</div> : null}
-                        <div className="text-[11px] text-slate-600">{t('skdr.exec.verifiedLine', { v: n(s.verified), rate: rateText(s.verified_rate), cases: n(s.cases) })}</div>
-                        {s.deaths !== null ? <div className="text-[11px] font-semibold text-red-600">{t('skdr.exec.deathsN', { n: n(s.deaths) })}</div> : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {showPe ? (
-                <div className={`mt-3 ${showEbs ? 'border-t border-slate-100 pt-3' : ''}`}>
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">{t('skdr.exec.individual')}* <SourceBadge source="pe" /></div>
-                  <div className="mt-1 flex items-end justify-between gap-3">
-                    <div className="flex gap-4">
-                      {ind.split ? ind.split.map((sp) => (
-                        <div key={sp.label}>
-                          <div className="text-2xl font-black text-slate-900">{n(sp.codes.reduce((s, k) => s + (ind.by_status[k] ?? 0), 0))}</div>
-                          <div className="text-[11px] font-semibold text-slate-600">{sp.label}</div>
-                        </div>
-                      )) : <div className="text-2xl font-black text-slate-900">{n(ind.total)}</div>}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-black text-red-600">{n(ind.deaths)}</div>
-                      <div className="text-[11px] text-red-600">{t('skdr.exec.deaths')}</div>
-                    </div>
-                  </div>
-                  <div className="mt-1 text-[11px] text-slate-600">
-                    {(ind.status_defs || []).map((s) => `${n(ind.by_status[s.code] ?? 0)} ${s.label}`).join(' · ')}
-                    {ind.unclassified ? ` · ${t('skdr.exec.others', { n: n(ind.unclassified) })}` : ''}
-                  </div>
-                </div>
-              ) : null}
-              <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
-                {c.disease_code ? <Link href={`/penyakit/${c.disease_code.toLowerCase()}`} className="font-bold text-[#0060A9] hover:underline">{t('skdr.exec.diseasePage')}</Link> : <span />}
-                <Link href={c.link || `/pe/${c.pe_form}`} className="font-bold text-[#0060A9] hover:underline">{t('skdr.exec.peList')}</Link>
-              </div>
-            </Shell>
-          )
-        })}
+      {/* PR 016: 4 KPI cards following the global Sumber filter (replaces the fixed per-disease group cards). */}
+      <div className="grid grid-cols-1 items-stretch gap-3 md:auto-rows-fr md:grid-cols-2 2xl:grid-cols-4" data-testid="summary-cards">
+        {showEbs ? <Kpi testId="kpi-ebs" days={days} until={until} bucket={bucket} title={t('skdr.kpi.ebsTitle')} rows={[{ src: 'ebs', label: ukuran === 'kasus' ? t('skdr.charts.metricEbsCases') : t('skdr.kpi.ebsSignals'), value: n(ukuran === 'kasus' ? sm?.kpi.ebs?.cases ?? 0 : sm?.kpi.ebs?.alerts ?? 0),
+          d24: te ? (ukuran === 'kasus' ? te.d24?.cases : te.d24?.alerts) ?? null : undefined, spark: ukuran === 'kasus' ? te?.cases : te?.alerts,
+          sub: t('skdr.kpi.ebsSub', { v: n(sm?.kpi.ebs?.verified ?? 0), other: ukuran === 'kasus' ? t('skdr.kpi.otherAlerts', { n: n(sm?.kpi.ebs?.alerts ?? 0) }) : t('skdr.kpi.otherCases', { n: n(sm?.kpi.ebs?.cases ?? 0) }) }) }]} /> : null}
+        {showPe ? <Kpi testId="kpi-pe" days={days} until={until} bucket={bucket} title={t('skdr.kpi.peTitle')} rows={[{ src: 'pe', label: t('skdr.kpi.peCases'), value: n(sm?.kpi.pe?.cases ?? 0), d24: tp ? tp.d24?.cases ?? null : undefined, spark: tp?.cases, sub: t('skdr.kpi.peSub', { v: n(sm?.kpi.pe?.verified ?? 0) }) }]} /> : null}
+        <Kpi testId="kpi-deaths" days={days} until={until} bucket={bucket} title={t('skdr.kpi.deathsTitle')} rows={[
+          ...(showEbs ? [{ src: 'ebs' as const, label: t('skdr.kpi.deathsEbs'), value: n(sm?.kpi.ebs?.deaths ?? 0), tone: 'text-red-600', d24: te ? te.d24?.deaths ?? null : undefined, spark: te?.deaths }] : []),
+          ...(showPe ? [{ src: 'pe' as const, label: t('skdr.kpi.deathsPe'), value: n(sm?.kpi.pe?.deaths ?? 0), tone: 'text-red-600', d24: tp ? tp.d24?.deaths ?? null : undefined, spark: tp?.deaths }] : []),
+        ]} />
+        <Kpi testId="kpi-regions" days={days} until={until} bucket={bucket} title={t('skdr.kpi.regionsTitle')} rows={[
+          ...(showEbs ? [{ src: 'ebs' as const, label: t('skdr.kpi.regionsEbs'), value: n(sm?.kpi.ebs?.provinces ?? 0), d24: te ? te.d24?.provinces ?? null : undefined, spark: te?.provinces, sub: t('skdr.kpi.kabN', { n: n(sm?.kpi.ebs?.kabkota ?? 0) }) }] : []),
+          ...(showPe ? [{ src: 'pe' as const, label: t('skdr.kpi.regionsPe'), value: n(sm?.kpi.pe?.provinces ?? 0), d24: tp ? tp.d24?.provinces ?? null : undefined, spark: tp?.provinces, sub: t('skdr.kpi.kabN', { n: n(sm?.kpi.pe?.kabkota ?? 0) }) }] : []),
+        ]} />
+        {sumber !== 'all' ? (showEbs
+          ? <Kpi testId="kpi-extra" title={t('skdr.kpi.verifiedEbs')} rows={[{ src: 'ebs', label: t('skdr.kpi.verifiedRate'), value: sm?.kpi.ebs?.alerts ? `${pct1(((sm.kpi.ebs.verified) / sm.kpi.ebs.alerts) * 100)}%` : '—', sub: sm?.kpi.ebs ? `${n(sm.kpi.ebs.verified)} / ${n(sm.kpi.ebs.alerts)}` : undefined }]} />
+          : <Kpi testId="kpi-extra" title={t('skdr.kpi.verifiedPe')} rows={[{ src: 'pe', label: t('skdr.kpi.verifiedRate'), value: sm?.kpi.pe?.cases ? `${pct1((sm.kpi.pe.verified / sm.kpi.pe.cases) * 100)}%` : '—', sub: sm?.kpi.pe ? `${n(sm.kpi.pe.verified)} / ${n(sm.kpi.pe.cases)}` : undefined }]} />) : null}
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">{tx.footnote} {tx.individual_def} {tx.alert_def}</p>
 
@@ -188,11 +297,18 @@ export default function ExecutiveSummary({ query, afterCards }: { query: Record<
       {afterCards}
 
       {/* PR 012: No. 50–64 — tren mingguan + heatmap minggu epid × provinsi */}
-      <TrendHeatmap query={query as Record<string, unknown>} />
+      <TrendHeatmap query={query as Record<string, unknown>} sumber={sumber} ukuran={ukuran} />
+
+      {/* PR 016: disease section driven by the DB registry (scales to new diseases / PE forms). */}
+      <Panel title={t('skdr.dtable.title')} testId="disease-section"
+        legend={<>{showEbs ? <SourceKey source="ebs" /> : null}{showPe ? <SourceKey source="pe" /> : null}</>}>
+        {sm ? <DiseaseTable rows={sm.diseases} sumber={sumber} ukuran={ukuran} /> : smErr ? <ErrorState message={smErr} onRetry={() => setTick((x) => x + 1)} /> : <SkeletonTable />}
+        {showEbs && sm?.ebs_unmapped_alerts ? <p className="mt-2 text-[11px] text-slate-500">{t('skdr.charts.unmapped', { n: n(sm.ebs_unmapped_alerts) })}</p> : null}
+      </Panel>
 
       {/* No. 21–35 — CFR + 95% CI (Kasus PE, kasus konfirmasi) */}
       {showPe && d.cfr.groups.length ? (
-        <Panel title={t('skdr.exec.cfrTitle')} sources={['pe']} testId="cfr">
+        <Panel title={t('skdr.exec.cfrTitle')} testId="cfr">
           {star > 0 ? (
             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               <b>{t('skdr.exec.checkData')}</b> {t('skdr.exec.checkDataText', { n: n(star), list: d.cfr.star_deaths.map((x) => `${x.label.replace('*', '')} ${n(x.deaths)}`).join(' · ') })}
@@ -243,101 +359,9 @@ export default function ExecutiveSummary({ query, afterCards }: { query: Record<
         </Panel>
       ) : null}
 
-      {/* PR 013: equal-height cards (grid stretch + Panel h-full), no blank bottoms. */}
-      <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        {/* No. 41–45 — 7-1-7 */}
-        {showEbs ? (
-          <Panel title={t('skdr.exec.t717')} sources={['ebs']} testId="gauges-717">
-            <div className="grid flex-1 grid-cols-2 content-center gap-3 sm:grid-cols-3 2xl:grid-cols-4">
-              <Gauge r={null} label={t('skdr.exec.detect7')} />
-              {subs.map((s) => <Gauge key={s.group + s.code} r={s.notification} label={`${t('skdr.exec.notify1')} · ${s.label}`} />)}
-              <Gauge r={null} label={t('skdr.exec.respond7')} />
-            </div>
-            <p className="mt-3 text-xs text-slate-500">{t('skdr.exec.t717Note')}</p>
-          </Panel>
-        ) : null}
+      {/* PR 016: No. 41–45 — Kinerja 7-1-7 as a 3-step timeline + per-disease table (follows the global Sumber filter). */}
+      <T717 data={sm?.t717} sumber={sumber} />
 
-        {/* Status alur PE (donut) + Kelengkapan NIK */}
-        {showPe ? (
-          <Panel title={t('skdr.exec.peStatus')} sources={['pe']} testId="pe-donut">
-            {peTotal ? (
-              <div className="flex flex-1 flex-col items-center gap-4 sm:flex-row">
-                <div className="relative aspect-square w-full max-w-[260px] shrink-0 sm:w-[48%]" data-testid="donut-box">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={statusTotals.filter((s) => s.value)} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="98%" paddingAngle={2} isAnimationActive={false}>
-                        {statusTotals.filter((s) => s.value).map((s) => <Cell key={s.code} fill={STATUS_COLOR[s.code]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: any) => n(Number(v))} contentStyle={{ fontSize: 13 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-black text-slate-900">{n(peTotal)}</span>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('skdr.exec.peTotal')}</span>
-                  </div>
-                </div>
-                <ul className="w-full min-w-0 flex-1 space-y-2 text-sm">
-                  {statusTotals.map((s) => (
-                    <li key={s.code} className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2"><span className="h-3.5 w-3.5 rounded" style={{ background: STATUS_COLOR[s.code] }} />{s.name}</span>
-                      <span><b className="text-lg">{n(s.value)}</b> <span className="text-xs text-slate-500">{peTotal ? `${pct1((s.value / peTotal) * 100)}%` : ''}</span></span>
-                    </li>
-                  ))}
-                  <li className="border-t border-slate-100 pt-2 text-xs text-slate-500">{d.pe_status.map((p) => <Link key={p.code} href={`/pe/${p.pe_form}`} className="mr-2 font-semibold text-[#0060A9] hover:underline">{p.label}</Link>)}</li>
-                </ul>
-              </div>
-            ) : <Empty>{t('skdr.exec.peEmpty')}</Empty>}
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" data-testid="nik-kpi">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{t('skdr.exec.nikTitle')}</div>
-                <div className="text-xs text-slate-500">{d.nik.den ? `${n(d.nik.num)} / ${n(d.nik.den)} ${t('skdr.exec.nikUnit')}` : t('skdr.exec.noData')}</div>
-              </div>
-              <div className="text-3xl font-black text-slate-900">{rateText(d.nik)}</div>
-            </div>
-          </Panel>
-        ) : null}
-
-        {/* Cakupan wilayah: big KPI, thick bars, unreported provinces */}
-        <Panel title={t('skdr.exec.coverage')} sources={showEbs && showPe ? ['ebs', 'pe'] : [showEbs ? 'ebs' : 'pe']} testId="coverage">
-          <div className="grid grid-cols-2 gap-4">
-            {cov.map((c) => (
-              <div key={c.name}>
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{c.name}</div>
-                <div className="text-4xl font-black leading-tight text-slate-900" data-testid="coverage-kpi">{rateText(c.r)}</div>
-                <div className="text-sm text-slate-600">{n(c.r.num)} / {n(c.r.den)} {t('skdr.exec.reporting')}</div>
-                <div className="mt-2 h-4 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={Math.round(c.pct)} aria-valuemin={0} aria-valuemax={100} aria-label={c.name}>
-                  <div className="h-full rounded-full bg-[#00A3AD]" style={{ width: `${Math.min(100, c.pct)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" data-testid="coverage-missing">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{t('skdr.exec.missingProv', { n: n(d.coverage.provinces_missing?.length ?? 0) })}</div>
-            {d.coverage.provinces_missing?.length ? (
-              <div className="mt-2 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-                {d.coverage.provinces_missing.map((p) => <span key={p} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">{p}</span>)}
-              </div>
-            ) : <div className="mt-1 text-sm font-semibold text-emerald-700">{t('skdr.exec.allReported')}</div>}
-            {d.coverage.kab_by_province?.length ? (
-              <div className="mt-3 border-t border-slate-200 pt-3" data-testid="coverage-lowest">
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{t('skdr.exec.lowestKab')}</div>
-                <ul className="mt-2 space-y-2">
-                  {d.coverage.kab_by_province.map((p) => {
-                    const v = p.den ? (p.num / p.den) * 100 : 0
-                    return (
-                      <li key={p.name} className="text-sm">
-                        <div className="flex justify-between gap-2"><span className="truncate text-slate-700">{p.name}</span><span className="shrink-0 font-bold text-slate-900">{pct1(v)}% <span className="font-normal text-slate-500">({n(p.num)}/{n(p.den)})</span></span></div>
-                        <div className="mt-1 h-2 rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#00A3AD]" style={{ width: `${v}%` }} /></div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-          <p className="mt-3 text-xs text-slate-500">{t('skdr.exec.coverageNote')}</p>
-        </Panel>
-      </div>
       {d.cards.length === 0 && !d.no_group_for_disease ? <div className="flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-4 w-4" />{t('skdr.exec.noConfig')}</div> : null}
     </section>
   )

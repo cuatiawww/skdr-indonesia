@@ -12,6 +12,7 @@ import { inputCls } from '@/components/master/MasterUi'
 import { cond, isFilled, labelsOf, pruneHidden, validateAll, warningsAll, checkField, type Data, type Issue, type PeField, type PeSchema } from '@/lib/pe-engine'
 import { ApiError, CLASS_STYLE, peFetch, STATUS_STYLE } from '@/lib/pe-api'
 import { FieldView, type FieldCtx, type Masters, type Opt } from './PeFields'
+import { SkeletonDetail } from '@/components/ui/Skeleton'
 
 interface Transition { from: string; to: string; label: string; roles?: string[]; validate?: boolean; note_required?: boolean }
 interface Workflow { editable_status: string[]; status_labels: Record<string, string>; transitions: Transition[] }
@@ -163,7 +164,7 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
   }, [saveState])
 
   if (loadErr) return <div className="w-full p-8 text-sm text-red-600">{t('skdr.master.loadFailed')}: {loadErr}</div>
-  if (!schema || !def) return <div className="flex w-full items-center justify-center p-16 text-slate-400"><Loader2 className="h-6 w-6 animate-spin text-[#0060A9]" /></div>
+  if (!schema || !def) return <SkeletonDetail />
 
   const steps = schema.steps
   const step = steps[stepIdx]
@@ -267,10 +268,10 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
       </div>
 
       {viewOnly && rec && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-[#0060A9]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-primary">
           <span className="inline-flex items-center gap-2 font-semibold"><Eye className="h-4 w-4" /> Mode lihat (hanya baca)</span>
           {statusEditable ? (
-            <Link href={`/pe/${formKey}/${rec.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#004b85]"><Pencil className="h-3.5 w-3.5" /> Edit</Link>
+            <Link href={`/pe/${formKey}/${rec.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-primary-dark"><Pencil className="h-3.5 w-3.5" /> Edit</Link>
           ) : <span className="text-slate-500">PE berstatus {statusLabel(rec.status)} tidak dapat diedit.</span>}
         </div>
       )}
@@ -317,14 +318,14 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
                 )}
                 <button type="button" onClick={() => goto(i)} aria-current={active ? 'step' : undefined}
                   aria-label={`Langkah ${i + 1}: ${s.title}. ${done ? 'Lengkap' : `${n} isian belum valid`}`}
-                  className={`relative z-10 mx-auto flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-1.5 text-center transition duration-200 ${active ? 'scale-[1.04] bg-[#0060A9]/5 ring-1 ring-[#0060A9]/40' : 'hover:bg-slate-50'}`}>
+                  className={`relative z-10 mx-auto flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-1.5 text-center transition duration-200 ${active ? 'scale-[1.04] bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-slate-50'}`}>
                   <span className="relative flex h-9 w-9 items-center justify-center">
                     <svg viewBox="0 0 24 24" className="absolute inset-0 h-9 w-9 -rotate-90" aria-hidden>
                       <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2.5" className="stroke-slate-200" />
                       <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - st.pct)}
-                        className={`transition-[stroke-dashoffset] duration-500 ${done ? 'stroke-emerald-500' : 'stroke-[#0060A9]'}`} />
+                        className={`transition-[stroke-dashoffset] duration-500 ${done ? 'stroke-emerald-500' : 'stroke-primary'}`} />
                     </svg>
-                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${done ? 'bg-emerald-500 text-white' : active ? 'bg-[#0060A9] text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${done ? 'bg-emerald-500 text-white' : active ? 'bg-primary text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>
                       {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
                     </span>
                     {!done && (
@@ -333,7 +334,7 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
                       </span>
                     )}
                   </span>
-                  <span className={`line-clamp-2 text-[11px] font-semibold leading-tight ${active ? 'text-[#0060A9]' : 'text-slate-700'}`}>{s.title}</span>
+                  <span className={`line-clamp-2 text-[11px] font-semibold leading-tight ${active ? 'text-primary' : 'text-slate-700'}`}>{s.title}</span>
                   <span className={`text-[10px] ${done ? 'text-emerald-600' : 'text-amber-600'}`}>{st.total ? `${st.done}/${st.total} wajib` : 'tanpa isian wajib'}</span>
                 </button>
                 {/* tooltip: ringkasan isian yang belum valid */}
@@ -355,7 +356,7 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
           <div className="mt-3 flex gap-1.5 overflow-x-auto border-t border-slate-100 pt-3" data-testid="pe-sections-nav">
             {step.sections.filter((se) => !se.visible || cond(se.visible, data)).map((se) => (
               <button key={se.id} type="button" onClick={() => scrollToSec(se.id)} aria-current={activeSec === se.id ? 'location' : undefined}
-                className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${activeSec === se.id ? 'bg-[#0060A9] text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${activeSec === se.id ? 'bg-primary text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
                 {se.title}
               </button>
             ))}
@@ -381,11 +382,11 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
               <ArrowLeft className="h-4 w-4" /> {t('skdr.pe.prev')}
             </button>
             {stepIdx < steps.length - 1 ? (
-              <button onClick={() => goto(stepIdx + 1)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#004b85]">
+              <button onClick={() => goto(stepIdx + 1)} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-primary-dark">
                 {t('skdr.pe.next')} <ArrowRight className="h-4 w-4" />
               </button>
             ) : (
-              <button onClick={finish} disabled={!editable} className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#004b85] disabled:opacity-40">
+              <button onClick={finish} disabled={!editable} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-primary-dark disabled:opacity-40">
                 <Save className="h-4 w-4" /> {t('skdr.pe.saveExit')}
               </button>
             )}
@@ -404,7 +405,7 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
                 </div>
                 {rec.classification_override && <p className="text-slate-500">{t('skdr.pe.systemClass')}: <b>{rec.classification_label || t('skdr.pe.classPending')}</b> · {t('skdr.pe.reason')}: {rec.override_reason}</p>}
                 {rec.classification_basis && <p className="text-slate-500">{rec.classification_basis}</p>}
-                {rec.status !== 'final' && <button onClick={() => setOverrideOpen(true)} className="text-[11px] font-semibold text-[#0060A9] hover:underline">{t('skdr.pe.overrideBtn')}</button>}
+                {rec.status !== 'final' && <button onClick={() => setOverrideOpen(true)} className="text-[11px] font-semibold text-primary hover:underline">{t('skdr.pe.overrideBtn')}</button>}
               </div>
             )}
           </div>
@@ -431,7 +432,7 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
                 )}
                 {transitions.map((x) => (
                   <button key={x.to} onClick={() => setTransition(x)} disabled={saveState === 'saving'}
-                    className={`w-full rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider ${x.to === 'dikembalikan' ? 'border border-amber-300 bg-white text-amber-700 hover:bg-amber-50' : 'bg-[#0060A9] text-white hover:bg-[#004b85]'} disabled:opacity-50`}>
+                    className={`w-full rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider ${x.to === 'dikembalikan' ? 'border border-amber-300 bg-white text-amber-700 hover:bg-amber-50' : 'bg-primary text-white hover:bg-primary-dark'} disabled:opacity-50`}>
                     {x.label}
                   </button>
                 ))}
@@ -512,7 +513,7 @@ function ClusterMonitoring({ schema, cluster, today, onSaved, disabled }: { sche
           </div>
         ))}
       </div>
-      {!disabled && <button onClick={saveMon} disabled={busy} className="rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#004b85] disabled:opacity-50">{t('skdr.pe.saveMonitoring')}</button>}
+      {!disabled && <button onClick={saveMon} disabled={busy} className="rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-primary-dark disabled:opacity-50">{t('skdr.pe.saveMonitoring')}</button>}
     </div>
   )
 }
@@ -553,7 +554,7 @@ function ClusterModal({ open, onClose, formKey, masters, defaults, onCreated, to
         <div><label className={lab}>{t('skdr.pe.lokasi')}</label><input className={inputCls} value={f.lokasi || ''} onChange={(e) => setF({ ...f, lokasi: e.target.value })} /></div>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">{t('common.cancel')}</button>
-          <button disabled={busy} className="rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white disabled:opacity-50">{t('common.save')}</button>
+          <button disabled={busy} className="rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white disabled:opacity-50">{t('common.save')}</button>
         </div>
       </form>
     </Modal>
@@ -581,7 +582,7 @@ function OverrideModal({ open, onClose, rec, options, onDone }: { open: boolean;
         {code && <textarea className={inputCls} rows={3} placeholder={t('skdr.pe.reasonPh')} value={reason} onChange={(e) => setReason(e.target.value)} required />}
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600">{t('common.cancel')}</button>
-          <button className="rounded-xl bg-[#0060A9] px-4 py-2 font-bold uppercase tracking-wider text-white">{t('common.save')}</button>
+          <button className="rounded-xl bg-primary px-4 py-2 font-bold uppercase tracking-wider text-white">{t('common.save')}</button>
         </div>
       </form>
     </Modal>
@@ -612,7 +613,7 @@ function TransitionModal({ tr, rec, onClose, onDone, onInvalid, beforeSubmit }: 
         <textarea className={inputCls} rows={3} placeholder={tr.note_required ? t('skdr.pe.noteRequired') : t('skdr.pe.noteOptional')} value={note} onChange={(e) => setNote(e.target.value)} required={!!tr.note_required} />
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600">{t('common.cancel')}</button>
-          <button disabled={busy} className="rounded-xl bg-[#0060A9] px-4 py-2 font-bold uppercase tracking-wider text-white disabled:opacity-50">{tr.label}</button>
+          <button disabled={busy} className="rounded-xl bg-primary px-4 py-2 font-bold uppercase tracking-wider text-white disabled:opacity-50">{tr.label}</button>
         </div>
       </form>
     </Modal>

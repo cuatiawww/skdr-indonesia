@@ -360,7 +360,7 @@ function SvgFlag({ code }: { code: string }) {
     case "GLOBAL":
     case "WORLD":
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-full w-full p-0.5 bg-slate-100">
+        <svg viewBox="0 0 24 24" fill="none" stroke="rgb(var(--brand-600))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-full w-full p-0.5 bg-slate-100">
           <circle cx="12" cy="12" r="10" />
           <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
           <path d="M2 12h20" />
@@ -388,7 +388,7 @@ function SvgFlag({ code }: { code: string }) {
         return <span className="flex h-full w-full items-center justify-center text-[11px] leading-none">{emoji}</span>;
       }
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-full w-full p-0.5 bg-slate-100">
+        <svg viewBox="0 0 24 24" fill="none" stroke="rgb(var(--brand-600))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-full w-full p-0.5 bg-slate-100">
           <circle cx="12" cy="12" r="10" />
           <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
           <path d="M2 12h20" />

@@ -33,7 +33,7 @@ export default function MasterPenyakitPage() {
         loading={list.loading} onRefresh={list.reload} onAdd={() => { setEditing(null); setOpen(true) }} addLabel={t('skdr.master.dis.add')} />
       <MasterToolbar search={list.search} setSearch={list.setSearch} placeholder={t('skdr.master.dis.search')}
         status={list.status} setStatus={list.setStatus} total={list.total} totalLabel={t('skdr.master.dis.total')}>
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-[#0060A9]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-primary">
           <Database className="h-3 w-3" /> {t('skdr.master.dis.standard')}
         </span>
       </MasterToolbar>
@@ -55,7 +55,7 @@ export default function MasterPenyakitPage() {
               <tbody className="divide-y divide-slate-100">
                 {list.data.map((r) => (
                   <tr key={r.id} className={`transition hover:bg-blue-50/30 ${r.is_active ? '' : 'opacity-60'}`}>
-                    <td className="px-4 py-3 font-mono text-xs font-bold text-[#0060A9]"><span className="rounded border border-blue-100 bg-blue-50 px-2 py-0.5">{r.code}</span></td>
+                    <td className="px-4 py-3 font-mono text-xs font-bold text-primary"><span className="rounded border border-blue-100 bg-blue-50 px-2 py-0.5">{r.code}</span></td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{r.name}</div>
                       {r.english_name && <div className="max-w-xs truncate text-[11px] text-slate-400">{r.english_name}</div>}

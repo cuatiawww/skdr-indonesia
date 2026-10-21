@@ -227,7 +227,7 @@ export default function DiseaseDetailPanel({ open = true, disease, locations, di
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#0060A9]" />
+          <Activity className="h-4 w-4 text-primary" />
           <span className="text-sm font-bold text-slate-800">{tr("skdr.detail.disease_detail")}</span>
         </div>
         <button type="button" onClick={onClose} aria-label={tr("skdr.detail.close_disease_detail")}

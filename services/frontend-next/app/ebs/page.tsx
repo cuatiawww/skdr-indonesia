@@ -77,7 +77,7 @@ export default function EbsSyncPage() {
   const statusBadge = (s: string) =>
     s === 'sukses' ? <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />{t('skdr.ebs.statusOk')}</span>
       : s === 'gagal' ? <span className="inline-flex items-center gap-1 rounded-full border border-red-200/60 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700"><XCircle className="h-3 w-3" />{t('skdr.ebs.statusFail')}</span>
-      : <span className="inline-flex items-center gap-1 rounded-full border border-blue-200/60 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#0060A9]"><Loader2 className="h-3 w-3 animate-spin" />{t('skdr.ebs.statusRunning')}</span>
+      : <span className="inline-flex items-center gap-1 rounded-full border border-blue-200/60 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-primary"><Loader2 className="h-3 w-3 animate-spin" />{t('skdr.ebs.statusRunning')}</span>
 
   return (
     <div className="w-full space-y-6 bg-[#f8fafc] px-4 py-6 sm:px-6 lg:px-8">
@@ -93,7 +93,7 @@ export default function EbsSyncPage() {
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('skdr.master.refresh')}
           </button>
           <button onClick={syncNow} disabled={!!st?.running || !st?.key_configured}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#0060A9] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#004b85] disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-primary-dark disabled:opacity-50">
             {st?.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />} {st?.running ? t('skdr.ebs.running') : t('skdr.ebs.syncNow')}
           </button>
         </div>
@@ -102,7 +102,7 @@ export default function EbsSyncPage() {
       {st && !st.key_configured && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{t('skdr.ebs.noKey')}</div>}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className={card}><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t('skdr.ebs.rows')}</p><p className="mt-1 text-2xl font-bold text-[#0060A9]">{nf(tot?.rows ?? 0)}</p>
+        <div className={card}><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t('skdr.ebs.rows')}</p><p className="mt-1 text-2xl font-bold text-primary">{nf(tot?.rows ?? 0)}</p>
           <p className="text-[11px] text-slate-400">{tot?.first_date ?? '—'} s.d. {tot?.last_date ?? '—'}</p></div>
         <div className={card}><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t('skdr.ebs.cases')}</p><p className="mt-1 text-2xl font-bold text-slate-800">{nf(tot?.cases ?? 0)}</p>
           <p className="text-[11px] text-slate-400">{(st?.per_year || []).map((y) => `${y.year}: ${nf(y.rows)}`).join(' · ')}</p></div>
@@ -170,7 +170,7 @@ export default function EbsSyncPage() {
                   <td className="px-4 py-2 text-right font-mono">{nf(d.cases)}</td>
                   <td className="px-4 py-2">
                     <select value={d.disease_id ?? ''} onChange={(e) => mapDiag(d, e.target.value)}
-                      className="w-full max-w-xs rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-[#0060A9] focus:outline-none">
+                      className="w-full max-w-xs rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-primary focus:outline-none">
                       <option value="">{t('skdr.ebs.unmapped')}</option>
                       {diseases.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                     </select>

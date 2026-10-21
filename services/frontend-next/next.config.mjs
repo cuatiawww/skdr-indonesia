@@ -4,9 +4,9 @@ const cspDirectives = [
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://cloudflareinsights.com",
   "script-src-elem 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://server.arcgisonline.com https://services.arcgisonline.com https://*.arcgisonline.com https://gis.bnpb.go.id https://*.tile.opentopomap.org https://flagcdn.com https://*.tile.stamen.com https://*.stadiamaps.com https://purecatamphetamine.github.io https://gibs.earthdata.nasa.gov https://*.earthdata.nasa.gov https://*.inaturalist.org https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com https://*.gbif.org https://inaturalist-open-data.s3.amazonaws.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://server.arcgisonline.com https://services.arcgisonline.com https://*.arcgisonline.com https://gis.bnpb.go.id https://*.tile.opentopomap.org https://flagcdn.com https://*.tile.stamen.com https://*.stadiamaps.com https://purecatamphetamine.github.io https://*.inaturalist.org https://static.inaturalist.org https://inaturalist-open-data.s3.amazonaws.com https://*.gbif.org https://inaturalist-open-data.s3.amazonaws.com",
   "font-src 'self' data:",
-  "connect-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://server.arcgisonline.com https://services.arcgisonline.com https://*.arcgisonline.com https://gis.bnpb.go.id https://*.tile.opentopomap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://static.cloudflareinsights.com https://sipkk-new.mediaciptainformasi.co.id https://opsroom.sipongidata.my.id https://router.project-osrm.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://nominatim.openstreetmap.org https://gibs.earthdata.nasa.gov https://*.earthdata.nasa.gov https://api.gbif.org",
+  "connect-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://server.arcgisonline.com https://services.arcgisonline.com https://*.arcgisonline.com https://gis.bnpb.go.id https://*.tile.opentopomap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://static.cloudflareinsights.com https://sipkk-new.mediaciptainformasi.co.id https://opsroom.sipongidata.my.id https://router.project-osrm.org https://nominatim.openstreetmap.org https://api.gbif.org",
   "worker-src 'self' blob:",
   "child-src 'self' blob:",
   "frame-src 'self' https://lookerstudio.google.com https://datastudio.google.com",
@@ -31,8 +31,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/', destination: '/main-dashboard', permanent: false },
-      { source: '/tv', destination: '/main-dashboard', permanent: false },
+      // PR 016: '/' is now the Beranda (app/page.tsx) and '/tv' the MODE TV placeholder (app/tv/page.tsx).
     ];
   },
   async rewrites() {

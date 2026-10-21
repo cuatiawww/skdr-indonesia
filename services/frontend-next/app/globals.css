@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PR 016: theme tokens — Kemenkes logo palette (logo teal #06B8A5, cyan #05BBCC, lime #D7DF21).
+   Channels "R G B"; overridden at runtime from app_settings.theme_palette (migration 024). */
+:root {
+  --brand-50: 236 250 248;
+  --brand-100: 207 243 238;
+  --brand-200: 159 230 220;
+  --brand-300: 99 211 197;
+  --brand-400: 44 195 177;
+  --brand-500: 6 184 165;
+  --brand-600: 4 153 138;
+  --brand-700: 4 122 111;
+  --brand-800: 5 94 86;
+  --brand-900: 6 69 64;
+  --brand-accent: 5 187 204;
+  --brand-lime: 215 223 33;
+  --src-ebs: 232 113 10;
+  --src-pe: 10 143 163;
+  --scale-ebs-0: 255 241 230; --scale-ebs-1: 253 186 116; --scale-ebs-2: 249 115 22; --scale-ebs-3: 194 65 12; --scale-ebs-4: 124 45 18;
+  --scale-pe-0: 224 246 249; --scale-pe-1: 158 227 236; --scale-pe-2: 63 195 212; --scale-pe-3: 10 143 163; --scale-pe-4: 7 94 107;
+  --scale-all-0: 207 243 238; --scale-all-1: 99 211 197; --scale-all-2: 6 184 165; --scale-all-3: 4 122 111; --scale-all-4: 6 69 64;
+}
+
 /* Keep the reports matrix typography consistent with the main dashboard.
    The page still uses utility classes such as font-sans/font-mono for layout
    semantics, but both resolve to the application Roboto family here. */
@@ -31,7 +53,7 @@
 }
 .wind-stream {
   animation: windStream 5s linear infinite;
-  box-shadow: 0 0 5px rgba(0, 96, 169, 0.75);
+  box-shadow: 0 0 5px rgb(var(--brand-700) / 0.75);
 }
 .wind-stream-delay {
   animation: windStream 7s linear infinite reverse;
@@ -57,7 +79,7 @@
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background: #0284c7;
+  background: rgb(var(--brand-600));
   box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.35);
   animation: livePulse 2.4s ease-out infinite;
 }
@@ -339,3 +361,12 @@
     color: inherit !important;
   }
 }
+
+/* PR 016: skeleton shimmer in the Kemenkes palette (shared by components/ui/Skeleton.tsx). */
+.skdr-skeleton {
+  background: linear-gradient(90deg, rgb(var(--brand-50)) 0%, rgb(var(--brand-100)) 40%, rgb(var(--brand-50)) 80%);
+  background-size: 200% 100%;
+  animation: skdr-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skdr-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skdr-skeleton { animation: none; } }

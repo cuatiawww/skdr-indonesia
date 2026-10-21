@@ -6,6 +6,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Filter, MapPin, Map as MapIcon, CalendarDays, Bug, Calendar, CheckCircle2, RotateCcw, ChevronDown, AlertCircle, Radio } from 'lucide-react';
 import { getEpiWeekDateRange, getCurrentEpiWeek, formatEpiRangeDescription, getWeeksInYear } from '@/lib/epi-week';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
+import { SourceFilter } from '@/components/analytics/SourceBadge';
+import type { Sumber } from '@/lib/use-sumber';
 import { fetchProvinces, fetchKabkota, type MasterProvince, type MasterKabkota } from '@/lib/skdr-api';
 
 export interface SkdrFilterState {
@@ -29,12 +31,28 @@ interface Props {
   onChange: (filters: SkdrFilterState) => void;
   onApply: (filters: SkdrFilterState) => void;
   isLoading?: boolean;
+  /** PR 016: global Sumber (Semua/EBS/PE) rendered inside the bar; applies immediately. */
+  sumber?: string;
+  onSumberChange?: (v: Sumber) => void;
+  /** false on /penyakit/[kode] where the disease is fixed by the page. */
+  showDisease?: boolean;
+  /** hide the title/period header row (compact use). */
+  compact?: boolean;
 }
 
 const box =
-  'relative rounded-xl border border-slate-200 bg-slate-50 hover:bg-white focus-within:border-[#0060A9] focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition shadow-2xs';
-const sel = 'w-full appearance-none bg-transparent px-3 py-2 text-xs font-bold text-slate-800 outline-none cursor-pointer pr-8 disabled:cursor-not-allowed disabled:text-slate-400';
-const lbl = 'text-[10.5px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1';
+  'relative h-10 min-w-0 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-100 transition shadow-2xs';
+const sel = 'h-full w-full truncate appearance-none bg-transparent px-3 text-xs font-bold text-slate-800 outline-none cursor-pointer pr-8 disabled:cursor-not-allowed disabled:text-slate-400';
+const mini = 'h-8 min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent px-1 text-xs font-bold text-slate-800 outline-none hover:bg-white';
+const chev = 'pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400';
+// static class names so Tailwind can see them: key = <has Sumber><has Penyakit>
+const GRID: Record<string, string> = {
+  '11': 'lg:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '10': 'lg:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '01': 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '00': 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+};
+const lbl = 'flex h-4 items-center gap-1 truncate text-[10.5px] font-extrabold uppercase leading-none tracking-wider text-slate-700';
 
 export default function SkdrFilterBar({
   availableDiseases = [],
@@ -45,6 +63,10 @@ export default function SkdrFilterBar({
   onChange,
   onApply,
   isLoading = false,
+  sumber,
+  onSumberChange,
+  showDisease = true,
+  compact = false,
 }: Props) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<SkdrFilterState>(value);
@@ -110,9 +132,9 @@ export default function SkdrFilterBar({
 
   return (
     <section className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all relative">
-      <div className="flex flex-col gap-2 pb-3 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2.5 text-[#0060A9]">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#0060A9]">
+      {compact ? null : <div className="flex flex-col gap-2 pb-3 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2.5 text-primary">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-primary">
             <Filter className="h-4 w-4" />
           </div>
           <div>
@@ -121,183 +143,105 @@ export default function SkdrFilterBar({
           </div>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-900">
-            <Calendar className="h-3.5 w-3.5 text-[#0060A9]" />
-            <span className="font-extrabold text-[11px] text-[#0060A9]">
+          <div className="flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs text-brand-900">
+            <Calendar className="h-3.5 w-3.5 text-primary" />
+            <span className="font-extrabold text-[11px] text-primary">
               {formatEpiRangeDescription(draft.startYear, draft.startWeek, draft.endYear, draft.endWeek, 'id')}
             </span>
-            <span className="ml-1 rounded-md bg-[#0060A9] px-1.5 py-0.5 text-[9.5px] font-bold text-white">
+            <span className="ml-1 rounded-md bg-primary px-1.5 py-0.5 text-[9.5px] font-bold text-white">
               {t('skdr.filter.weeksBadge', { count: totalWeeks })}
             </span>
           </div>
         </div>
-      </div>
+      </div>}
 
-      <form onSubmit={apply} className="mt-4 space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(14,minmax(0,1fr))]">
-          <div className="lg:col-span-2 flex flex-col gap-1">
-            <label htmlFor="select-disease" className={lbl}>
-              <Bug className="h-3 w-3 text-red-500" />
-              {t('skdr.filter.disease')}
-            </label>
-            <div className={box}>
-              <select id="select-disease" value={draft.disease} onChange={(e) => setDraft({ ...draft, disease: e.target.value })} className={sel}>
-                <option value="all">{t('skdr.filter.allDiseases')}</option>
-                {diseaseOptions.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            </div>
-            <p className="text-[10px] text-slate-500 px-1 truncate">
-              {draft.disease === 'all' ? t('skdr.filter.allClassifications') : t('skdr.filter.selected', { value: draft.disease })}
-            </p>
-          </div>
-
-          <div className="lg:col-span-2 flex flex-col gap-1">
-            <label htmlFor="select-source" className={lbl}>
-              <Radio className="h-3 w-3 text-emerald-600" />
-              {t('skdr.filter.source')}
-            </label>
-            <div className={box}>
-              <select id="select-source" value={draft.source || 'all'} onChange={(e) => setDraft({ ...draft, source: e.target.value })} className={sel}>
-                <option value="all">{t('skdr.filter.sourceAll')}</option>
-                <option value="pe">{t('skdr.filter.sourcePe')}</option>
-                <option value="ebs">{t('skdr.filter.sourceEbs')}</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            </div>
-            <p className="text-[10px] text-slate-500 px-1 truncate">{t('skdr.filter.sourceHint')}</p>
-          </div>
-
-          <div className="lg:col-span-2 flex flex-col gap-1">
-            <label htmlFor="select-province" className={lbl}>
-              <MapIcon className="h-3 w-3 text-[#0060A9]" />
-              {t('skdr.filter.province')}
-            </label>
-            <div className={box}>
-              <select
-                id="select-province"
-                value={draft.provinceId ?? ''}
-                onChange={(e) => setDraft({ ...draft, provinceId: e.target.value ? Number(e.target.value) : null, kabkotaId: null })}
-                className={sel}
-              >
-                <option value="">{t('skdr.filter.allProvinces', { count: provinces.length || 38 })}</option>
-                {provinces.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            </div>
-            <p className="text-[10px] text-slate-500 px-1 truncate">{provinceName || t('skdr.filter.allIndonesia')}</p>
-          </div>
-
-          <div className="lg:col-span-2 flex flex-col gap-1">
-            <label htmlFor="select-kabkota" className={lbl}>
-              <MapPin className="h-3 w-3 text-emerald-600" />
-              {t('skdr.filter.kabkota')}
-            </label>
-            <div className={box}>
-              <select
-                id="select-kabkota"
-                value={draft.kabkotaId ?? ''}
-                disabled={!draft.provinceId}
-                onChange={(e) => setDraft({ ...draft, kabkotaId: e.target.value ? Number(e.target.value) : null })}
-                className={sel}
-              >
-                <option value="">
-                  {draft.provinceId ? t('skdr.filter.allKabkota', { count: kabkota.length }) : t('skdr.filter.chooseProvinceFirst')}
-                </option>
-                {kabkota.map((k) => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            </div>
-            <p className="text-[10px] text-slate-500 px-1 truncate">
-              {kabName ? t('skdr.filter.selected', { value: kabName }) : draft.provinceId ? t('skdr.filter.wholeProvince') : '—'}
-            </p>
-          </div>
-
-          {(['start', 'end'] as const).map((side) => {
-            const yKey = side === 'start' ? 'startYear' : 'endYear';
-            const wKey = side === 'start' ? 'startWeek' : 'endWeek';
-            return (
-              <div key={side} className="lg:col-span-2 flex flex-col gap-1">
-                <label className={lbl}>
-                  <CalendarDays className={`h-3 w-3 ${side === 'start' ? 'text-emerald-600' : 'text-blue-600'}`} />
-                  {t(side === 'start' ? 'skdr.filter.startWeek' : 'skdr.filter.endWeek')}
-                </label>
-                <div className="flex gap-1.5">
-                  <div className={`${box} flex-1`}>
-                    <select
-                      aria-label={t(side === 'start' ? 'skdr.filter.startWeekAria' : 'skdr.filter.endWeekAria')}
-                      value={draft[wKey]}
-                      onChange={(e) => setDraft({ ...draft, [wKey]: Number(e.target.value) })}
-                      className="w-full bg-transparent px-2 py-2 text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                    >
-                      {weeks(draft[yKey]).map((w) => (
-                        <option key={w} value={w}>{t('skdr.filter.weekShort', { week: w })}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={`${box} w-20`}>
-                    <select
-                      aria-label={t(side === 'start' ? 'skdr.filter.startYearAria' : 'skdr.filter.endYearAria')}
-                      value={draft[yKey]}
-                      onChange={(e) => setDraft({ ...draft, [yKey]: Number(e.target.value) })}
-                      className="w-full bg-transparent px-2 py-2 text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                    >
-                      {years.map((y) => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <p
-                  className={`text-[9.5px] font-medium rounded-md px-1.5 py-0.5 mt-0.5 truncate border ${
-                    side === 'start' ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-blue-800 bg-blue-50 border-blue-200'
-                  }`}
-                >
-                  📅 {side === 'start' ? startRange.startFormatted : endRange.endFormatted}
-                </p>
+      {/* PR 016: one tidy row — every control is h-10 under a one-line label (no helper text below fields; full
+          names live in the title tooltip). Sumber is part of the bar; Awal/Akhir are one "Periode (Minggu Epi)" control. */}
+      <form onSubmit={apply} className={compact ? "space-y-3" : "mt-4 space-y-3"} data-testid="skdr-filter-bar">
+        <div className={`grid grid-cols-1 items-end gap-3 sm:grid-cols-2 ${GRID[`${onSumberChange ? 1 : 0}${showDisease ? 1 : 0}`]}`}>
+          {onSumberChange ? (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className={lbl}><Radio className="h-3 w-3 text-primary" />{t('skdr.source.filter')}</span>
+              <div className="[&>div]:flex [&>div]:h-10 [&>div]:w-full [&>div]:items-stretch [&_button]:flex-1 [&_button]:justify-center">
+                <SourceFilter value={sumber || 'all'} onChange={onSumberChange} />
               </div>
-            );
-          })}
+            </div>
+          ) : null}
 
-          <div className="lg:col-span-2 flex items-end gap-1.5 pb-0.5">
-            <button
-              type="submit"
-              id="btn-apply-filter"
-              disabled={isLoading || invalid}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0060A9] hover:bg-[#004e8a] active:bg-[#003c6b] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white border border-[#004e8a] shadow-xs transition active:scale-98 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-            >
-              {isLoading ? (
-                <>
-                  <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>{t('common.loading')}</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>{t('skdr.filter.apply')}</span>
-                </>
-              )}
+          {showDisease ? (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label htmlFor="select-disease" className={lbl}><Bug className="h-3 w-3 text-primary" />{t('skdr.filter.disease')}</label>
+              <div className={box} title={draft.disease === 'all' ? t('skdr.filter.allClassifications') : draft.disease}>
+                <select id="select-disease" value={draft.disease} onChange={(e) => setDraft({ ...draft, disease: e.target.value })} className={sel}>
+                  <option value="all">{t('skdr.filter.allDiseases')}</option>
+                  {diseaseOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <ChevronDown className={chev} />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor="select-province" className={lbl}><MapIcon className="h-3 w-3 text-primary" />{t('skdr.filter.province')}</label>
+            <div className={box} title={provinceName || t('skdr.filter.allIndonesia')}>
+              <select id="select-province" value={draft.provinceId ?? ''} className={sel}
+                onChange={(e) => setDraft({ ...draft, provinceId: e.target.value ? Number(e.target.value) : null, kabkotaId: null })}>
+                <option value="">{t('skdr.filter.allProvinces', { count: provinces.length || 38 })}</option>
+                {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <ChevronDown className={chev} />
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor="select-kabkota" className={lbl}><MapPin className="h-3 w-3 text-primary" />{t('skdr.filter.kabkota')}</label>
+            <div className={box} title={kabName || (draft.provinceId ? t('skdr.filter.wholeProvince') : t('skdr.filter.chooseProvinceFirst'))}>
+              <select id="select-kabkota" value={draft.kabkotaId ?? ''} disabled={!draft.provinceId} className={sel}
+                onChange={(e) => setDraft({ ...draft, kabkotaId: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">{draft.provinceId ? t('skdr.filter.allKabkota', { count: kabkota.length }) : t('skdr.filter.chooseProvinceFirst')}</option>
+                {kabkota.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+              </select>
+              <ChevronDown className={chev} />
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+            <span className={lbl}><CalendarDays className="h-3 w-3 text-primary" />{t('skdr.filter.epiRange')}</span>
+            <div className={`${box} flex h-10 items-center gap-1 px-2`} title={`${startRange.startFormatted} – ${endRange.endFormatted}`} data-testid="epi-range">
+              {(['start', 'end'] as const).map((side) => {
+                const yKey = side === 'start' ? 'startYear' : 'endYear';
+                const wKey = side === 'start' ? 'startWeek' : 'endWeek';
+                return (
+                  <React.Fragment key={side}>
+                    {side === 'end' ? <span className="px-1 text-xs font-bold text-slate-400">–</span> : null}
+                    <select aria-label={t(side === 'start' ? 'skdr.filter.startWeekAria' : 'skdr.filter.endWeekAria')} value={draft[wKey]}
+                      onChange={(e) => setDraft({ ...draft, [wKey]: Number(e.target.value) })} className={mini}>
+                      {weeks(draft[yKey]).map((w) => <option key={w} value={w}>{t('skdr.filter.weekShort', { week: w })}</option>)}
+                    </select>
+                    <select aria-label={t(side === 'start' ? 'skdr.filter.startYearAria' : 'skdr.filter.endYearAria')} value={draft[yKey]}
+                      onChange={(e) => setDraft({ ...draft, [yKey]: Number(e.target.value) })} className={mini}>
+                      {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1 lg:justify-end">
+            <button type="submit" id="btn-apply-filter" disabled={isLoading || invalid}
+              className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-primary-dark bg-primary px-5 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition hover:bg-primary-dark active:bg-brand-900 disabled:pointer-events-none disabled:opacity-50 lg:flex-none">
+              {isLoading ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              <span>{isLoading ? t('common.loading') : t('skdr.filter.apply')}</span>
             </button>
-            <button
-              type="button"
-              id="btn-reset-filter"
-              onClick={reset}
-              title={t('skdr.filter.resetTitle')}
-              aria-label={t('skdr.filter.resetTitle')}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition active:scale-98 shadow-xs cursor-pointer shrink-0"
-            >
+            <button type="button" id="btn-reset-filter" onClick={reset} title={t('skdr.filter.resetTitle')} aria-label={t('skdr.filter.resetTitle')}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-600 shadow-xs transition hover:bg-slate-200 hover:text-slate-900">
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
         {invalid && (
-          <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-2 text-xs text-red-700">
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{t('skdr.filter.invalidRange')}</span>
           </div>

@@ -81,7 +81,7 @@ export default function Pagination({
               onClick={() => onGoTo(p)}
               className={`min-w-[28px] h-7 rounded-lg px-2 text-xs font-semibold transition cursor-pointer ${
                 p === page
-                  ? 'bg-[#0060A9] text-white shadow-2xs'
+                  ? 'bg-primary text-white shadow-2xs'
                   : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
               }`}
             >

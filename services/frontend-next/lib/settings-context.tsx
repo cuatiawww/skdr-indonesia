@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { SidebarGroupConfig, DEFAULT_NAVIGATION_CONFIG, ensureBorderCountriesMenu } from '@/lib/menu';
 import { setNavigationCache } from '@/lib/auth';
 import { PUBLIC_BASE_PATH } from '@/lib/public-path';
+import { applyPalette } from '@/lib/theme';
 
 export interface SystemSettings {
   app_name: string;
@@ -62,6 +63,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             ? ensureBorderCountriesMenu(config.navigation_menu)
             : DEFAULT_SETTINGS.navigation_menu;
           setNavigationCache(navMenu);
+          // PR 016: theme colours live in app_settings.theme_palette (migration 024); CSS defaults in globals.css.
+          try {
+            const pal = typeof config.theme_palette === 'string' ? JSON.parse(config.theme_palette) : config.theme_palette;
+            applyPalette(pal);
+          } catch {
+            // keep CSS defaults
+          }
           setSettings({
             ...DEFAULT_SETTINGS,
             ...config,

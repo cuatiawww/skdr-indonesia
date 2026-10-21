@@ -32,7 +32,7 @@ export function FieldView({ f, value, onChange, setOther, ctx, path }: {
   const showOther = f.other && (Array.isArray(value) ? value.includes(f.other.value) : value === f.other.value)
   const wide = ['table', 'multiselect', 'textarea', 'info', 'cluster_monitoring'].includes(f.type) || (f.label?.length ?? 0) > 70
 
-  if (f.type === 'info') return <div className="col-span-full rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs font-medium text-[#0060A9]">{f.label}</div>
+  if (f.type === 'info') return <div className="col-span-full rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs font-medium text-primary">{f.label}</div>
   if (f.type === 'cluster_monitoring') return (
     <div className="col-span-full space-y-2">
       <div className={lbl}>{f.label}</div>
@@ -80,7 +80,7 @@ export function FieldView({ f, value, onChange, setOther, ctx, path }: {
             return (
               <label key={o} className={`flex cursor-pointer items-start gap-2 text-sm leading-snug ${ctx.disabled ? 'cursor-not-allowed opacity-60' : ''} ${on ? 'font-medium text-slate-900' : 'text-slate-700'}`}>
                 <input type="checkbox" checked={on} disabled={ctx.disabled} onChange={() => toggle(o)} onBlur={blur}
-                  className={`mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-[#0060A9] ${bad ? 'outline outline-1 outline-red-400' : ''}`} />
+                  className={`mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-primary ${bad ? 'outline outline-1 outline-red-400' : ''}`} />
                 <span>{o}{o === f.exclusive ? <span className="ml-1 text-[11px] text-slate-400">(tidak bisa digabung)</span> : null}</span>
               </label>
             )
@@ -113,7 +113,7 @@ export function FieldView({ f, value, onChange, setOther, ctx, path }: {
             <option value="">{t('skdr.pe.noCluster')}</option>
             {ctx.clusters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          {!ctx.disabled && <button type="button" onClick={ctx.onNewCluster} className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-[#0060A9] hover:bg-blue-50">{t('skdr.pe.newCluster')}</button>}
+          {!ctx.disabled && <button type="button" onClick={ctx.onNewCluster} className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-primary hover:bg-blue-50">{t('skdr.pe.newCluster')}</button>}
         </div>
       ); break
     case 'ebs':
@@ -168,7 +168,7 @@ function TableField({ f, rows, onChange, ctx, path }: { f: PeField; rows: Data[]
         </div>
       ))}
       {!ctx.disabled && (
-        <button type="button" onClick={() => onChange([...rows, {}])} className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[#0060A9]/40 bg-white px-3 py-2 text-xs font-semibold text-[#0060A9] hover:bg-blue-50">
+        <button type="button" onClick={() => onChange([...rows, {}])} className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-white px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
           <Plus className="h-3.5 w-3.5" /> {t('skdr.pe.addRow')}
         </button>
       )}
