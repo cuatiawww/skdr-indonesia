@@ -1,15 +1,31 @@
 'use client'
 
-import { useSettings } from '@/lib/settings-context'
+import { Globe2, Mail, MessageCircle } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/LanguageContext'
 
-export default function Footer() {
-  const { settings } = useSettings()
+const links=[['Instagram','https://www.instagram.com/kemenkes_ri'],['YouTube','https://www.youtube.com/KementerianKesehatanRI'],['WhatsApp','https://wa.me/628111500567'],['Email','mailto:kontak@kemkes.go.id'],['Website','https://kemkes.go.id']]
+
+export default function Footer(){
+  const { t } = useTranslation();
   return (
     <footer className="border-t border-blue-100 bg-white">
-      <div className="h-1 bg-gradient-to-r from-[#0060A9] via-[#1a78c2] to-transparent" />
-      <div className="flex min-h-16 w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <p className="text-xs text-slate-500">© {new Date().getFullYear()} {settings.footer_text}</p>
+      <div className="h-1 bg-gradient-to-r from-[#0060A9] via-[#1a78c2] to-transparent"/>
+      <div className="flex min-h-16 w-full flex-col items-center justify-between gap-3 px-4 py-3 sm:px-6 md:flex-row">
+        <p className="text-center text-xs text-slate-500 md:text-left">
+          {t("footer.copyright")}
+        </p>
+        <nav>
+          <ul className="flex items-center gap-1.5">
+            {links.map(([label,href],i)=>(
+              <li key={label}>
+                <a href={href} target={href.startsWith('http')?'_blank':undefined} rel="noopener noreferrer" aria-label={label} title={label} className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-blue-50/70 text-[#0060A9] transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-[#0060A9] hover:text-white">
+                  {i===2?<MessageCircle className="h-4 w-4"/>:i===3?<Mail className="h-4 w-4"/>:<Globe2 className="h-4 w-4"/>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </footer>
-  )
+  );
 }

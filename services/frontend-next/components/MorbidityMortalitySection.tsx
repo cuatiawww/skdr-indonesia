@@ -1,0 +1,490 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Activity,
+  AlertCircle,
+  AlertOctagon,
+  ArrowRight,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Filter,
+  Flame,
+  HelpCircle,
+  Info,
+  Percent,
+  RefreshCw,
+  Skull,
+  TrendingDown,
+  Users,
+} from 'lucide-react';
+import {
+  fetchMorbidityMortality,
+  MorbidityMortalityResponse,
+  WeeklyMorbidityMortality,
+  DiseaseMorbidityMortality,
+} from '@/lib/api';
+import { EpiFilterState } from './EpiFilterBar';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from 'recharts';
+
+interface MorbidityMortalitySectionProps {
+  filters: EpiFilterState;
+  surveillanceMode?: string;
+  prototypeMode?: boolean;
+  dateDetail?: string;
+}
+
+export default function MorbidityMortalitySection({
+  filters,
+  surveillanceMode,
+  prototypeMode,
+  dateDetail,
+}: MorbidityMortalitySectionProps) {
+  const [data, setData] = useState<MorbidityMortalityResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const isIbs = surveillanceMode === 'IBS';
+  const [chartView, setChartView] = useState<'news_coverage' | 'cases_deaths'>(
+    isIbs ? 'cases_deaths' : (prototypeMode || surveillanceMode === 'EBS' ? 'news_coverage' : 'cases_deaths')
+  );
+
+  useEffect(() => {
+    if (isIbs) {
+      setChartView('cases_deaths');
+    } else if (prototypeMode || surveillanceMode === 'EBS') {
+      setChartView('news_coverage');
+    }
+  }, [isIbs, prototypeMode, surveillanceMode]);
+  const loadData = async (activeFilters: EpiFilterState) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchMorbidityMortality({
+        country: activeFilters.country,
+        disease: activeFilters.disease,
+        start_year: activeFilters.startYear,
+        start_week: activeFilters.startWeek,
+        end_year: activeFilters.endYear,
+        end_week: activeFilters.endWeek,
+      });
+      setData(res);
+    } catch (err: any) {
+      console.error('Failed to load morbidity and mortality:', err);
+      setError(err?.message || 'Failed to load morbidity and mortality data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData(filters);
+  }, [filters]);
+
+  const formatCompact = (num: number): string => {
+    const value = Number(num);
+    if (!Number.isFinite(value)) return '0';
+    if (value >= 1_000_000) return (value / 1_000_000).toFixed(1) + 'M';
+    if (value >= 1_000) return (value / 1_000).toFixed(value >= 10_000 ? 0 : 1) + 'K';
+    return value.toLocaleString('en-US');
+  };
+
+  // CFR is a percentage: keep stale or inconsistent source values display-safe.
+  const normalizeCfr = (value: number): number => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    return Math.min(100, Math.max(0, numeric));
+  };
+
+  // Max values for relative horizontal bars in top diseases list
+  const maxCasesInList = useMemo(() => {
+    if (!data?.top_diseases || data.top_diseases.length === 0) return 1;
+    return Math.max(...data.top_diseases.map((d) => d.total_cases), 1);
+  }, [data]);
+
+  const maxDeathsInList = useMemo(() => {
+    if (!data?.top_diseases || data.top_diseases.length === 0) return 1;
+    return Math.max(...data.top_diseases.map((d) => d.total_deaths), 1);
+  }, [data]);
+
+  const latestWeekPoint = useMemo(() => {
+    if (!data?.weekly_trends || data.weekly_trends.length === 0) return null;
+    return data.weekly_trends[data.weekly_trends.length - 1];
+  }, [data]);
+
+  return (
+    <section className="mt-6 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white via-white to-slate-50/50 p-5 lg:p-7 shadow-sm">
+      {/* ?? Top Header Bar ?? */}
+      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <h2 className="text-xl font-black tracking-tight text-slate-900 lg:text-2xl uppercase">
+            Case & Fatality Overview
+          </h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500 lg:text-sm">
+            Provides an overview of reported cases and deaths, highlighting trends, impact, affected populations, and changes across monitored ASEAN countries over time.
+          </p>
+          {dateDetail && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#0060A9]">
+              <Calendar className="h-3.5 w-3.5 text-[#0060A9]" />
+              <span>Periode: {dateDetail}</span>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* â”€â”€ 3 Big Stat KPI Cards â”€â”€ */}
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 lg:gap-4">
+        {/* Card 1: TOTAL MORBIDITY */}
+        <div className="flex flex-col justify-between rounded-xl border border-sky-200/80 bg-gradient-to-br from-white to-sky-50/40 p-4 shadow-xs">
+          <div className="text-[11px] font-black uppercase tracking-wider text-sky-800">Total Morbidity</div>
+          <div className="my-1 text-3xl sm:text-4xl font-black tracking-tight text-slate-900 truncate">{data ? formatCompact(data.summary?.total_morbidity) : '...'}</div>
+          <div className="text-[11px] font-semibold text-slate-500">Total Detected Cases</div>
+        </div>
+        {/* Card 2: TOTAL MORTALITY */}
+        <div className="flex flex-col justify-between rounded-xl border border-rose-200/80 bg-gradient-to-br from-white to-rose-50/40 p-4 shadow-xs">
+          <div className="text-[11px] font-black uppercase tracking-wider text-rose-800">Total Mortality</div>
+          <div className="my-1 text-3xl sm:text-4xl font-black tracking-tight text-rose-700 truncate">{data ? formatCompact(data.summary?.total_mortality) : '...'}</div>
+          <div className="text-[11px] font-semibold text-slate-500">Total Reported Deaths</div>
+        </div>
+        {/* Card 3: CFR (Case Fatality Rate) */}
+        <div className="flex flex-col justify-between rounded-xl border border-amber-200/80 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-xs">
+          <div className="text-[11px] font-black uppercase tracking-wider text-amber-800">Case Fatality Rate (CFR)</div>
+          <div className="my-1 text-3xl sm:text-4xl font-black tracking-tight text-amber-900">{data ? `${normalizeCfr(data.summary?.cfr_pct).toFixed(2)}%` : '...'}</div>
+          <div className="text-[11px] font-semibold text-slate-500">Case Fatality Ratio</div>
+        </div>
+      </div>
+
+      {/* ?? Main Dual Section: Weekly Case Trend (Center) & Top Health Topics Cases vs Deaths (Right) ?? */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* CENTER / LEFT: Weekly Trend of Morbidity & Mortality (Dual Y-Axis Area + Line) */}
+        <div className="lg:col-span-7 flex flex-col rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+            <div>
+              <h3 className="text-sm font-black text-slate-900">
+                {chartView === 'news_coverage' ? 'Total of News Coverage' : 'Monthly Case & Fatality Trend'}
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {chartView === 'news_coverage'
+                  ? 'Monthly volume of health surveillance news coverage and outbreak media reports'
+                  : 'Monthly case dynamics (left axis) versus deaths (right axis) within the selected range'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              {prototypeMode && !isIbs && (
+                <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setChartView('news_coverage')}
+                    className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${
+                      chartView === 'news_coverage'
+                        ? 'bg-white text-sky-700 shadow-xs border border-slate-200/80 font-bold'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    News Coverage
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartView('cases_deaths')}
+                    className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${
+                      chartView === 'cases_deaths'
+                        ? 'bg-white text-sky-700 shadow-xs border border-slate-200/80 font-bold'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Cases & Deaths
+                  </button>
+                </div>
+              )}
+              {chartView === 'news_coverage' ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">
+                    Total News: {formatCompact(data?.summary?.total_news_coverage ?? 0)}
+                  </span>
+                  {latestWeekPoint && (
+                    <span className="hidden sm:inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                      Latest: {formatCompact(latestWeekPoint.news_coverage ?? 0)} articles
+                    </span>
+                  )}
+                </div>
+              ) : latestWeekPoint && (
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">
+                    Cases: {formatCompact(latestWeekPoint.morbidity)}
+                  </span>
+                  <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                    Deaths: {formatCompact(latestWeekPoint.mortality)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Chart View (News Coverage or Dual Y-Axis Case/Fatality) */}
+          <div className="mt-4 h-80 w-full">
+            {loading ? (
+              <div className="flex h-full items-center justify-center">
+                <RefreshCw className="h-6 w-6 animate-spin text-sky-600" />
+              </div>
+            ) : error ? (
+              <div className="flex h-full items-center justify-center text-xs text-rose-600">
+                {error}
+              </div>
+            ) : chartView === 'news_coverage' ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={data?.weekly_trends || []}
+                  margin={{ top: 15, right: 15, left: -5, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorNewsCoverage" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis
+                    dataKey="week_label"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={{ stroke: '#cbd5e1' }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#0284c7' }}
+                    axisLine={{ stroke: '#0284c7' }}
+                    tickFormatter={(v) => formatCompact(v)}
+                  />
+                  <Tooltip
+                    formatter={(val: any) => [
+                      Number(val).toLocaleString('en-US') + ' articles',
+                      'Total News Coverage',
+                    ]}
+                    labelFormatter={(label) => `Month: ${label}`}
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="news_coverage"
+                    name="Total of News Coverage"
+                    fill="url(#colorNewsCoverage)"
+                    stroke="#0284c7"
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: '#0284c7' }}
+                    activeDot={{ r: 6 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={data?.weekly_trends || []}
+                  margin={{ top: 15, right: 15, left: -5, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorMorbidity" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0284c7" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis
+                    dataKey="week_label"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    axisLine={{ stroke: '#cbd5e1' }}
+                  />
+                  {/* Left Y-Axis for Morbidity (Cases) */}
+                  <YAxis
+                    yAxisId="left"
+                    orientation="left"
+                    tick={{ fontSize: 11, fill: '#0284c7' }}
+                    axisLine={{ stroke: '#0284c7' }}
+                    tickFormatter={(v) => formatCompact(v)}
+                  />
+                  {/* Right Y-Axis for Mortality (Deaths) */}
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: '#e11d48' }}
+                    axisLine={{ stroke: '#e11d48' }}
+                    tickFormatter={(v) => formatCompact(v)}
+                  />
+                  <Tooltip
+                    formatter={(val: any, name: any) => [
+                      Number(val).toLocaleString('en-US'),
+                      String(name).toLowerCase().includes('morbidity') || name === 'morbidity'
+                        ? 'Morbidity (Cases)'
+                        : 'Mortality (Deaths)',
+                    ]}
+                    labelFormatter={(label) => `Month: ${label}`}
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="morbidity"
+                    name="Morbidity (Cases)"
+                    fill="url(#colorMorbidity)"
+                    stroke="#0284c7"
+                    strokeWidth={2.5}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="mortality"
+                    name="Mortality (Deaths)"
+                    stroke="#e11d48"
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: '#e11d48' }}
+                    activeDot={{ r: 6 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {chartView === 'news_coverage' ? (
+            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2.5">
+              <span className="flex items-center gap-1.5 text-sky-700 font-semibold">
+                <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                Aggregated monthly health news coverage & epidemic intelligence reports
+              </span>
+              <span className="text-slate-400">
+                {data?.weekly_trends?.length ?? 0} Months Monitored
+              </span>
+            </div>
+          ) : (
+            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2.5">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[#0284c7]" />
+                Left Axis (Blue): Monthly Case Volume
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[#e11d48]" />
+                Right Axis (Red): Monthly Death Volume
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: Top Health Topics by Total Cases and Deaths (Butterfly Comparative Bar Chart) */}
+        <div className="lg:col-span-5 flex flex-col rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Top Health Topics by Cases & Deaths
+                </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Comparative case-versus-death ratio by health topic
+              </p>
+            </div>
+          </div>
+
+          {/* Table Header Columns */}
+          <div className="mt-3 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400 px-1 border-b border-slate-100 pb-1.5">
+            <span className="w-1/3">Health Topics</span>
+            <span className="w-1/3 text-center text-sky-700 font-bold">Total Cases</span>
+            <span className="w-1/3 text-right text-rose-700 font-bold">Total Deaths</span>
+          </div>
+
+          {/* Comparative Rows */}
+          <div className="mt-2 flex flex-col divide-y divide-slate-100 overflow-y-auto max-h-[320px] pr-1">
+            {data?.top_diseases.map((d) => {
+              const casesPct = Math.max(Math.round((d.total_cases / maxCasesInList) * 100), 2);
+              const deathsPct = Math.max(Math.round((d.total_deaths / maxDeathsInList) * 100), 2);
+              const cfr = normalizeCfr(d.cfr_pct);
+
+              return (
+                <div
+                  key={d.disease}
+                  className="py-2 px-1 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  {/* Top row: Health topic name + CFR badge */}
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                    <span className="truncate max-w-[170px]">{d.disease}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.2 text-[10px] font-black ${
+                        cfr > 5
+                          ? 'bg-rose-100 text-rose-700'
+                          : cfr > 0
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      CFR: {cfr.toFixed(2)}%
+                    </span>
+                  </div>
+
+                  {/* Bottom comparative bars */}
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    {/* Left Bar (Cases) */}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-sky-500"
+                          style={{ width: `${casesPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-sky-800 font-mono">
+                        {formatCompact(d.total_cases)} cases
+                      </span>
+                    </div>
+
+                    {/* Right Bar (Deaths) */}
+                    <div className="flex flex-col gap-0.5 text-right">
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex justify-end">
+                        <div
+                          className="h-full rounded-full bg-rose-500"
+                          style={{ width: `${deathsPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-rose-800 font-mono">
+                        {formatCompact(d.total_deaths)} deaths
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2">
+            <span>Health topics are scoped by the integrated filter above.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

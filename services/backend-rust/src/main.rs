@@ -1,4 +1,5 @@
 mod case_reports;
+mod dashboard;
 mod db;
 mod master;
 
@@ -40,11 +41,21 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
-        .route("/api/v1/settings", get(master::settings))
+        // settings + master data
+        .route("/api/v1/console/settings", get(master::console_settings))
+        .route("/api/v1/master/regions", get(master::regions))
+        .route("/api/v1/master/countries", get(master::countries))
         .route("/api/v1/master/diseases", get(master::diseases))
         .route("/api/v1/master/locations", get(master::locations))
+        .route("/api/v1/disease-concepts", get(master::disease_concepts))
+        // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
-        .route("/api/v1/dashboard/summary", get(case_reports::summary))
+        // main dashboard (NLP shapes, form data only)
+        .route("/api/v1/public-dashboard", get(dashboard::public_dashboard))
+        .route("/api/v1/kpi-snapshot", get(dashboard::kpi_snapshot))
+        .route("/api/v1/crawling-stats", get(dashboard::crawling_stats))
+        .route("/api/v1/crawling-stats/live", get(dashboard::crawling_stats_live))
+        .route("/api/v1/crawl-history/summary", get(dashboard::crawl_history_summary))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
         .with_state(AppState { pool });
 

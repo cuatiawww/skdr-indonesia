@@ -1,0 +1,447 @@
+//! NLP-PENYAKIT main-dashboard endpoints (same JSON shape), fed only by form case reports.
+use axum::{extract::{Query, State}, Json};
+use chrono::{Datelike, Duration, NaiveDate};
+use deadpool_postgres::Object;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use tokio_postgres::types::ToSql;
+
+use crate::{internal, ApiError, AppState};
+
+#[derive(Deserialize, Default, Clone)]
+pub struct DashQuery {
+    pub country: Option<String>,
+    pub scope: Option<String>,
+    pub disease: Option<String>,
+    pub start_year: Option<i32>,
+    pub start_week: Option<i32>,
+    pub end_year: Option<i32>,
+    pub end_week: Option<i32>,
+}
+
+/// MMWR week 1 starts on the Sunday on or before 4 January.
+pub fn mmwr_week_start(year: i32, week: i32) -> NaiveDate {
+    let jan4 = NaiveDate::from_ymd_opt(year, 1, 4).unwrap();
+    let back = jan4.weekday().num_days_from_sunday() as i64;
+    jan4 - Duration::days(back) + Duration::days(((week.max(1) - 1) as i64) * 7)
+}
+
+pub fn current_mmwr(today: NaiveDate) -> (i32, i32) {
+    for y in [today.year() + 1, today.year(), today.year() - 1] {
+        let s = mmwr_week_start(y, 1);
+        if today >= s {
+            return (y, ((today - s).num_days() / 7 + 1) as i32);
+        }
+    }
+    (today.year(), 1)
+}
+
+pub struct Resolved {
+    start: Option<NaiveDate>,
+    end: Option<NaiveDate>,
+    iso2: Option<Vec<String>>,
+    disease: Option<String>,
+    scope: String,
+}
+
+impl Resolved {
+    fn params(&self) -> [&(dyn ToSql + Sync); 4] {
+        [&self.start, &self.end, &self.iso2, &self.disease]
+    }
+    fn params_no_dates(&self) -> [&(dyn ToSql + Sync); 4] {
+        const NONE: Option<NaiveDate> = None;
+        [&NONE, &NONE, &self.iso2, &self.disease]
+    }
+    fn filter_key(&self) -> String {
+        format!(
+            "{}|{}|{}|{}",
+            self.start.map(|d| d.to_string()).unwrap_or_default(),
+            self.end.map(|d| d.to_string()).unwrap_or_default(),
+            self.scope,
+            self.disease.clone().unwrap_or_else(|| "all".into())
+        )
+    }
+}
+
+const LOC: &str = "COALESCE(NULLIF(r.location_name, ''), l.name, c.name, 'Unknown')";
+
+fn base() -> String {
+    "FROM case_reports r
+     JOIN master_diseases d ON d.id = r.disease_id
+     LEFT JOIN master_countries c ON c.id = r.country_id
+     LEFT JOIN master_locations l ON l.id = r.location_id
+     WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
+       AND ($3::text[] IS NULL OR c.iso2 = ANY($3)) AND ($4::text IS NULL OR d.name = $4)"
+        .to_string()
+}
+
+async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiError> {
+    let start = match (q.start_year, q.start_week) {
+        (Some(y), Some(w)) => Some(mmwr_week_start(y, w)),
+        _ => None,
+    };
+    let end = match (q.end_year, q.end_week) {
+        (Some(y), Some(w)) => Some(mmwr_week_start(y, w) + Duration::days(6)),
+        _ => None,
+    };
+    let disease = q.disease.clone().map(|d| d.trim().to_string()).filter(|d| !d.is_empty() && d.to_lowercase() != "all");
+
+    let raw = q.country.clone().unwrap_or_default().trim().to_string();
+    let lower = raw.to_lowercase();
+    let default_scope = lower.is_empty() || ["all", "asean", "asean11", "asean_11"].contains(&lower.as_str());
+    let token = if default_scope {
+        q.scope.clone().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).unwrap_or_else(|| "asean".into())
+    } else {
+        lower.clone()
+    };
+    let token = if token == "asean11" || token == "asean_11" { "asean".to_string() } else { token };
+    if token == "global" || token == "world" {
+        return Ok(Resolved { start, end, iso2: None, disease, scope: "global".into() });
+    }
+    let region = c
+        .query_opt(
+            "SELECT code FROM master_regions WHERE lower(code) = $1 OR lower(name) = $1 OR lower(replace(code, '_', '')) = $1",
+            &[&token],
+        )
+        .await
+        .map_err(internal)?;
+    if let Some(r) = region {
+        let code: String = r.get(0);
+        if code == "GLOBAL" {
+            return Ok(Resolved { start, end, iso2: None, disease, scope: "global".into() });
+        }
+        let rows = c
+            .query(
+                "SELECT c.iso2 FROM master_country_regions cr JOIN master_countries c ON c.id = cr.country_id
+                 JOIN master_regions r ON r.id = cr.region_id WHERE r.code = $1",
+                &[&code],
+            )
+            .await
+            .map_err(internal)?;
+        return Ok(Resolved { start, end, iso2: Some(rows.iter().map(|r| r.get(0)).collect()), disease, scope: code.to_lowercase() });
+    }
+    let names: Vec<String> = raw.split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
+    let rows = c
+        .query(
+            "SELECT iso2 FROM master_countries WHERE lower(name) = ANY($1) OR lower(iso2) = ANY($1) OR lower(iso3) = ANY($1)",
+            &[&names],
+        )
+        .await
+        .map_err(internal)?;
+    Ok(Resolved { start, end, iso2: Some(rows.iter().map(|r| r.get(0)).collect()), disease, scope: raw })
+}
+
+async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
+    let sql = format!(
+        "SELECT COALESCE(SUM(r.cases),0)::bigint, COALESCE(SUM(r.deaths),0)::bigint, COUNT(*)::bigint,
+                COALESCE(SUM(r.cases) FILTER (WHERE r.is_reviewed),0)::bigint,
+                COALESCE(SUM(r.deaths) FILTER (WHERE r.is_reviewed),0)::bigint,
+                COUNT(*) FILTER (WHERE r.is_reviewed)::bigint,
+                COUNT(DISTINCT COALESCE(c.name,'') || '|' || {LOC})::bigint,
+                COUNT(DISTINCT COALESCE(c.name,'') || '|' || {LOC}) FILTER (WHERE r.latitude IS NOT NULL AND r.longitude IS NOT NULL)::bigint
+         {}",
+        base()
+    );
+    let r = c.query_one(&sql, &f.params()).await.map_err(internal)?;
+    let master: i64 = c
+        .query_one("SELECT COUNT(*)::bigint FROM master_locations WHERE is_active", &[])
+        .await
+        .map_err(internal)?
+        .get(0);
+    let (cases, deaths, events): (i64, i64, i64) = (r.get(0), r.get(1), r.get(2));
+    let (cr, dr, er): (i64, i64, i64) = (r.get(3), r.get(4), r.get(5));
+    let (locs, mapped): (i64, i64) = (r.get(6), r.get(7));
+    Ok(json!({
+        "cases": cases, "deaths": deaths, "events": events,
+        "cases_reviewed": cr, "cases_unreviewed": cases - cr,
+        "deaths_reviewed": dr, "deaths_unreviewed": deaths - dr,
+        "events_reviewed": er, "events_unreviewed": events - er,
+        "locations": locs, "locations_mapped": mapped, "locations_unmapped": locs - mapped,
+        "active_locations": locs, "active_alerts": 0, "location_master_count": master,
+        "locations_definition": "distinct_location_name", "kpi_source": "live_query",
+        "scope": f.scope, "scope_label": f.scope,
+        "snapshot_computed_at": chrono::Utc::now().to_rfc3339(), "snapshot_filter_key": f.filter_key(), "snapshot_stale": false,
+    }))
+}
+
+fn outbreak(
+    country: String, loc: String, province: Option<String>, disease: String, lat: Option<f64>, lng: Option<f64>,
+    cases: i64, deaths: i64, events: i64, case_date: String, created: String, reviewed: bool, detail: Value,
+) -> Value {
+    json!({
+        "location_name": loc, "disease": disease, "country": country, "province": province, "city": null,
+        "latitude": lat, "longitude": lng, "cases": cases, "deaths": deaths,
+        "cases_reported": true, "deaths_reported": true, "event_count": events, "confidence": null,
+        "threshold": 0, "severity": "NORMAL", "has_alert": false,
+        "case_date": case_date, "sort_date": case_date, "case_date_precision": "day",
+        "latest_date": case_date, "published_date": created, "crawled_at": created,
+        "geo_level": if lat.is_some() && lng.is_some() { "location" } else { "none" },
+        "is_national": false, "source_type": "FORM", "is_official": false,
+        "sources": [{ "url": null, "source_name": "Case Report Form", "source_type": "form", "published_at": created }],
+        "detail": detail.as_object().map(|o| {
+            let mut o = o.clone();
+            o.insert("needs_review".into(), json!(!reviewed));
+            o.insert("is_health_related".into(), json!(true));
+            o.insert("source_name".into(), json!("Case Report Form"));
+            o.insert("source_type".into(), json!("form"));
+            Value::Object(o)
+        }).unwrap_or(json!({})),
+    })
+}
+
+const ISO_TS: &str = "to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')";
+fn iso(col: &str) -> String {
+    ISO_TS.replace("%s", col)
+}
+
+async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
+    let sql = format!(
+        "SELECT COALESCE(c.name,''), {LOC}, MAX(l.name), d.name,
+                (array_agg(r.latitude ORDER BY r.created_at DESC) FILTER (WHERE r.latitude IS NOT NULL))[1],
+                (array_agg(r.longitude ORDER BY r.created_at DESC) FILTER (WHERE r.longitude IS NOT NULL))[1],
+                SUM(r.cases)::bigint, SUM(r.deaths)::bigint, COUNT(*)::bigint, MAX(r.report_date)::text,
+                {}, BOOL_AND(r.is_reviewed)
+         {} GROUP BY 1, 2, 4 ORDER BY 7 DESC LIMIT 250",
+        iso("MAX(r.created_at)"),
+        base()
+    );
+    let rows = c.query(&sql, &f.params()).await.map_err(internal)?;
+    Ok(rows
+        .iter()
+        .map(|r| {
+            let (cases, deaths): (i64, i64) = (r.get(6), r.get(7));
+            outbreak(
+                r.get(0), r.get(1), r.get(2), r.get(3), r.get(4), r.get(5), cases, deaths, r.get(8), r.get(9), r.get(10), r.get(11),
+                json!({ "case_count": cases, "death_count": deaths }),
+            )
+        })
+        .collect())
+}
+
+async fn signal_feed(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
+    let sql = format!(
+        "SELECT r.id::text, COALESCE(c.name,''), {LOC}, l.name, d.name, r.latitude, r.longitude, r.cases, r.deaths,
+                r.report_date::text, {}, r.is_reviewed, r.notes
+         {} ORDER BY r.report_date DESC, r.created_at DESC LIMIT 200",
+        iso("r.created_at"),
+        base()
+    );
+    let rows = c.query(&sql, &f.params()).await.map_err(internal)?;
+    Ok(rows
+        .iter()
+        .map(|r| {
+            let (cases, deaths) = (r.get::<_, i32>(7) as i64, r.get::<_, i32>(8) as i64);
+            let date: String = r.get(9);
+            let created: String = r.get(10);
+            outbreak(
+                r.get(1), r.get(2), r.get(3), r.get(4), r.get(5), r.get(6), cases, deaths, 1, date.clone(), created.clone(), r.get(11),
+                json!({
+                    "event_id": r.get::<_, String>(0), "url": null, "content": r.get::<_, Option<String>>(12),
+                    "published_at": created, "crawled_at": created, "case_date": date, "event_date": date,
+                    "case_count": cases, "death_count": deaths, "publish_source": "form",
+                }),
+            )
+        })
+        .collect())
+}
+
+async fn grouped(c: &Object, f: &Resolved, col: &str) -> Result<Vec<Value>, ApiError> {
+    let sql = format!(
+        "SELECT {col}, COALESCE(SUM(r.cases),0)::bigint, COALESCE(SUM(r.deaths),0)::bigint, COUNT(*)::bigint
+         {} GROUP BY 1 ORDER BY 2 DESC, 1",
+        base()
+    );
+    Ok(c.query(&sql, &f.params())
+        .await
+        .map_err(internal)?
+        .iter()
+        .map(|r| json!({ "name": r.get::<_, String>(0), "cases": r.get::<_, i64>(1), "deaths": r.get::<_, i64>(2), "events": r.get::<_, i64>(3) }))
+        .collect())
+}
+
+async fn by_country(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
+    let mut rows = grouped(c, f, "COALESCE(c.name, 'Unknown')").await?;
+    if let Some(iso2) = &f.iso2 {
+        // Like NLP: every country in scope is listed, with 0 when it has no reports.
+        let names = c
+            .query("SELECT name FROM master_countries WHERE iso2 = ANY($1) ORDER BY display_order, name", &[iso2])
+            .await
+            .map_err(internal)?;
+        for n in names {
+            let name: String = n.get(0);
+            if !rows.iter().any(|r| r["name"] == json!(name)) {
+                rows.push(json!({ "name": name, "cases": 0, "deaths": 0, "events": 0 }));
+            }
+        }
+    }
+    Ok(rows)
+}
+
+async fn trends(c: &Object, f: &Resolved) -> Result<Value, ApiError> {
+    let cur = "r.report_date >= date_trunc('month', current_date)";
+    let prev = "r.report_date >= date_trunc('month', current_date) - interval '1 month' AND r.report_date < date_trunc('month', current_date)";
+    let sql = format!(
+        "SELECT COALESCE(SUM(r.cases) FILTER (WHERE {cur}),0)::bigint, COALESCE(SUM(r.cases) FILTER (WHERE {prev}),0)::bigint,
+                COALESCE(SUM(r.deaths) FILTER (WHERE {cur}),0)::bigint, COALESCE(SUM(r.deaths) FILTER (WHERE {prev}),0)::bigint,
+                COUNT(*) FILTER (WHERE {cur})::bigint, COUNT(*) FILTER (WHERE {prev})::bigint,
+                COUNT(DISTINCT {LOC}) FILTER (WHERE {cur})::bigint, COUNT(DISTINCT {LOC}) FILTER (WHERE {prev})::bigint,
+                to_char(current_date, 'YYYY-MM'), to_char(current_date - interval '1 month', 'YYYY-MM')
+         {}",
+        base()
+    );
+    let r = c.query_one(&sql, &f.params_no_dates()).await.map_err(internal)?;
+    let p = |i: usize| json!({ "current": r.get::<_, i64>(i), "previous": r.get::<_, i64>(i + 1) });
+    Ok(json!({
+        "cases": p(0), "deaths": p(2), "events": p(4), "locations": p(6),
+        "alerts": { "current": 0, "previous": 0 },
+        "current_month": r.get::<_, String>(8), "previous_month": r.get::<_, String>(9),
+    }))
+}
+
+pub async fn public_dashboard(State(s): State<AppState>, Query(q): Query<DashQuery>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let f = resolve(&c, &q).await?;
+    let (ey, ew) = current_mmwr(chrono::Local::now().date_naive());
+    let years: Vec<i32> = c
+        .query("SELECT DISTINCT EXTRACT(YEAR FROM report_date)::int FROM case_reports ORDER BY 1 DESC", &[])
+        .await
+        .map_err(internal)?
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    let diseases: Vec<String> = c
+        .query("SELECT name FROM master_diseases WHERE is_active ORDER BY name", &[])
+        .await
+        .map_err(internal)?
+        .iter()
+        .map(|r| r.get(0))
+        .collect();
+    Ok(Json(json!({
+        "success": true,
+        "data": {
+            "updated_at": chrono::Utc::now().to_rfc3339(),
+            "available_years": years, "available_diseases": diseases,
+            "current_epi_week": ew, "current_epi_year": ey,
+            "filters": {
+                "country": f.scope, "scope": f.scope, "disease": f.disease, "source": null,
+                "start_date": f.start.map(|d| d.to_string()), "end_date": f.end.map(|d| d.to_string()),
+                "start_year": q.start_year, "start_week": q.start_week, "end_year": q.end_year, "end_week": q.end_week, "year": q.end_year,
+            },
+            "kpis": kpis(&c, &f).await?,
+            "alerts": [],
+            "signal_feed": signal_feed(&c, &f).await?,
+            "signal_feed_page_size": 20,
+            "locations": locations(&c, &f).await?,
+            "map_locations_limit": 250,
+            "by_disease": grouped(&c, &f, "d.name").await?,
+            "by_country": by_country(&c, &f).await?,
+            "ai_summary": { "text": "", "provider": "unavailable", "cached": false, "mode": "disabled" },
+            "trends": trends(&c, &f).await?,
+            "weekly_trend": [],
+        }
+    })))
+}
+
+pub async fn kpi_snapshot(State(s): State<AppState>, Query(q): Query<DashQuery>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let f = resolve(&c, &q).await?;
+    Ok(Json(json!({
+        "success": true,
+        "data": {
+            "kpis": kpis(&c, &f).await?,
+            "snapshot": { "computed_at": chrono::Utc::now().to_rfc3339(), "filter_key": f.filter_key(), "is_stale": false, "kpi_source": "live_query" }
+        }
+    })))
+}
+
+async fn form_counts(c: &Object) -> Result<(i64, i64, i64, i64, Option<String>), ApiError> {
+    let r = c
+        .query_one(
+            &format!(
+                "SELECT COUNT(*)::bigint,
+                        COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint,
+                        COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()) - interval '1 month' AND created_at < date_trunc('month', now()))::bigint,
+                        COUNT(*) FILTER (WHERE is_reviewed)::bigint, {}
+                 FROM case_reports",
+                iso("MAX(created_at)")
+            ),
+            &[],
+        )
+        .await
+        .map_err(internal)?;
+    Ok((r.get(0), r.get(1), r.get(2), r.get(3), r.get(4)))
+}
+
+fn breakdown(total: i64, reviewed: i64) -> Value {
+    // Form mapping: Processed / Health stored = reviewed reports; waiting = unreviewed.
+    json!({ "processed_health": reviewed, "non_health": 0, "waiting": total - reviewed, "in_progress": 0, "stuck": 0,
+            "failed": 0, "duplicate": 0, "archived": 0, "other": 0, "stuck_after_minutes": 0 })
+}
+
+pub async fn crawling_stats(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let (total, this_month, last_month, reviewed, last_at) = form_counts(&c).await?;
+    let monthly = c
+        .query(
+            "SELECT EXTRACT(MONTH FROM created_at)::int, COUNT(*)::bigint FROM case_reports
+             WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM now()) GROUP BY 1",
+            &[],
+        )
+        .await
+        .map_err(internal)?;
+    let year = chrono::Local::now().year();
+    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let perf: Vec<Value> = (1..=12)
+        .map(|m| {
+            let n = monthly.iter().find(|r| r.get::<_, i32>(0) == m).map(|r| r.get::<_, i64>(1)).unwrap_or(0);
+            json!({ "month_num": m, "month_label": months[(m - 1) as usize], "sub_label": format!("{} {}", months[(m - 1) as usize], year),
+                    "total_count": n, "news_count": 0, "social_count": 0, "ibs_count": 0, "form_count": n })
+        })
+        .collect();
+    let now = chrono::Local::now();
+    Ok(Json(json!({
+        "success": true,
+        "data": {
+            "total": total, "total_crawled_all_time": total, "this_month": this_month, "last_month": last_month,
+            "total_processed": reviewed, "health_stored_in_db": reviewed, "non_health_stored_in_db": 0, "stored_in_db": total,
+            "nlp_processing": 0, "status_breakdown": breakdown(total, reviewed),
+            "total_news": 0, "total_social": 0, "total_ibs": 0, "monthly_performance": perf,
+            "current_month": now.format("%Y-%m").to_string(),
+            "previous_month": (now.date_naive().with_day(1).unwrap() - Duration::days(1)).format("%Y-%m").to_string(),
+            "live_crawled": 0, "current_live_crawl": 0, "active_run_count": 0, "active_since": null,
+            "collector_status": "IDLE", "last_report_at": last_at, "last_run_at": null, "enabled_sources": 0,
+            "crawler_mode": "form_only",
+            "by_source_type": [{ "source_type": "form", "total": total, "processed": reviewed, "this_month": this_month }],
+        }
+    })))
+}
+
+pub async fn crawling_stats_live(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let (total, _, _, reviewed, _) = form_counts(&c).await?;
+    Ok(Json(json!({
+        "success": true,
+        "data": { "total": total, "status_breakdown": breakdown(total, reviewed), "throughput_per_minute": 0,
+                  "throughput_window_minutes": 0, "poll_seconds": 15, "server_time": chrono::Utc::now().to_rfc3339() }
+    })))
+}
+
+pub async fn crawl_history_summary(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let c = s.pool.get().await.map_err(internal)?;
+    let r = c
+        .query_one(
+            "SELECT COUNT(*)::bigint, COUNT(*) FILTER (WHERE latitude IS NOT NULL AND longitude IS NOT NULL)::bigint,
+                    COUNT(*) FILTER (WHERE NOT is_reviewed)::bigint FROM case_reports",
+            &[],
+        )
+        .await
+        .map_err(internal)?;
+    let (total, geo, review): (i64, i64, i64) = (r.get(0), r.get(1), r.get(2));
+    Ok(Json(json!({
+        "success": true,
+        "data": { "raw_reports": total, "disease_events": total, "mapped": geo, "with_geo": geo, "without_geo": total - geo,
+                  "needs_review": review, "jobs": 0, "matrix_rows": 0, "noise_excluded": 0, "by_channel": { "form": total },
+                  "quality": { "surveillance": total, "review": 0, "noise": 0 }, "phase": "form", "default_quality": "all",
+                  "fields": [], "note": "" }
+    })))
+}

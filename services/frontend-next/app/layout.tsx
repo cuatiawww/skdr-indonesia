@@ -1,9 +1,12 @@
-import type { Metadata } from 'next'
-import localFont from 'next/font/local'
-import './globals.css'
-import AppShell from '@/components/layout/AppShell'
-import { SettingsProvider } from '@/lib/settings-context'
+import { SettingsProvider } from "@/lib/settings-context"
+import type { Metadata } from "next"
+import localFont from "next/font/local"
+import "./globals.css"
+import LayoutContent from "@/components/layout/LayoutContent"
+import { LanguageProvider } from "@/lib/i18n/LanguageContext"
 
+// Use locally-bundled font files so Docker build works without internet access.
+// Files were downloaded from Google Fonts (Roboto v51, Latin subset).
 const roboto = localFont({
   src: [
     { path: '../public/fonts/Roboto-300.woff2', weight: '300', style: 'normal' },
@@ -17,17 +20,21 @@ const roboto = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'SKDR Indonesia',
-  description: 'Case reporting form and surveillance dashboard',
+  title: "ASEAN Real-time AI Surveillance Data",
+  description: "Real-time multilingual surveillance data dashboard",
 }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${roboto.variable} font-roboto antialiased`} suppressHydrationWarning>
-        <SettingsProvider>
-          <AppShell>{children}</AppShell>
-        </SettingsProvider>
+        <SettingsProvider><LanguageProvider>
+          <LayoutContent>{children}</LayoutContent>
+        </LanguageProvider></SettingsProvider>
       </body>
     </html>
   )

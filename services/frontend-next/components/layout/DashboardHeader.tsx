@@ -1,21 +1,56 @@
 'use client'
 
-import { ClipboardPlus, LayoutDashboard, Menu, TableProperties } from 'lucide-react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { PUBLIC_BASE_PATH } from '@/lib/public-path'
-import { useSettings } from '@/lib/settings-context'
+import {
+  ChevronDown,
+  Home,
+  LayoutDashboard,
+  Menu,
+  Tv,
+  FileSpreadsheet,
+  Settings as SettingsIcon,
+  Users as UsersIcon,
+  FileText,
+  SlidersHorizontal,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { PUBLIC_BASE_PATH } from "@/lib/public-path";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
+import { useSettings } from "@/lib/settings-context";
 
-const tabs = [
-  { href: '/', label: 'DASHBOARD', icon: LayoutDashboard },
-  { href: '/form', label: 'REPORT FORM', icon: ClipboardPlus },
-  { href: '/reports', label: 'CASE REPORTS', icon: TableProperties },
-]
+export default function DashboardHeader({
+  onToggleSidebar,
+  authenticated = true,
+  consoleMode = false,
+}: {
+  onToggleSidebar: () => void;
+  authenticated?: boolean;
+  consoleMode?: boolean;
+}) {
+  const pathname = usePathname();
+  const { t } = useTranslation();
+  const { settings } = useSettings();
 
-export default function DashboardHeader({ onToggleSidebar }: { onToggleSidebar: () => void }) {
-  const pathname = usePathname()
-  const { settings } = useSettings()
-  const logoSrc = `${PUBLIC_BASE_PATH}/Logo-Kemenkes.png`
+  const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
+  
+  const isPrototype =
+    pathname === '/main-dashboard-prototype' ||
+    pathname.startsWith('/main-dashboard-prototype') ||
+    pathname === '/prototype' ||
+    pathname.startsWith('/prototype');
+
+  const appTitle = isPrototype
+    ? "ABVC DATA CRAWLING"
+    : consoleMode
+    ? "SYSTEM MANAGEMENT CONSOLE"
+    : (settings.app_name || "ASEAN REAL-TIME AI SURVEILLANCE DATA");
+    
+  const appSubtitle = isPrototype
+    ? ""
+    : consoleMode
+    ? "Centralized System Management, Branding & Configuration Portal"
+    : (settings.app_tagline || "Real-time multilingual data monitoring");
 
   return (
     <header className="w-full border-b border-white/20 bg-[#102f78]">
@@ -29,47 +64,153 @@ export default function DashboardHeader({ onToggleSidebar }: { onToggleSidebar: 
           <div className="flex min-w-0 items-center gap-4">
             <button
               onClick={onToggleSidebar}
-              aria-label="Open menu"
+              aria-label={t("header.openMenu")}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/50 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <Link href="/" className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-5">
+            <Link
+              href={consoleMode ? "/console/settings" : "/"}
+              className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-5"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoSrc} alt="Logo" className="h-auto max-h-[62px] w-[132px] shrink-0 rounded-lg bg-white/90 object-contain p-1 md:w-[168px]" />
+              <img
+                src={logoSrc}
+                alt="Logo"
+                className="h-auto max-h-[62px] w-[132px] shrink-0 object-contain md:w-[168px]"
+                onError={(e) => {
+                  e.currentTarget.src = `${PUBLIC_BASE_PATH}/abvc-logo.webp`;
+                }}
+              />
               <div className="min-w-0 border-white/35 md:border-l md:pl-5">
-                <h1 className="max-w-[720px] text-lg font-extrabold uppercase leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] sm:text-2xl md:text-3xl">
-                  {settings.app_name}
-                </h1>
-                {settings.app_tagline ? (
-                  <p className="mt-2 hidden max-w-[760px] text-xs leading-relaxed text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)] sm:block md:text-sm lg:text-base">
-                    {settings.app_tagline}
-                  </p>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  <h1 className="max-w-[720px] text-lg font-extrabold uppercase leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] sm:text-2xl md:text-3xl">
+                    {appTitle}
+                  </h1>
+                  {consoleMode && (
+                    <span className="hidden items-center rounded-md border border-white/30 bg-white/15 px-2 py-0.5 text-xs font-bold text-white sm:inline-flex">
+                      ADMIN CONSOLE
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 hidden max-w-[760px] text-xs leading-relaxed text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)] sm:block md:text-sm lg:text-base">
+                  {appSubtitle}
+                </p>
               </div>
             </Link>
           </div>
           <div className="flex flex-wrap items-center gap-2.5 lg:justify-end">
-            <div className="hidden items-center rounded-2xl border border-white/45 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm sm:flex">
-              {tabs.map(({ href, label, icon: Icon }) => {
-                const active = href === '/' ? pathname === '/' : pathname?.startsWith(href)
-                return (
-                  <Link
-                    key={href}
-                    href={href}
+            <LanguageSwitcher />
+
+            {/* In Console Mode: Show Console Tabs (Settings, Users, Configuration Modul) + Button to return to Surveillance Dashboard */}
+            {consoleMode ? (
+              <div className="hidden items-center rounded-2xl border border-white/45 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm sm:flex">
+                <Link
+                  href="/console/settings"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname?.startsWith("/console/settings")
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                  Settings
+                </Link>
+                <Link
+                  href="/console/configuration-modul"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname?.startsWith("/console/configuration-modul")
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Modules
+                </Link>
+                <Link
+                  href="/console/users"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname?.startsWith("/console/users")
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <UsersIcon className="h-4 w-4" />
+                  Users
+                </Link>
+                <Link
+                  href="/reports/drafts"
                     className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                      active ? 'bg-[#0060A9] text-white hover:bg-[#004b85]' : 'text-slate-700 hover:bg-white hover:text-[#0060A9]'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Link>
-                )
-              })}
-            </div>
+                    pathname?.startsWith("/reports/drafts") || pathname?.startsWith("/reports/new") || pathname?.startsWith("/reports/edit")
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  Reports
+                </Link>
+                <Link
+                  href="/main-dashboard"
+                  className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white hover:text-[#0060A9]"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard ↗
+                </Link>
+              </div>
+            ) : (
+              /* In Regular Dashboard Mode: Show Home, Main Dashboard, TV mode, and Reports */
+              <div className="hidden items-center rounded-2xl border border-white/45 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm sm:flex">
+                <Link
+                  href="/"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname === "/"
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <Home className="h-4 w-4" />
+                  {t("header.home") || "HOME"}
+                </Link>
+                <Link
+                  href="/main-dashboard"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname?.startsWith("/main-dashboard")
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  {t("header.mainDashboard") || "DASHBOARD"}
+                </Link>
+                <Link
+                  href="/tv"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname === "/tv"
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <Tv className="h-4 w-4" />
+                  {t("header.tvMode")}
+                </Link>
+                <Link
+                  href="/reports"
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    pathname?.startsWith("/reports") || pathname?.startsWith("/laporan")
+                      ? "bg-[#0060A9] text-white hover:bg-[#004b85]"
+                      : "text-slate-700 hover:bg-white hover:text-[#0060A9]"
+                  }`}
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {t("header.reports") || "REPORTS"}
+                </Link>
+              </div>
+            )}
+
+            {/* SKDR: no login/logout yet; NLP user menu removed. */}
           </div>
         </div>
       </div>
     </header>
-  )
+  );
 }
