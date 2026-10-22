@@ -13,6 +13,17 @@ const OFFSET = 84
 function collect(root: HTMLElement): Item[] {
   const out: Item[] = []
   const seen = new Set<string>()
+  // PR 022: dashboard anchors (data-nav-label, order/labels from app_settings.dashboard_sections) win over heading scan
+  const anchors = root.querySelectorAll<HTMLElement>('[data-nav-label]')
+  if (anchors.length) {
+    anchors.forEach((sec) => {
+      const label = sec.dataset.navLabel
+      if (!label || seen.has(label) || sec.offsetHeight === 0) return
+      seen.add(label)
+      out.push({ id: sec.id, label, el: sec })
+    })
+    return out
+  }
   root.querySelectorAll<HTMLElement>('section.skdr-section').forEach((sec, i) => {
     if (sec.parentElement?.closest('section.skdr-section')) return // only top-level sections
     const h = sec.querySelector('h2.skdr-section-title')

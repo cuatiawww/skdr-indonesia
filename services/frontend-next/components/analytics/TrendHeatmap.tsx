@@ -149,7 +149,21 @@ function Heatmap({ ov, sumber, ukuran }: { ov: Overview; sumber: Sumber; ukuran:
   )
 }
 
-export default function TrendHeatmap({ query, sumber = 'all', ukuran = 'alert' }: { query: Record<string, unknown>; sumber?: Sumber; ukuran?: UkuranEbs }) {
+/** PR 022: EBS weekly series ends where the API data ends (no zero-filling presented as a real drop). */
+function EbsCoverage({ ov, sumber }: { ov: Overview; sumber: Sumber }) {
+  if (sumber === 'pe' || !ov.sources.ebs || !ov.weeks.length) return null
+  const tot = ov.weeks.map((_, i) => ov.trend.ebs.reduce((a, s) => a + (s.alerts[i] || 0), 0))
+  let last = -1
+  tot.forEach((v, i) => { if (v > 0) last = i })
+  if (last < 0 || last >= ov.weeks.length - 2) return null
+  return (
+    <p className="border-l-2 border-amber-400 bg-amber-50/60 px-3 py-1.5 text-[11px] text-amber-900" data-testid="ebs-coverage">
+      Laporan EBS terbaru yang tersedia sampai minggu {ov.weeks[last].label}; minggu sesudahnya belum ada data.
+    </p>
+  )
+}
+
+export default function TrendHeatmap({ query, sumber = 'all', ukuran = 'alert', hideHeatmap = false }: { query: Record<string, unknown>; sumber?: Sumber; ukuran?: UkuranEbs; hideHeatmap?: boolean }) {
   const { t } = useTranslation()
   const [ov, setOv] = useState<Overview | null>(null)
   const [err, setErr] = useState('')
@@ -166,7 +180,9 @@ export default function TrendHeatmap({ query, sumber = 'all', ukuran = 'alert' }
     <div className="space-y-3" data-testid="trend-heatmap">
       {ov.disease_not_found ? <Empty>{t('skdr.charts.diseaseNotFound')}</Empty> : null}
       {sumber === 'all' ? <Combined ov={ov} ukuran={ukuran} /> : <PerDisease ov={ov} src={sumber} ukuran={ukuran} />}
-      <Heatmap ov={ov} sumber={sumber} ukuran={ukuran} />
+      <EbsCoverage ov={ov} sumber={sumber} />
+      {/* PR 022: hidden via app_settings.dashboard_sections.hidden ("heatmap"), migration 047 */}
+      {hideHeatmap ? null : <Heatmap ov={ov} sumber={sumber} ukuran={ukuran} />}
     </div>
   )
 }

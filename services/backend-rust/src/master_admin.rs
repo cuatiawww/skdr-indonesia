@@ -322,9 +322,19 @@ pub async fn diseases_list(State(s): State<AppState>, Query(q): Query<ListQuery>
         .await
         .map_err(internal)?;
     let total = rows.first().map(|r| r.get::<_, i64>(10)).unwrap_or(0);
+    // PR 021: kategori per penyakit (utama dulu)
+    let ids: Vec<i32> = rows.iter().map(|r| r.get(0)).collect();
+    let cats: std::collections::HashMap<i32, Value> = c
+        .query("SELECT m.disease_id, jsonb_agg(jsonb_build_object('code', k.code, 'short_name', k.short_name, 'color', k.color, 'is_primary', m.is_primary)
+                ORDER BY m.is_primary DESC, k.sort_order) FROM master_disease_category_map m JOIN master_disease_categories k ON k.id = m.category_id
+                WHERE m.disease_id = ANY($1) GROUP BY 1", &[&ids])
+        .await
+        .map_err(internal)?
+        .iter().map(|r| (r.get::<_, i32>(0), r.get::<_, Value>(1))).collect();
     let data = rows
         .iter()
         .map(|r| json!({
+            "kategori": cats.get(&r.get::<_, i32>(0)).cloned().unwrap_or_else(|| json!([])),
             "id": r.get::<_, i32>(0), "code": r.get::<_, String>(1), "name": r.get::<_, String>(2),
             "english_name": r.get::<_, Option<String>>(3), "category": r.get::<_, Option<String>>(4),
             "is_zoonotic": r.get::<_, bool>(5), "description": r.get::<_, Option<String>>(6),
@@ -348,6 +358,8 @@ pub struct DiseaseBody {
     icd10: Option<String>,
     symptoms: Option<String>,
     transmission: Option<String>,
+    /// PR 021: kode kategori (kategori utama di urutan pertama); None = tidak diubah.
+    kategori: Option<Vec<String>>,
 }
 
 fn check_disease(b: &DiseaseBody) -> Result<(String, String, Value), ApiError> {
@@ -375,7 +387,9 @@ pub async fn disease_create(State(s): State<AppState>, Json(b): Json<DiseaseBody
         )
         .await
         .map_err(|e| db_err(e, DIS_DUP))?;
-    Ok((StatusCode::CREATED, Json(json!({ "success": true, "id": r.get::<_, i32>(0) }))))
+    let id: i32 = r.get(0);
+    if let Some(k) = &b.kategori { crate::kategori::set_for_disease(&c, id, k).await?; }
+    Ok((StatusCode::CREATED, Json(json!({ "success": true, "id": id }))))
 }
 
 pub async fn disease_update(State(s): State<AppState>, Path(id): Path<i32>, Json(b): Json<DiseaseBody>) -> Result<Json<Value>, ApiError> {
@@ -390,6 +404,7 @@ pub async fn disease_update(State(s): State<AppState>, Path(id): Path<i32>, Json
         )
         .await
         .map_err(|e| db_err(e, DIS_DUP))?;
+    if n > 0 { if let Some(k) = &b.kategori { crate::kategori::set_for_disease(&c, id, k).await?; } }
     changed(n, id)
 }
 

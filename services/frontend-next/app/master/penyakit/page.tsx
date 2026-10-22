@@ -7,6 +7,10 @@ import Modal from '@/components/Modal'
 import Pagination from '@/components/Pagination'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { MASTER_PATHS, masterSend, setMasterStatus, useMasterList, type AdminDisease } from '@/lib/skdr-master-api'
+import { useCategories } from '@/lib/kategori'
+
+type KategoriChip = { code: string; short_name: string; color?: string | null; is_primary: boolean }
+const kats = (r: AdminDisease | null): KategoriChip[] => ((r as unknown as { kategori?: KategoriChip[] })?.kategori || [])
 import { EditButton, Field, FormActions, inputCls, MasterHeader, MasterToolbar, StatusBadge, StatusToggle, TableState, tableHeadCls, thCls } from '@/components/master/MasterUi'
 
 const P = MASTER_PATHS.diseases
@@ -45,6 +49,7 @@ export default function MasterPenyakitPage() {
               <thead><tr className={tableHeadCls}>
                 <th className={thCls}>{t('skdr.master.dis.code')}</th>
                 <th className={thCls}>{t('skdr.master.dis.name')}</th>
+                <th className={thCls}>Kategori Surveilans</th>
                 <th className={thCls}>{t('skdr.master.dis.category')}</th>
                 <th className={`${thCls} text-center`}>{t('skdr.master.dis.zoonotic')}</th>
                 <th className={`${thCls} text-center`}>{t('skdr.master.dis.aliases')}</th>
@@ -59,6 +64,15 @@ export default function MasterPenyakitPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{r.name}</div>
                       {r.english_name && <div className="max-w-xs truncate text-[11px] text-slate-400">{r.english_name}</div>}
+                    </td>
+                    <td className="px-4 py-3" data-testid="kategori-cell">
+                      <div className="flex max-w-[16rem] flex-wrap gap-1">
+                        {kats(r).length ? kats(r).map((k) => (
+                          <span key={k.code} title={k.is_primary ? 'Kategori utama' : 'Kategori tambahan'}
+                            className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${k.is_primary ? 'text-white' : 'bg-white'}`}
+                            style={k.is_primary ? { background: k.color || '#475569', borderColor: k.color || '#475569' } : { color: k.color || '#475569', borderColor: k.color || '#cbd5e1' }}>{k.short_name}</span>
+                        )) : <span className="text-xs text-slate-400">-</span>}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {r.category ? <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{r.category}</span>
@@ -107,6 +121,10 @@ function DiseaseForm({ item, onCancel, onSaved }: { item: AdminDisease | null; o
     icd10: (item as any)?.icd10 ?? '', symptoms: (item as any)?.symptoms ?? '', transmission: (item as any)?.transmission ?? '',
   })
   const [saving, setSaving] = useState(false)
+  // PR 021: kategori surveilans (DB); urutan pertama = kategori utama
+  const categories = useCategories()
+  const [kat, setKat] = useState<string[]>(kats(item).map((k) => k.code))
+  const toggleKat = (code: string) => setKat((v) => (v.includes(code) ? v.filter((x) => x !== code) : [...v, code]))
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const code = f.code.trim().toUpperCase()
@@ -118,6 +136,7 @@ function DiseaseForm({ item, onCancel, onSaved }: { item: AdminDisease | null; o
         code, name: f.name.trim(), english_name: f.english_name, category: f.category, is_zoonotic: f.is_zoonotic, description: f.description,
         aliases_id: f.aliases.split(',').map((s) => s.trim()).filter(Boolean), is_active: f.is_active,
         icd10: f.icd10, symptoms: f.symptoms, transmission: f.transmission,
+        kategori: kat,
       }
       if (item) await masterSend('PUT', `${P}/${item.id}`, body)
       else await masterSend('POST', P, body)
@@ -140,6 +159,22 @@ function DiseaseForm({ item, onCancel, onSaved }: { item: AdminDisease | null; o
         <Field label={t('skdr.master.dis.category')}>
           <input className={inputCls} value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} />
         </Field>
+        <div className="sm:col-span-2">
+          <Field label="Kategori Surveilans" hint="Bisa lebih dari satu. Yang dipilih pertama menjadi kategori utama.">
+            <div className="flex flex-wrap gap-2" data-testid="kategori-picker">
+              {categories.map((c) => {
+                const i = kat.indexOf(c.code)
+                return (
+                  <button type="button" key={c.code} onClick={() => toggleKat(c.code)} title={c.name}
+                    className={`rounded-full border px-3 py-1 text-xs font-bold transition ${i >= 0 ? 'text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                    style={i >= 0 ? { background: c.color || '#475569', borderColor: c.color || '#475569' } : undefined}>
+                    {c.short_name}{i === 0 ? ' (utama)' : ''}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+        </div>
         <div className="sm:col-span-2">
           <Field label={t('skdr.master.dis.aliases')} hint={t('skdr.master.dis.aliasesHint')}>
             <input className={inputCls} value={f.aliases} onChange={(e) => setF({ ...f, aliases: e.target.value })} />

@@ -11,7 +11,8 @@ import type { Sumber } from '@/lib/use-sumber';
 import { fetchProvinces, fetchFormDiseases, type MasterProvince, type MasterKabkota, type MasterDisease } from '@/lib/skdr-api';
 import { fetchFrom } from '@/lib/api';
 import MultiSelect from '@/components/filters/MultiSelect';
-import { Building2 } from 'lucide-react';
+import { Building2, Layers } from 'lucide-react';
+import { useCategories } from '@/lib/kategori';
 
 /** API params for a filter state: comma lists, omitted when not narrowed. */
 export function filterParams(f: SkdrFilterState) {
@@ -20,6 +21,7 @@ export function filterParams(f: SkdrFilterState) {
     province_id: f.provinceIds.length ? f.provinceIds.join(',') : undefined,
     kabkota_id: f.kabkotaIds.length ? f.kabkotaIds.join(',') : undefined,
     unit: f.units?.length ? f.units.join('|') : undefined,
+    kategori: f.kategori || undefined,
   };
 }
 /** Browser URL state: ?penyakit=a,b&prov=11,12&kab=... */
@@ -47,6 +49,8 @@ export interface SkdrFilterState {
   kabkotaIds: number[];
   /** PR 019: Unit pelapor (lower-cased names as recorded in EBS `unit` / PE `unit_pelapor`); empty = semua. */
   units?: string[];
+  /** PR 021: kode kategori penyakit (master_disease_categories); kosong = semua kategori. */
+  kategori?: string;
   startYear: number;
   startWeek: number;
   endYear: number;
@@ -69,6 +73,10 @@ interface Props {
   showDisease?: boolean;
   /** hide the title/period header row (compact use). */
   compact?: boolean;
+  /** PR 021: show the Kategori Penyakit select (narrows the Penyakit options). */
+  showKategori?: boolean;
+  /** PR 021: category fixed by the page (per-category dashboard): select hidden, Penyakit limited to it. */
+  lockedKategori?: string;
 }
 
 const box =
@@ -83,6 +91,11 @@ const GRID: Record<string, string> = {
   '10': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
   '01': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
   '00': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  // PR 021: + Kategori Penyakit column
+  '111': 'lg:grid-cols-4 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '011': 'lg:grid-cols-4 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '101': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '001': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
 };
 const lbl = 'flex h-4 items-center gap-1 truncate text-[10.5px] font-extrabold uppercase leading-none tracking-wider text-slate-700';
 
@@ -99,6 +112,8 @@ export default function SkdrFilterBar({
   onSumberChange,
   showDisease = true,
   compact = false,
+  showKategori = false,
+  lockedKategori,
 }: Props) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<SkdrFilterState>(value);
@@ -131,12 +146,26 @@ export default function SkdrFilterBar({
   );
   const invalid = draft.startYear > draft.endYear || (draft.startYear === draft.endYear && draft.startWeek > draft.endWeek);
   // Penyakit options from the registry (master_diseases); availableDiseases (names) only as a fallback before it loads
+  // PR 021: kategori penyakit (DB) - the chosen (or page-locked) category narrows the Penyakit options
+  const categories = useCategories();
+  const activeKategori = lockedKategori || draft.kategori || '';
+  const inKategori = useMemo(() => {
+    const c = categories.find((x) => x.code === activeKategori);
+    return c ? new Set(c.diseases.map((d) => d.code)) : null;
+  }, [categories, activeKategori]);
   const diseaseOptions = useMemo(
-    () => diseases.length
+    () => (diseases.length
       ? diseases.map((d) => ({ value: d.code, label: d.name })).sort((a, b) => a.label.localeCompare(b.label, 'id'))
-      : Array.from(new Set(availableDiseases.filter((d) => d && d.trim()))).sort((a, b) => a.localeCompare(b, 'id')).map((d) => ({ value: d, label: d })),
-    [diseases, availableDiseases],
+      : Array.from(new Set(availableDiseases.filter((d) => d && d.trim()))).sort((a, b) => a.localeCompare(b, 'id')).map((d) => ({ value: d, label: d })))
+      .filter((o) => !inKategori || inKategori.has(o.value)),
+    [diseases, availableDiseases, inKategori],
   );
+  const setKategori = (code: string) => {
+    const c = categories.find((x) => x.code === code);
+    const keep = c ? draft.diseases.filter((d) => c.diseases.some((x) => x.code === d)) : draft.diseases;
+    setDraft({ ...draft, kategori: code, diseases: keep });
+  };
+  const kategoriShown = showKategori && !lockedKategori;
   const provinceOptions = useMemo(() => provinces.map((p) => ({ value: String(p.id), label: p.name })), [provinces]);
   // Kab/Kota limited to the checked provinces (all provinces when none checked), grouped by province
   const kabOptions = useMemo(() => {
@@ -180,7 +209,7 @@ export default function SkdrFilterBar({
   };
   const reset = () => {
     const d: SkdrFilterState = {
-      diseases: [], source: 'all', provinceIds: [], kabkotaIds: [], units: [],
+      diseases: [], source: 'all', provinceIds: [], kabkotaIds: [], units: [], kategori: '',
       startYear: currentEpi.year, startWeek: 1, endYear: currentEpi.year, endWeek: currentEpi.week || 1,
     };
     setDraft(d);
@@ -216,12 +245,24 @@ export default function SkdrFilterBar({
       {/* PR 016: one tidy row — every control is h-10 under a one-line label (no helper text below fields; full
           names live in the title tooltip). Sumber is part of the bar; Awal/Akhir are one "Periode (Minggu Epi)" control. */}
       <form onSubmit={apply} className={compact ? "space-y-3" : "mt-4 space-y-3"} data-testid="skdr-filter-bar">
-        <div className={`grid grid-cols-1 items-end gap-3 sm:grid-cols-2 ${GRID[`${onSumberChange ? 1 : 0}${showDisease ? 1 : 0}`]}`}>
+        <div className={`grid grid-cols-1 items-end gap-3 sm:grid-cols-2 ${GRID[`${onSumberChange ? 1 : 0}${showDisease ? 1 : 0}${kategoriShown ? 1 : ''}`]}`}>
           {onSumberChange ? (
             <div className="flex min-w-0 flex-col gap-1.5">
               <span className={lbl}><Radio className="h-3 w-3 text-primary" />{t('skdr.source.filter')}</span>
               <div className="[&>div]:flex [&>div]:h-10 [&>div]:w-full [&>div]:items-stretch [&_button]:flex-1 [&_button]:justify-center">
                 <SourceFilter value={sumber || 'all'} onChange={onSumberChange} />
+              </div>
+            </div>
+          ) : null}
+
+          {kategoriShown ? (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label htmlFor="select-kategori" className={lbl}><Layers className="h-3 w-3 text-primary" />Kategori Penyakit</label>
+              <div className={box}>
+                <select id="select-kategori" className={sel} value={draft.kategori || ''} onChange={(e) => setKategori(e.target.value)} data-testid="select-kategori">
+                  <option value="">Semua kategori</option>
+                  {categories.map((c) => <option key={c.code} value={c.code} title={c.name}>{c.short_name}</option>)}
+                </select>
               </div>
             </div>
           ) : null}

@@ -1,5 +1,6 @@
 ﻿'use client'
 
+import PetaMultiMode from "@/components/dashboard/PetaMultiMode";
 import { tr } from "@/lib/i18n/LanguageContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -59,6 +60,12 @@ import { getCurrentEpiWeek } from "@/lib/epi-week";
 import type { OutbreakLocation, PublicDashboard } from "@/types";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { ErrorState, SkeletonMap } from "@/components/ui/Skeleton";
+import { useParams } from "next/navigation";
+import LabSection from "@/components/dashboard/LabSection";
+import KlasterSection from "@/components/dashboard/KlasterSection";
+import EpiCurve from "@/components/dashboard/EpiCurve";
+import { SectionHeader } from "@/components/analytics/SourceBadge";
+import { kategoriCode, useCategories } from "@/lib/kategori";
 
 const SpatialOutbreakMap = dynamic(
   () => import("@/components/SpatialOutbreakMap"),
@@ -252,6 +259,11 @@ export default function DashboardPage() {
   const numLocale = locale === "en" ? "en-US" : "id-ID";
   const currentYear = new Date().getFullYear();
   const currentEpi = getCurrentEpiWeek();
+  // PR 021: on /dasbor/kategori/<kode> the same dashboard is locked to that disease category (from the DB).
+  const routeParams = useParams<{ kode?: string }>();
+  const lockedKategori = routeParams?.kode ? kategoriCode(String(routeParams.kode)) : "";
+  const categories = useCategories();
+  const kategoriInfo = categories.find((c) => c.code === lockedKategori);
   const [filters, setFilters] = useState<EpiFilterState>({
     diseases: [],
     source: "all",
@@ -316,13 +328,14 @@ export default function DashboardPage() {
 
   const dashboardApiFilters = useCallback((active: EpiFilterState) => ({
     ...filterParams(active),
+    kategori: lockedKategori || active.kategori || undefined,
     source: sumber === "all" ? undefined : sumber,
     start_year: active.startYear,
     start_week: active.startWeek,
     end_year: active.endYear,
     end_week: active.endWeek,
     year: active.endYear,
-  }), [sumber]);
+  }), [sumber, lockedKategori]);
 
   const refreshKpis = useCallback(async () => {
     const kpiData = await fetchKpiSnapshot(dashboardApiFilters(applied)).catch(() => null);
@@ -392,10 +405,10 @@ export default function DashboardPage() {
       <section className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-wide text-slate-900">
-            {t("dashboard.pageTitle")}
+            {lockedKategori ? `Dasbor ${kategoriInfo?.short_name || lockedKategori}` : t("dashboard.pageTitle")}
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            {t("dashboard.pageSubtitle")}
+            {lockedKategori ? (kategoriInfo ? `${kategoriInfo.name}: ${kategoriInfo.description || ""} Mencakup ${kategoriInfo.diseases.map((d) => d.name).join(", ") || "-"}.` : "") : t("dashboard.pageSubtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -424,6 +437,8 @@ export default function DashboardPage() {
         isLoading={loading}
         sumber={sumber}
         onSumberChange={setSumber}
+        showKategori
+        lockedKategori={lockedKategori || undefined}
       />
       {/* PR 018: section quick-nav floats only after the (non-sticky) filter bar has scrolled away */}
       <div ref={navSentinelRef} aria-hidden className="!mt-0 h-0" />
@@ -439,6 +454,16 @@ export default function DashboardPage() {
         query={dashboardApiFilters(applied)}
         sumber={sumber}
         ukuran={ukuran}
+        slots={{
+          laboratorium: <LabSection query={dashboardApiFilters(applied)} />,
+          klaster: (
+            <section className="skdr-section w-full space-y-4">
+              <SectionHeader title="Klaster dan epi curve" description="Kurva epidemi mingguan dan klaster KLB." />
+              <EpiCurve query={dashboardApiFilters(applied)} />
+              <KlasterSection query={dashboardApiFilters(applied)} showHeader={false} />
+            </section>
+          ),
+        }}
         afterCards={
       <section className="skdr-section w-full">
         <div className="w-full">
@@ -463,7 +488,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="skdr-card mt-4 min-h-[460px] w-full flex-1 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05)]" data-testid="map-card">
-              {!data ? (error ? null : <SkeletonMap height={520} />) : <SpatialOutbreakMap
+              <PetaMultiMode query={dashboardApiFilters(applied) as Record<string, unknown>} sinyal={!data ? (error ? null : <SkeletonMap height={520} />) : <SpatialOutbreakMap
                 countries={countryData}
                 locations={mapLocations}
                 highlightCountry="Indonesia"
@@ -472,16 +497,13 @@ export default function DashboardPage() {
                 initialZoom={5}
                 sourceMode={sumber}
                 fitTo={fitTo}
-              />}
+              />} />
             </div>
           </article>
         </div>
       </section>
         }
       />
-
-
-
 
     </div>
   );

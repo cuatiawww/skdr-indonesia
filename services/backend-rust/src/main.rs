@@ -14,6 +14,11 @@ mod master_admin;
 mod pe;
 mod pe_engine;
 mod external_sync;
+mod alert;
+mod kategori;
+mod lab_klaster;
+mod dash_alert;
+mod ebs_dash;
 
 use axum::{http::StatusCode, routing::{get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -24,6 +29,8 @@ use tower_http::cors::{Any, CorsLayer};
 pub struct AppState {
     pub pool: Pool,
     pub ebs_running: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// PR 021: Alert SKDR sync running flag.
+    pub alert_running: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 pub type ApiError = (StatusCode, Json<Value>);
@@ -54,12 +61,25 @@ async fn main() -> anyhow::Result<()> {
     cache::load(&pool).await;
     let ebs_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     ebs::spawn_scheduler(pool.clone(), ebs_running.clone());
+    let alert_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    alert::spawn_scheduler(pool.clone(), alert_running.clone());
 
     let app = Router::new()
         .route("/health", get(health))
         // settings + master data
         .route("/api/v1/console/settings", get(master::console_settings))
         .route("/api/v1/master/diseases", get(master::diseases))
+        // PR 021: kategori penyakit, Laboratorium, Klaster, Alert SKDR
+        .route("/api/v1/master/disease-categories", get(kategori::list))
+        .route("/api/v1/laboratorium", get(lab_klaster::laboratorium))
+        .route("/api/v1/klaster", get(lab_klaster::klaster))
+        .route("/api/v1/epicurve", get(dash_alert::epicurve))
+        .route("/api/v1/alert-skdr", get(dash_alert::alert_skdr))
+        .route("/api/v1/dashboard/sections", get(dash_alert::sections))
+        .route("/api/v1/ebs-analitik", get(ebs_dash::analitik))
+        .route("/api/v1/ebs-wilayah", get(ebs_dash::wilayah))
+        .route("/api/v1/integrasi/alert-skdr/status", get(alert::status))
+        .route("/api/v1/integrasi/alert-skdr/sync", post(alert::sync_now))
         .route("/api/v1/master/provinces", get(master::provinces))
         .route("/api/v1/master/kabkota", get(master::kabkota))
         .route("/api/v1/disease-concepts", get(master::disease_concepts))
@@ -130,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
         // PR 016: short response cache for dashboard/analytics reads (config: app_settings 'api_cache').
         .layer(axum::middleware::from_fn(cache::layer))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
-        .with_state(AppState { pool, ebs_running });
+        .with_state(AppState { pool, ebs_running, alert_running });
 
     let bind = std::env::var("BACKEND_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8091".into());
     let listener = tokio::net::TcpListener::bind(&bind).await?;

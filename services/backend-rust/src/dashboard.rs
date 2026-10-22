@@ -24,6 +24,8 @@ pub struct DashQuery {
     pub end_date: Option<String>,
     /// PR 019: Unit pelapor (nama unit seperti tercatat di EBS `unit` / PE `unit_pelapor`), dipisah "|".
     pub unit: Option<String>,
+    /// PR 021: kode kategori penyakit (master_disease_categories.code), dipisah koma; dipersempit ke penyakit kategori itu.
+    pub kategori: Option<String>,
 }
 
 /// MMWR week 1 starts on the Sunday on or before 4 January.
@@ -113,8 +115,19 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
     let ints = |v: &Option<String>| -> Vec<i32> { v.as_deref().unwrap_or("").split(',').filter_map(|x| x.trim().parse().ok()).collect() };
     let province = ints(&q.province_id);
     let kabkota = ints(&q.kabkota_id);
-    let disease: Vec<String> = q.disease.as_deref().unwrap_or("").split(',').map(|d| d.trim().to_string())
+    let mut disease: Vec<String> = q.disease.as_deref().unwrap_or("").split(',').map(|d| d.trim().to_string())
         .filter(|d| !d.is_empty() && d.to_lowercase() != "all").collect();
+    // PR 021: kategori -> kode penyakit kategori itu (irisan dengan pilihan penyakit); kategori tanpa penyakit = tidak ada yang cocok.
+    let kategori: Vec<String> = q.kategori.as_deref().unwrap_or("").split(',').map(|k| k.trim().to_uppercase())
+        .filter(|k| !k.is_empty() && k != "ALL").collect();
+    if !kategori.is_empty() {
+        let in_cat: Vec<String> = c.query(
+            "SELECT DISTINCT d.code FROM master_disease_category_map m JOIN master_disease_categories k ON k.id = m.category_id AND k.is_active
+             JOIN master_diseases d ON d.id = m.disease_id WHERE k.code = ANY($1)", &[&kategori]).await.map_err(internal)?
+            .iter().map(|r| r.get(0)).collect();
+        disease = if disease.is_empty() { in_cat } else { disease.into_iter().filter(|d| in_cat.iter().any(|x| x.eq_ignore_ascii_case(d))).collect() };
+        if disease.is_empty() { disease = vec!["__KATEGORI_KOSONG__".to_string()]; }
+    }
     let drows = if disease.is_empty() { vec![] } else {
         c.query("SELECT id, name FROM master_diseases WHERE code = ANY($1) OR name = ANY($1) OR lower(code) = ANY($1) ORDER BY name", &[&disease]).await.map_err(internal)?
     };

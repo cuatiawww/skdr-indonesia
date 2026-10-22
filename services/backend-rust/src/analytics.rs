@@ -551,8 +551,8 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
         }
         let rows: Vec<Value> = reg.iter().filter_map(|r| { let id: i32 = r.get(0); per.get(&id).map(|v| json!({ "id": id, "code": r.get::<_, String>(1), "name": r.get::<_, String>(2), "notification": v })) }).collect();
         let missing_fields = json!({
-            "detection": ["Tanggal Rumor Diketahui (A.11)"],
-            "response": ["Tanggal Tatalaksana Kasus (B.20)", "Tanggal PE (B.28)", "Tanggal Mobilisasi TGC (B.30)", "Tanggal pengendalian faktor risiko (B.34)", "Tanggal Penyuluhan/Komunikasi Risiko (B.37)", "Tanggal Koordinasi Rapat LP/LS (B.39)"],
+            "detection": ["Tanggal Rumor Diketahui"],
+            "response": ["Tanggal Tatalaksana Kasus", "Tanggal PE", "Tanggal Mobilisasi TGC", "Tanggal pengendalian faktor risiko", "Tanggal Penyuluhan/Komunikasi Risiko", "Tanggal Koordinasi Rapat LP/LS"],
         });
         // PR 018: per-signal timing (latest alerts in the filter) for the 7-1-7 detail; each row opens the signal modal
         let sig = c.query(&format!("SELECT e.id_ebs, e.no_ebs, COALESCE(d.name, e.diagnosa), e.kota, e.propinsi, e.tgl_laporan::text,

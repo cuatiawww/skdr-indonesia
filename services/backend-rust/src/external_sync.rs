@@ -28,38 +28,7 @@ static FIRMS_LAST_GOOD: Mutex<Option<Value>> = Mutex::new(None);
 static WILDLIFE_CACHE: Mutex<Option<CacheItem>> = Mutex::new(None);
 static WILDLIFE_LAST_GOOD: Mutex<Option<Value>> = Mutex::new(None);
 
-// ---------------------------------------------------------------------------
-// Seed fallback data in case of upstream network timeouts
-// ---------------------------------------------------------------------------
-fn fallback_hotspots() -> Vec<Value> {
-    vec![
-        json!({ "latitude": -0.53, "longitude": 101.45, "brightness": 328.4, "confidence": "nominal", "acq_date": "2026-10-21", "acq_time": "0612", "satellite": "N", "frp": 14.2 }),
-        json!({ "latitude": -2.21, "longitude": 113.92, "brightness": 341.2, "confidence": "high", "acq_date": "2026-10-21", "acq_time": "0615", "satellite": "N", "frp": 28.5 }),
-        json!({ "latitude": -1.84, "longitude": 114.15, "brightness": 332.0, "confidence": "nominal", "acq_date": "2026-10-21", "acq_time": "0615", "satellite": "N", "frp": 16.8 }),
-        json!({ "latitude": -3.12, "longitude": 104.58, "brightness": 320.1, "confidence": "low", "acq_date": "2026-10-21", "acq_time": "0618", "satellite": "N", "frp": 8.7 }),
-        json!({ "latitude": 0.82, "longitude": 109.28, "brightness": 335.6, "confidence": "nominal", "acq_date": "2026-10-21", "acq_time": "0620", "satellite": "N", "frp": 19.3 }),
-        json!({ "latitude": -7.25, "longitude": 110.42, "brightness": 319.4, "confidence": "low", "acq_date": "2026-10-21", "acq_time": "0622", "satellite": "N", "frp": 7.1 }),
-        json!({ "latitude": -8.35, "longitude": 114.20, "brightness": 324.8, "confidence": "nominal", "acq_date": "2026-10-21", "acq_time": "0625", "satellite": "N", "frp": 11.4 }),
-        json!({ "latitude": -4.01, "longitude": 119.85, "brightness": 330.2, "confidence": "nominal", "acq_date": "2026-10-21", "acq_time": "0628", "satellite": "N", "frp": 15.6 }),
-        json!({ "latitude": -2.52, "longitude": 140.48, "brightness": 326.5, "confidence": "nominal", "acq_date": "2026-10-21", "acq_time": "0630", "satellite": "N", "frp": 13.0 }),
-        json!({ "latitude": -0.15, "longitude": 117.20, "brightness": 344.0, "confidence": "high", "acq_date": "2026-10-21", "acq_time": "0632", "satellite": "N", "frp": 32.1 })
-    ]
-}
-
-fn fallback_wildlife() -> Vec<Value> {
-    vec![
-        json!({ "species": "Anas gibberifrons", "genericName": "Anas", "scientificName": "Anas gibberifrons S.Müller, 1842", "country": "ID", "eventDate": "2026-10-18", "decimalLatitude": -6.1256, "decimalLongitude": 106.6559 }),
-        json!({ "species": "Egretta garzetta", "genericName": "Egretta", "scientificName": "Egretta garzetta (Linnaeus, 1766)", "country": "ID", "eventDate": "2026-10-17", "decimalLatitude": -7.3798, "decimalLongitude": 112.7874 }),
-        json!({ "species": "Ardea intermedia", "genericName": "Ardea", "scientificName": "Ardea intermedia Wagler, 1829", "country": "ID", "eventDate": "2026-10-19", "decimalLatitude": -8.7482, "decimalLongitude": 115.1672 }),
-        json!({ "species": "Plegadis falcinellus", "genericName": "Plegadis", "scientificName": "Plegadis falcinellus (Linnaeus, 1766)", "country": "ID", "eventDate": "2026-10-16", "decimalLatitude": -5.0617, "decimalLongitude": 119.5540 }),
-        json!({ "species": "Dendrocygna arcuata", "genericName": "Dendrocygna", "scientificName": "Dendrocygna arcuata (Horsfield, 1824)", "country": "ID", "eventDate": "2026-10-15", "decimalLatitude": 3.6422, "decimalLongitude": 98.8853 }),
-        json!({ "species": "Haliaeetus leucogaster", "genericName": "Haliaeetus", "scientificName": "Haliaeetus leucogaster (Gmelin, 1788)", "country": "ID", "eventDate": "2026-10-19", "decimalLatitude": -1.2683, "decimalLongitude": 116.8944 }),
-        json!({ "species": "Bubulcus ibis", "genericName": "Bubulcus", "scientificName": "Bubulcus ibis (Linnaeus, 1758)", "country": "ID", "eventDate": "2026-10-20", "decimalLatitude": -7.9072, "decimalLongitude": 110.0544 }),
-        json!({ "species": "Anhinga melanogaster", "genericName": "Anhinga", "scientificName": "Anhinga melanogaster Pennant, 1769", "country": "ID", "eventDate": "2026-10-14", "decimalLatitude": -2.8983, "decimalLongitude": 104.7000 }),
-        json!({ "species": "Microcarbo niger", "genericName": "Microcarbo", "scientificName": "Microcarbo niger (Vieillot, 1817)", "country": "ID", "eventDate": "2026-10-18", "decimalLatitude": 1.1211, "decimalLongitude": 104.1189 }),
-        json!({ "species": "Charadrius javanicus", "genericName": "Charadrius", "scientificName": "Charadrius javanicus Chasen, 1938", "country": "ID", "eventDate": "2026-10-17", "decimalLatitude": -6.9742, "decimalLongitude": 110.3744 })
-    ]
-}
+// PR 022: no seeded sample hotspots / wildlife; an upstream failure returns an empty, honest "unavailable" payload.
 
 // ---------------------------------------------------------------------------
 // MAP LAYER HANDLERS
@@ -308,7 +277,7 @@ pub async fn map_fires() -> Json<Value> {
                     return Json(val.clone());
                 }
             }
-            fallback_hotspots()
+            return Json(json!({ "status": "unavailable", "source": "NASA FIRMS (VIIRS)", "total": 0, "hotspots": [] }));
         }
     };
 
@@ -388,7 +357,7 @@ pub async fn map_wildlife(Query(_q): Query<HashMap<String, String>>) -> Json<Val
                     return Json(val.clone());
                 }
             }
-            fallback_wildlife()
+            return Json(json!({ "status": "unavailable", "source": "GBIF (Aves)", "total": 0, "results": [] }));
         }
     };
 

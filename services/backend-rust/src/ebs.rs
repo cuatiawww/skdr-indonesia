@@ -195,6 +195,9 @@ pub async fn apply_mapping(pool: &Pool) -> anyhow::Result<()> {
          UPDATE ebs_reports e SET kabkota_id = k.id FROM master_kabkota k
            WHERE length(e.kode_depdagri_kota) = 4 AND k.kemendagri_code = substr(e.kode_depdagri_kota,1,2) || '.' || substr(e.kode_depdagri_kota,3,2)
              AND e.kabkota_id IS DISTINCT FROM k.id;
+         -- PR 023: new-region codes (e.g. Papua Selatan 93xx) match master_kabkota.code, not the legacy kemendagri_code
+         UPDATE ebs_reports e SET kabkota_id = k.id FROM master_kabkota k
+           WHERE e.kabkota_id IS NULL AND k.code = trim(e.kode_depdagri_kota);
          INSERT INTO ebs_diagnosa_alias (diagnosa)
            SELECT DISTINCT lower(trim(diagnosa)) FROM ebs_reports WHERE trim(COALESCE(diagnosa,'')) <> '' ON CONFLICT (diagnosa) DO NOTHING;
          UPDATE ebs_diagnosa_alias a SET disease_id = d.id, match_source = 'otomatis', updated_at = now()

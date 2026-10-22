@@ -9,7 +9,10 @@ import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, PolarAngleAxis, RadialBar
 import { peFetch } from '@/lib/pe-api'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { ciText, fmt as n, pct1, rateText, type Rate } from '@/lib/analytics-api'
-import { Empty, Panel, SourceKey } from '@/components/analytics/SourceBadge'
+import { Empty, Panel, SectionHeader, SourceKey } from '@/components/analytics/SourceBadge'
+import { AlertCfr, AlertSection, AlertT717 } from '@/components/dashboard/AlertSkdrSections'
+import { useDashboardSections } from '@/lib/dashboard-sections'
+import { EbsAlertPanel, EbsPrevYear, EbsResponsCard, EbsUnitPanel } from '@/components/dashboard/EbsPanels'
 import { type SummaryDisease } from '@/components/dashboard/DiseaseTable'
 import DeathListModal from '@/components/dashboard/DeathListModal'
 import NarSkdr from '@/components/dashboard/NarSkdr'
@@ -220,8 +223,9 @@ function Kpi({ title, rows, testId, days = [], until, bucket = 'day' }: { title:
   )
 }
 
-export default function ExecutiveSummary({ query, afterCards, sumber = 'all', ukuran = 'alert' }: { query: Record<string, string | number | undefined | null>; afterCards?: React.ReactNode; sumber?: Sumber; ukuran?: UkuranEbs }) {
+export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber = 'all', ukuran = 'alert' }: { query: Record<string, string | number | undefined | null>; afterCards?: React.ReactNode; slots?: Record<string, React.ReactNode>; sumber?: Sumber; ukuran?: UkuranEbs }) {
   const { t } = useTranslation()
+  const sections = useDashboardSections()
   const [d, setD] = useState<Exec | null>(null)
   const [err, setErr] = useState('')
   const [sm, setSm] = useState<Summary | null>(null)
@@ -270,8 +274,11 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
   // sheet No. 9: header sentence includes the epi-week range of the global period filter
   const qq = query as Record<string, unknown>
   const epiLabel = qq.start_week && qq.end_week ? t('skdr.exec.epiRange', { sw: String(qq.start_week), sy: String(qq.start_year), ew: String(qq.end_week), ey: String(qq.end_year) }) : ''
-  return (
-    <section className="w-full space-y-4" aria-label={t('skdr.exec.aria')}>
+  const hidden = new Set(sections.hidden)
+  const blocks: Record<string, React.ReactNode> = {
+    ringkasan: (
+      <section className="skdr-section w-full space-y-4">
+        <SectionHeader title="Ringkasan" />
       <p className="border-l-2 border-brand-300 pl-3 text-sm text-slate-600">
         {t('skdr.exec.showing')} {parts.join(` ${t('skdr.exec.and')} `)} · {dmy(d.filters.start_date)} – {dmy(d.filters.end_date)} {epiLabel ? `(${epiLabel})` : ''} · {d.filters.scope} · {d.filters.disease || t('skdr.exec.allDiseases')}
         {showEbs && h.ebs_alerts_all !== null ? <span className="text-slate-500"> ({t('skdr.exec.allEbs', { n: n(h.ebs_alerts_all) })})</span> : null}
@@ -298,19 +305,20 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">{tx.footnote} {tx.individual_def} {tx.alert_def}</p>
 
-      {/* PR 011: peta lebar penuh langsung di bawah 4 kartu ringkasan */}
-      {afterCards}
 
       {/* PR 018: carousel of compact disease cards directly below the map (replaces the PR 016 disease table panel) */}
       {sm ? (sm.diseases.length ? <DiseaseCarousel rows={[...sm.diseases].sort((a, b) => Number(diseaseActive(b, sumber)) - Number(diseaseActive(a, sumber)) || a.name.localeCompare(b.name, 'id'))} sumber={sumber} ukuran={ukuran} /> : null)
         : smErr ? <ErrorState message={smErr} onRetry={() => setTick((x) => x + 1)} /> : <SkeletonTable />}
       {showEbs && sm?.ebs_unmapped_alerts ? <p className="-mt-2 text-[11px] text-slate-500">{t('skdr.charts.unmapped', { n: n(sm.ebs_unmapped_alerts) })}</p> : null}
-
-      {/* PR 012: No. 50–64 — tren mingguan + heatmap minggu epid × provinsi */}
-      <TrendHeatmap query={query as Record<string, unknown>} sumber={sumber} ukuran={ukuran} />
-
-      {/* No. 21–35 — CFR + 95% CI (Kasus PE, kasus konfirmasi) */}
-      {showPe && d.cfr.groups.length ? (
+        {showEbs ? <EbsUnitPanel query={query as Record<string, unknown>} /> : null}
+      </section>
+    ),
+    cfr: (
+      <section className="skdr-section w-full space-y-4">
+        <SectionHeader title="Case fatality rate (CFR)" description="Kematian per kasus Alert SKDR per penyakit dengan IK 95%; CFR Kasus PE tampil bila datanya ada." />
+        <AlertCfr query={query as Record<string, unknown>} />
+      {/* PR 022: CFR Kasus PE only when there are PE cases with a known outcome (no table of zeros) */}
+      {showPe && d.cfr.groups.some((g) => g.rows.some((r) => r.known > 0 || r.deaths > 0)) ? (
         <Panel title={t('skdr.exec.cfrTitle')} testId="cfr">
           {star > 0 ? (
             <div className="mb-3 border-l-4 border-amber-400 bg-amber-50/70 px-3 py-2 text-sm text-amber-900" data-testid="cfr-check">
@@ -366,14 +374,36 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
           <p className="mt-3 text-xs text-slate-500">{t('skdr.cfrList.footnote')} {tx.cfr_note} {t('skdr.exec.fractionNote')} {t('skdr.exec.cfrZoom', { max: pct1(cfrMax) })}</p>
         </Panel>
       ) : null}
-
-      {/* PR 016: No. 41–45 — Kinerja 7-1-7 as a 3-step timeline + per-disease table (follows the global Sumber filter). */}
-      <T717 data={sm?.t717} sumber={sumber} />
-
-      {/* PR 018: NAR–SKDR (No. 76–81) — dashboard section per sheet No. 10 */}
-      <NarSkdr qs={qs} sumber={sumber} />
-
+      </section>
+    ),
+    alert: (
+      <section className="skdr-section w-full space-y-4">
+        <SectionHeader title="Alert dan status tindak lanjut" />
+        <AlertSection query={query as Record<string, unknown>} />
+        {showEbs ? <EbsAlertPanel query={query as Record<string, unknown>} /> : null}
+      </section>
+    ),
+    t717: (
+      <section className="skdr-section w-full space-y-4">
+        <SectionHeader title="Ketepatan respons (7-1-7)" description="Deteksi ≤ 7 hari, notifikasi ≤ 1 hari, respons ≤ 7 hari. Dihitung hanya dari tanggal yang tersedia; tahap tanpa tanggal ditandai belum tersedia." />
+        <T717 data={sm?.t717} sumber={sumber} />
+        <AlertT717 query={query as Record<string, unknown>} />
+        {showEbs ? <EbsResponsCard query={query as Record<string, unknown>} /> : null}
+      </section>
+    ),
+    laboratorium: slots.laboratorium,
+    wilayah: afterCards, // PR 023: peta EBS rinci digabung ke Peta Sinyal Surveilans (PetaMultiMode)
+    tren: <><TrendHeatmap query={query as Record<string, unknown>} sumber={sumber} ukuran={ukuran} hideHeatmap={hidden.has('heatmap')} />{showEbs ? <div className="mt-4"><EbsPrevYear query={query as Record<string, unknown>} /></div> : null}</>,
+    klaster: slots.klaster,
+    nar: <NarSkdr qs={qs} sumber={sumber} />,
+  }
+  const order = [...sections.order, ...Object.keys(blocks).filter((k) => !sections.order.includes(k))]
+  return (
+    <div className="w-full space-y-6" aria-label={t('skdr.exec.aria')}>
+      {order.filter((id) => !hidden.has(id) && blocks[id]).map((id) => (
+        <div key={id} id={`seksi-${id}`} data-nav-label={sections.labels[id] || id} data-testid={`seksi-${id}`} className="scroll-mt-24">{blocks[id]}</div>
+      ))}
       {d.cards.length === 0 && !d.no_group_for_disease ? <div className="flex items-center gap-2 text-xs text-amber-700"><AlertTriangle className="h-4 w-4" />{t('skdr.exec.noConfig')}</div> : null}
-    </section>
+    </div>
   )
 }
