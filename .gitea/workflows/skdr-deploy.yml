@@ -10,7 +10,7 @@ on:
 
 concurrency:
   group: skdr-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
