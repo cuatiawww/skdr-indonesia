@@ -40,10 +40,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tmp_env="$(mktemp)"
-          trap 'rm -f "$tmp_env"' EXIT
-          cp .env.example "$tmp_env"
-          docker compose --env-file "$tmp_env" config --quiet
+          trap 'rm -f .env' EXIT
+          cp .env.example .env
+          docker compose config --quiet
 
   deploy:
     name: Deploy production
