@@ -1,0 +1,64 @@
+name: SKDR validate and deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: skdr-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  validate:
+    name: Validate
+    runs-on:
+      - production
+      - docker
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Build backend image validation
+        run: docker build --pull -t skdr-indonesia-backend-ci services/backend-rust
+
+      - name: Install frontend dependencies
+        working-directory: services/frontend-next
+        run: npm ci --no-audit --fund=false
+
+      - name: Typecheck frontend
+        working-directory: services/frontend-next
+        run: npm run typecheck
+
+      - name: Validate Compose model
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp_env="$(mktemp)"
+          trap 'rm -f "$tmp_env"' EXIT
+          cp .env.example "$tmp_env"
+          docker compose --env-file "$tmp_env" config --quiet
+
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on:
+      - production
+      - docker
+    steps:
+      - name: Checkout deployment script
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Deploy exact commit
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: bash scripts/deploy-gitea.sh

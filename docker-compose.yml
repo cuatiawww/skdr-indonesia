@@ -1,57 +1,61 @@
 services:
-  skdr-postgres:
-    image: postgres:16-alpine
-    container_name: skdr-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "127.0.0.1:${DB_HOST_PORT:-5442}:5432"
-    volumes:
-      - skdr_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  skdr-backend-rust:
+  skdr-indonesia-backend:
     build:
       context: ./services/backend-rust
-    container_name: skdr-backend-rust
+    container_name: skdr-indonesia-backend
     restart: on-failure
-    env_file: .env
-    ports:
-      - "127.0.0.1:${BACKEND_HOST_PORT:-8091}:8091"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-skdr_indonesia}
+      BACKEND_BIND_ADDR: ${BACKEND_BIND_ADDR:-0.0.0.0:8091}
+      MIGRATIONS_DIR: ${MIGRATIONS_DIR:-/init}
+      RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - ./database/init:/init:ro
-    depends_on:
-      skdr-postgres:
-        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8091/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
 
-  skdr-frontend-next:
+  skdr-indonesia-frontend:
     image: node:20
-    container_name: skdr-frontend-next
+    container_name: skdr-indonesia-frontend
     restart: unless-stopped
     working_dir: /app
-    command: sh -c "npm install && npm run dev -- -p 3200"
+    command: sh -c "npm ci --no-audit --fund=false && npm run dev -- -p 3200"
     environment:
-      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
-      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH}
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://skdr-indonesia-backend:8091}
+      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/skdr}
       NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-id}
       WATCHPACK_POLLING: "true"
-    ports:
-      - "127.0.0.1:${FRONTEND_HOST_PORT:-3200}:3200"
     volumes:
       - ./services/frontend-next:/app
-      - skdr_fe_node_modules:/app/node_modules
-      - skdr_fe_next:/app/.next
+      - skdr_indonesia_fe_node_modules:/app/node_modules
+      - skdr_indonesia_fe_next:/app/.next
+    networks:
+      - backend
+      - proxy
     depends_on:
-      - skdr-backend-rust
+      skdr-indonesia-backend:
+        condition: service_healthy
+
+networks:
+  backend:
+    external: true
+    name: backend
+  proxy:
+    external: true
+    name: proxy
 
 volumes:
-  skdr_pg_data:
-  skdr_fe_node_modules:
-  skdr_fe_next:
+  skdr_indonesia_fe_node_modules:
+  skdr_indonesia_fe_next:
