@@ -142,9 +142,9 @@ export default function PeListPage() {
             <div className="ml-auto text-xs font-medium text-slate-500">{t('skdr.pe.total')}: <span className="font-bold text-slate-800">{total.toLocaleString('id-ID')}</span></div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+          <div>
+            <div className="skdr-table-card">
+              <table className="skdr-table text-left text-xs">
                 <thead><tr className={tableHeadCls}>
                   <th className={thCls}>{t('skdr.pe.noPe')}</th><th className={thCls}>{t('skdr.pe.patient')}</th><th className={thCls}>{t('skdr.pe.region')}</th>
                   <th className={thCls}>{t('skdr.pe.tglLaporan')}</th><th className={thCls}>{t('skdr.pe.onset')}</th><th className={thCls}>{t('skdr.pe.classification')}</th>
@@ -152,9 +152,9 @@ export default function PeListPage() {
                   <th className={thCls}>{t('skdr.pe.completeness')}</th><th className={thCls}>{t('skdr.pe.updated')}</th>
                   <th className={`${thCls} text-right`}>Aksi</th>
                 </tr></thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody>
                   {rows.map((r) => (
-                    <tr key={r.id} className="hover:bg-blue-50/30">
+                    <tr key={r.id} >
                       <td className="px-4 py-2.5"><Link href={`/pe/${form}/${r.id}`} className="font-mono font-semibold text-primary hover:underline">{r.no_pe}</Link></td>
                       <td className="px-4 py-2.5 text-slate-700">{r.patient_initials || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-600">{r.kabkota || '—'}{r.province ? <span className="text-slate-400"> · {r.province}</span> : ''}</td>
@@ -213,18 +213,18 @@ export default function PeListPage() {
           </Modal>
         </>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+        <div>
+          <div className="skdr-table-card">
+            <table className="skdr-table text-left text-xs">
               <thead><tr className={tableHeadCls}>
                 <th className={thCls}>{t('skdr.pe.clusterCode')}</th><th className={thCls}>{t('skdr.pe.clusterName')}</th><th className={thCls}>{t('skdr.pe.region')}</th>
                 <th className={thCls}>{t('skdr.pe.tglRumor')}</th><th className={`${thCls} text-right`}>{t('skdr.pe.casesLinked')}</th><th className={thCls}>{t('skdr.pe.monitoring')}</th>
                 <th className={thCls}>{t('skdr.master.status')}</th><th className={thCls}>{t('skdr.pe.updated')}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {clusters.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">{t('skdr.pe.noClusters')}</td></tr>}
                 {clusters.map((c) => (
-                  <tr key={c.id} className="hover:bg-blue-50/30">
+                  <tr key={c.id} >
                     <td className="px-4 py-2.5 font-mono font-semibold text-slate-700">{c.code}</td>
                     <td className="px-4 py-2.5 text-slate-700">{c.name}</td>
                     <td className="px-4 py-2.5 text-slate-600">{c.kabkota || '—'}{c.province ? <span className="text-slate-400"> · {c.province}</span> : ''}</td>

@@ -75,7 +75,7 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
         let sql = format!(
             "SELECT {w} wk, e.disease_id, d.code, d.name, e.province_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint
              FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id
-             WHERE {dt} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4))
+             WHERE {dt} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit)
                AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))
              GROUP BY 1, 2, 3, 4, 5", w = week_of(EBS_DATE), dt = EBS_DATE);
         for r in c.query(&sql, &[&w0, &w1, &f.province, &f.kabkota, &dis]).await.map_err(internal)? {
@@ -99,7 +99,7 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
             "SELECT {w} wk, c.disease_id, d.code, d.name, c.province_id, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint
              FROM pe_cases c LEFT JOIN master_diseases d ON d.id = c.disease_id
              WHERE c.deleted_at IS NULL AND c.status = ANY($6) AND {dt} BETWEEN $1 AND $2
-               AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))
+               AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))
              GROUP BY 1, 2, 3, 4, 5", w = week_of(PE_DATE), dt = PE_DATE);
         for r in c.query(&sql, &[&w0, &w1, &f.province, &f.kabkota, &dis, &counted]).await.map_err(internal)? {
             let Some(&i) = idx.get(&r.get::<_, NaiveDate>(0)) else { continue };
@@ -187,9 +187,9 @@ pub async fn disease(State(s): State<AppState>, Path(code): Path<String>, Query(
     let n = ws.len();
     let idx: HashMap<NaiveDate, usize> = ws.iter().enumerate().map(|(i, w)| (*w, i)).collect();
     let ebs_where = format!("(e.disease_id = $1 OR lower(COALESCE(NULLIF(trim(e.verifikasi), ''), trim(e.diagnosa))) = ANY($2))
-        AND {EBS_DATE} BETWEEN $3 AND $4 AND (cardinality($5::int[]) = 0 OR e.province_id = ANY($5)) AND (cardinality($6::int[]) = 0 OR e.kabkota_id = ANY($6))");
+        AND {EBS_DATE} BETWEEN $3 AND $4 AND (cardinality($5::int[]) = 0 OR e.province_id = ANY($5)) AND (cardinality($6::int[]) = 0 OR e.kabkota_id = ANY($6)) AND skdr_unit_ok(e.unit)");
     let pe_where = format!("c.disease_id = $1 AND c.deleted_at IS NULL AND c.status = ANY($2)
-        AND {PE_DATE} BETWEEN $3 AND $4 AND (cardinality($5::int[]) = 0 OR c.province_id = ANY($5)) AND (cardinality($6::int[]) = 0 OR c.kabkota_id = ANY($6))");
+        AND {PE_DATE} BETWEEN $3 AND $4 AND (cardinality($5::int[]) = 0 OR c.province_id = ANY($5)) AND (cardinality($6::int[]) = 0 OR c.kabkota_id = ANY($6)) AND skdr_unit_ok(c.data->>'unit_pelapor')");
     let ep: [&(dyn tokio_postgres::types::ToSql + Sync); 6] = [&did, &matches, &w0, &w1, &f.province, &f.kabkota];
     let pp: [&(dyn tokio_postgres::types::ToSql + Sync); 6] = [&did, &counted, &w0, &w1, &f.province, &f.kabkota];
 
@@ -296,8 +296,8 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     // PR 018: multi-select — disease codes/names resolved to ids once in resolve()
     let dis: Vec<i32> = f.disease_ids.clone();
     let dis_missing = !f.disease.is_empty() && dis.is_empty();
-    let ebs_where = format!("{EBS_DATE} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))");
-    let pe_where = format!("c.deleted_at IS NULL AND c.status = ANY($6) AND {PE_DATE} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))");
+    let ebs_where = format!("{EBS_DATE} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit) AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))");
+    let pe_where = format!("c.deleted_at IS NULL AND c.status = ANY($6) AND {PE_DATE} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))");
     let ep: [&(dyn tokio_postgres::types::ToSql + Sync); 5] = [&w0, &w1, &f.province, &f.kabkota, &dis];
     let pp: [&(dyn tokio_postgres::types::ToSql + Sync); 6] = [&w0, &w1, &f.province, &f.kabkota, &dis, &counted];
     let on_ebs = show_ebs && !dis_missing;
@@ -362,7 +362,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
         for r in c.query(&format!("SELECT e.disease_id, MAX({EBS_DATE}) FROM ebs_reports e WHERE {ebs_where} AND e.disease_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
             last.entry(r.get(0)).or_default().0 = r.get(1);
         }
-        let fl = "(cardinality($1::int[]) = 0 OR e.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR e.kabkota_id = ANY($2)) AND (cardinality($3::int[]) = 0 OR e.disease_id = ANY($3))";
+        let fl = "(cardinality($1::int[]) = 0 OR e.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR e.kabkota_id = ANY($2)) AND skdr_unit_ok(e.unit) AND (cardinality($3::int[]) = 0 OR e.disease_id = ANY($3))";
         for r in c.query(&format!("SELECT e.disease_id,
                     COUNT(*) FILTER (WHERE (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '24 hours' AND (e.create_date AT TIME ZONE 'Asia/Jakarta') <= now())::bigint,
                     COUNT(*) FILTER (WHERE (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '48 hours' AND (e.create_date AT TIME ZONE 'Asia/Jakarta') < now() - interval '24 hours')::bigint,
@@ -377,7 +377,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
             last.entry(r.get(0)).or_default().1 = r.get(1);
             known_pe.insert(r.get(0), r.get(2));
         }
-        let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND (cardinality($1::int[]) = 0 OR c.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR c.kabkota_id = ANY($2)) AND (cardinality($3::int[]) = 0 OR c.disease_id = ANY($3))";
+        let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND (cardinality($1::int[]) = 0 OR c.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR c.kabkota_id = ANY($2)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($3::int[]) = 0 OR c.disease_id = ANY($3))";
         let lpp: [&(dyn tokio_postgres::types::ToSql + Sync); 4] = [&f.province, &f.kabkota, &dis, &counted];
         for r in c.query(&format!("SELECT c.disease_id,
                     COUNT(*) FILTER (WHERE c.created_at >= now() - interval '24 hours' AND c.created_at <= now())::bigint,
@@ -461,8 +461,8 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let cap = if w1 < today { w1 } else { today };
     // The sparkline spans exactly the selected epi-week range (global filter): daily buckets when the range is
     // ≤ 56 days, otherwise epi weeks. "until" = latest report date with data (UI note "data s.d. …"); no private window.
-    let fe = "(cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))";
-    let fpe = "c.deleted_at IS NULL AND c.status = ANY($6) AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))";
+    let fe = "(cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit) AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))";
+    let fpe = "c.deleted_at IS NULL AND c.status = ANY($6) AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))";
     let ebs_latest: Option<NaiveDate> = if on_ebs { c.query_one(&format!("SELECT MAX({EBS_DATE}) FROM ebs_reports e WHERE {EBS_DATE} BETWEEN $1 AND $2 AND {fe}"), &ep).await.map_err(internal)?.get(0) } else { None };
     let pe_latest: Option<NaiveDate> = if on_pe { c.query_one(&format!("SELECT MAX({PE_DATE}) FROM pe_cases c WHERE {PE_DATE} BETWEEN $1 AND $2 AND {fpe}"), &pp).await.map_err(internal)?.get(0) } else { None };
     let latest = [ebs_latest, pe_latest].into_iter().flatten().max();
@@ -486,7 +486,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
             let Some(&i) = didx.get(&r.get::<_, NaiveDate>(0)) else { continue };
             for k in 0..4 { a[k][i] = r.get::<_, i64>(k + 1); }
         }
-        let fl = "(cardinality($1::int[]) = 0 OR e.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR e.kabkota_id = ANY($2)) AND (cardinality($3::int[]) = 0 OR e.disease_id = ANY($3))";
+        let fl = "(cardinality($1::int[]) = 0 OR e.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR e.kabkota_id = ANY($2)) AND skdr_unit_ok(e.unit) AND (cardinality($3::int[]) = 0 OR e.disease_id = ANY($3))";
         let fp: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&f.province, &f.kabkota, &dis];
         let r = c.query_one(&format!("WITH x AS (SELECT e.jml_kasus k, LEAST(e.jml_kematian, e.jml_kasus) m, e.province_id p,
                     CASE WHEN (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
@@ -510,7 +510,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
             let Some(&i) = didx.get(&r.get::<_, NaiveDate>(0)) else { continue };
             for k in 0..3 { a[k][i] = r.get::<_, i64>(k + 1); }
         }
-        let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND (cardinality($1::int[]) = 0 OR c.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR c.kabkota_id = ANY($2)) AND (cardinality($3::int[]) = 0 OR c.disease_id = ANY($3))";
+        let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND (cardinality($1::int[]) = 0 OR c.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR c.kabkota_id = ANY($2)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($3::int[]) = 0 OR c.disease_id = ANY($3))";
         let fp: [&(dyn tokio_postgres::types::ToSql + Sync); 4] = [&f.province, &f.kabkota, &dis, &counted];
         let r = c.query_one(&format!("WITH x AS (SELECT c.outcome o, c.province_id p, CASE WHEN c.created_at >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
                   FROM pe_cases c WHERE {fl} AND c.created_at >= now() - interval '48 hours' AND c.created_at <= now())

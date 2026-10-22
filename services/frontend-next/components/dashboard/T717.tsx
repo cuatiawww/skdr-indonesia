@@ -86,11 +86,11 @@ function Card({ k, title, target, explain, s, missing, th, rows, open, onToggle 
       {/* shared expand: grid-rows 0fr → 1fr gives a smooth height animation without measuring */}
       <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`} aria-hidden={!open}>
         <div className="min-h-0 overflow-hidden">
-          <table className="mt-3 w-full text-left text-xs" data-testid="t717-detail">
+          <div className="skdr-table-card mt-3"><table className="skdr-table text-left text-xs" data-testid="t717-detail">
             <thead className="border-b border-slate-200 text-[10.5px] uppercase tracking-wide text-slate-500">
               <tr><th className="py-1.5 pr-2">{t('skdr.dtable.disease')}</th><th className="px-2 text-right">%</th><th className="px-2 text-right">{t('skdr.t717.medianShort')}</th><th className="pl-2 text-right">n/N</th><th className="w-20 pl-2"><span className="sr-only">{t('skdr.t717.split')}</span></th></tr>
             </thead>
-            <tbody className="divide-y divide-slate-200/70">
+            <tbody>
               {rows.length ? rows.map((r) => {
                 const rc = tone(r.s?.pct, th)
                 return (
@@ -104,7 +104,7 @@ function Card({ k, title, target, explain, s, missing, th, rows, open, onToggle 
                 )
               }) : <tr><td colSpan={5} className="py-2 text-slate-500">{t('skdr.state.empty')}</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
 
@@ -146,8 +146,8 @@ export default function T717({ data, sumber }: { data: T717Data | null | undefin
       <div className="mt-4" data-testid="t717-signals">
         <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">{t('skdr.t717.signalsTitle')}</h4>
         {data.signals?.length ? (
-          <div className="mt-2 max-h-80 overflow-auto rounded-lg border border-line">
-            <table className="w-full text-left text-xs">
+          <div className="skdr-table-card mt-2 max-h-80 overflow-y-auto">
+            <table className="skdr-table text-left text-xs">
               <thead className="sticky top-0 bg-slate-50 text-[10.5px] uppercase tracking-wide text-slate-500">
                 <tr><th className="px-2 py-1.5">{t('skdr.t717.colSignal')}</th><th className="px-2">{t('skdr.dtable.disease')}</th><th className="px-2">{t('skdr.t717.colLocation')}</th>
                   <th className="px-2">{t('skdr.t717.colReport')}</th><th className="px-2">{t('skdr.t717.colCreated')}</th><th className="px-2 text-right">{t('skdr.t717.notify')}</th>

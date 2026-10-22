@@ -39,10 +39,10 @@ function Indicators() {
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full text-left text-xs">
+      <div className="skdr-table-card">
+        <table className="skdr-table text-left text-xs">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">{t('skdr.docs.colName')}</th><th className="px-3 py-2">{t('skdr.docs.colStatus')}</th><th className="px-3 py-2">{t('skdr.docs.colNote')}</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {list.map((i, k) => (
               <tr key={k} className="align-top"><td className="px-3 py-2 text-slate-800">{i.name}</td>
                 <td className="w-28 px-3 py-2"><span className={`rounded px-1.5 py-0.5 font-semibold ${IND_TONE[i.status] || ''}`}>{t(`skdr.docs.status.${i.status}`)}</span></td><td className="px-3 py-2 text-slate-500">{i.note}</td></tr>

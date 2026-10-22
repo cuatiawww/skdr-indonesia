@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useNavGroups, useNavMatch } from "@/lib/nav";
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
-import { PUBLIC_BASE_PATH } from "@/lib/public-path";
 import Breadcrumbs from "./Breadcrumbs";
 import Footer from "./Footer";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -30,26 +29,7 @@ export default function AppShell({
   const toggleCollapse = () => setCollapsed((c) => { window.localStorage.setItem("skdr_sidebar_collapsed", c ? "0" : "1"); return !c; });
   const authenticated = true; // SKDR: no auth
   const isDirectoryPage = false;
-  // on Beranda the header is transparent and home.jpg runs continuously from the very top (behind the
-  // header) to the bottom of the hero, measured from [data-testid=home-hero] so there is no seam between them.
   const isHome = pathname === "/";
-  const homeWrapRef = useRef<HTMLDivElement>(null);
-  const [homeBgH, setHomeBgH] = useState(0);
-  useEffect(() => {
-    if (!isHome) return;
-    const wrap = homeWrapRef.current;
-    if (!wrap) return;
-    const measure = () => {
-      const hero = wrap.querySelector('[data-testid="home-hero"]');
-      if (hero) setHomeBgH(Math.round(hero.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(wrap);
-    const mo = new MutationObserver(measure);
-    mo.observe(wrap, { childList: true, subtree: true });
-    return () => { ro.disconnect(); mo.disconnect(); };
-  }, [isHome]);
 
   // Close sidebar drawer automatically on page/route navigation
   useEffect(() => {
@@ -85,26 +65,17 @@ export default function AppShell({
           onClose={() => setSidebarOpen(false)}
         />
       </div>
-      <div ref={homeWrapRef} className={isHome ? "relative isolate flex flex-1 flex-col" : "contents"}>
-        {isHome ? (
-          <>
-            <div aria-hidden data-testid="home-bg" className="pointer-events-none absolute inset-x-0 top-0 -z-10 bg-white bg-cover bg-no-repeat bg-[position:right_top]" style={{ height: homeBgH || "100vh", backgroundImage: `url(${PUBLIC_BASE_PATH}/home.jpg)` }} />
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 bg-gradient-to-r from-white/90 via-white/50 to-transparent lg:from-white/70 lg:via-white/20" style={{ height: homeBgH || "100vh" }} />
-          </>
-        ) : null}
-        <div className="print:hidden">
-          <DashboardHeader
-            authenticated={authenticated}
-            consoleMode={consoleMode}
-            transparent={isHome}
-            onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-          />
-        </div>
-        <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'pb-3 md:pb-5'}`}>
-          {/* PR 018: no breadcrumb on Dasbor Utama (section quick-nav instead) */}
-          {pathname === "/main-dashboard" ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
-          <div className={isHome ? "" : "pt-3 md:pt-4"}>{children}</div>
-        </div>
+      <div className="print:hidden">
+        <DashboardHeader
+          authenticated={authenticated}
+          consoleMode={consoleMode}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+        />
+      </div>
+      <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'pb-3 md:pb-5'}`}>
+        {/* PR 018: no breadcrumb on Dasbor Utama or Beranda */}
+        {pathname === "/main-dashboard" || isHome ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
+        <div className={isHome ? "" : "pt-3 md:pt-4"}>{children}</div>
       </div>
       <div className="print:hidden">
         <Footer />

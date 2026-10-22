@@ -2,6 +2,7 @@ mod cache;
 mod case_reports;
 mod signals;
 mod privacy;
+mod fasyankes;
 mod nar;
 mod dashboard;
 mod db;
@@ -12,6 +13,7 @@ mod master;
 mod master_admin;
 mod pe;
 mod pe_engine;
+mod external_sync;
 
 use axum::{http::StatusCode, routing::{get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -102,9 +104,29 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/signals/pe-deaths", get(signals::pe_deaths))
         .route("/api/v1/signals/:source/:id", get(signals::detail))
         .route("/api/v1/nar/summary", get(nar::summary))
+        .route("/api/v1/master/fasyankes", get(fasyankes::list))
+        .route("/api/v1/filters/units", get(fasyankes::units))
+        .route("/api/v1/admin/fasyankes/status", get(fasyankes::status))
+        .route("/api/v1/admin/fasyankes/sync", post(fasyankes::sync_now))
         .route("/api/v1/crawling-stats", get(dashboard::crawling_stats))
         .route("/api/v1/crawling-stats/live", get(dashboard::crawling_stats_live))
         .route("/api/v1/crawl-history/summary", get(dashboard::crawl_history_summary))
+        // PR 019: External map layers & integration sync (BNPB, Flight Connect, NASA FIRMS, Satwa Liar)
+        .route("/api/v1/map-layers/flight-airports", get(external_sync::map_flight_airports))
+        .route("/api/v1/map-layers/flight-routes", get(external_sync::map_flight_routes))
+        .route("/api/v1/map-layers/flights", get(external_sync::map_flights))
+        .route("/api/v1/map-layers/fires", get(external_sync::map_fires))
+        .route("/api/v1/map-layers/wildlife", get(external_sync::map_wildlife))
+        .route("/api/v1/map-layers/hazards", get(external_sync::map_hazards))
+        .route("/api/v1/map-layers/vectors", get(external_sync::map_vectors))
+        .route("/api/v1/integrasi/bnpb/status", get(external_sync::bnpb_status))
+        .route("/api/v1/integrasi/bnpb/sync", post(external_sync::bnpb_sync))
+        .route("/api/v1/integrasi/flight/status", get(external_sync::flight_status))
+        .route("/api/v1/integrasi/flight/sync", post(external_sync::flight_sync))
+        .route("/api/v1/integrasi/firms/status", get(external_sync::firms_status))
+        .route("/api/v1/integrasi/firms/sync", post(external_sync::firms_sync))
+        .route("/api/v1/integrasi/satwa-liar/status", get(external_sync::wildlife_status))
+        .route("/api/v1/integrasi/satwa-liar/sync", post(external_sync::wildlife_sync))
         // PR 016: short response cache for dashboard/analytics reads (config: app_settings 'api_cache').
         .layer(axum::middleware::from_fn(cache::layer))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))

@@ -380,6 +380,20 @@
 
 /* PR 018: shared surfaces. Cards only where they carry meaning (KPI tiles, disease cards, carousel items, modals). */
 @layer components {
+  /* PR 018: one shared table style — subtle card (same as heatmap/map card), tinted header, zebra + hover rows,
+     horizontal scroll inside the card. :where() keeps specificity low so row-specific utilities (e.g. highlighted rows) win. */
+  .skdr-table-card { background: rgb(var(--card-bg)); border: 1px solid rgb(var(--card-border)); border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,0.05); overflow-x: auto; }
+  .skdr-table { width: 100%; border-collapse: collapse; }
+  .skdr-table :where(th, td) { padding-left: 0.625rem; padding-right: 0.625rem; }
+  .skdr-table :where(th) { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .skdr-table :where(td) { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .skdr-table :where(th:first-child, td:first-child) { padding-left: 0.875rem; }
+  .skdr-table :where(th:last-child, td:last-child) { padding-right: 0.875rem; }
+  .skdr-table :where(thead th) { background: rgb(var(--brand-50) / 0.7); color: rgb(71 85 105); border-bottom: 1px solid rgb(var(--card-border)); }
+  .skdr-table :where(tbody > tr) { border-top: 1px solid rgb(var(--rule) / 0.6); }
+  .skdr-table :where(tbody > tr:first-child) { border-top: 0; }
+  .skdr-table :where(tbody > tr:nth-child(even)) { background: rgb(var(--brand-50) / 0.35); }
+  .skdr-table :where(tbody > tr:hover) { background: rgb(var(--brand-50) / 0.8); }
   .skdr-card { background: rgb(var(--card-bg)); border: 1px solid rgb(var(--card-border)); border-radius: 12px; }
   .skdr-rule { border-color: rgb(var(--rule)); }
   .skdr-section { padding-top: var(--section-pad); }

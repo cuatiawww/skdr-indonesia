@@ -103,15 +103,20 @@ Yang dibutuhkan: integrasi API NAR (hasil laboratorium per NIK) dan kesepakatan 
 - Tangkapan layar: `after7-map-{1440,detail-1440}.png`, `after9-map-card-{1440,390}.png`.
 
 ## Header dan Beranda
-- Header semua halaman: latar `public/header.webp` / `public/header.jpg` (rata kanan, cover) dengan pudar putih di kiri; judul teal gelap. Gradien hijau lama dihapus. Tangkapan layar: `after8-header-{1440,390}.png`.
-- Beranda: hero penuh dengan `public/home.webp` / `public/home.jpg`; panel "Rilis Data Terkini" putih semi-transparan (backdrop-blur, bayangan tipis); pita situasi tidak lagi hijau tua (latar putih, teks teal gelap). Tangkapan layar: `after8-beranda-{1440,390}.png`.
-- Beranda tanpa sambungan: header transparan (tanpa border), `home.webp` / `home.jpg` digambar oleh `AppShell` dari tepi atas (di belakang header) sampai bawah hero (tinggi diukur dari `home-hero`), tanpa padding atas. Halaman lain: header-bg rata dengan konten. Tangkapan layar: `after10-seam-{1440,390}.png`, `after10-seam-dash-{1440,390}.png`.
+- Header semua halaman: latar `public/header-bg.jpg` (rata kanan, cover) dengan pudar putih di kiri; judul teal gelap. Gradien hijau lama dihapus. Tangkapan layar: `after8-header-{1440,390}.png`.
+- Beranda: hero penuh dengan `public/home-bg.webp` (≈150 KB, dari home-bg.jpg); panel "Rilis Data Terkini" putih semi-transparan (backdrop-blur, bayangan tipis); pita situasi tidak lagi hijau tua (latar putih, teks teal gelap). Tangkapan layar: `after8-beranda-{1440,390}.png`.
+- Beranda tanpa sambungan: header transparan (tanpa border), `home-bg.webp` digambar oleh `AppShell` dari tepi atas (di belakang header) sampai bawah hero (tinggi diukur dari `home-hero`), tanpa padding atas. Halaman lain: header-bg rata dengan konten. Tangkapan layar: `after10-seam-{1440,390}.png`, `after10-seam-dash-{1440,390}.png`.
 
 ## Menu bagian Dasbor (Spesifikasi No. 10)
 - `components/dashboard/SectionNav.tsx`: bilah pil mengambang (kartu frosted, bayangan tipis) yang muncul setelah bilah filter tergulir lewat. Daftar bagian diambil dari bagian tingkat atas halaman (`section.skdr-section` + judul `h2.skdr-section-title`), tanpa daftar di kode; label = judul bagian tanpa keterangan dalam kurung.
 - Klik = gulir halus dengan offset 84 px; bagian aktif disorot lewat IntersectionObserver. Tombol "Sembunyikan" melipat menjadi tombol kecil "Bagian"; status disimpan di localStorage (`skdr_section_nav_collapsed`). Di ponsel bilah dapat digulir horizontal.
 - Bilah filter tetap tidak sticky. Breadcrumb dihapus hanya di Dasbor Utama.
 - Tangkapan layar: `after11-sectionnav-{1440,390}.png`, `after11-sectionnav-collapsed-{1440,390}.png`.
+
+## Gaya tabel bersama
+- Kelas bersama di `globals.css`: `.skdr-table-card` (kartu halus seperti kartu heatmap/peta, gulir horizontal di dalam kartu) dan `.skdr-table` (header berwarna teal muda, baris zebra, sorotan hover; spesifisitas rendah lewat `:where()` sehingga baris khusus seperti baris berbintang CFR tetap berwarna sendiri). Judul bagian tetap di luar kartu. Grid heatmap tidak diubah.
+- Tabel yang diubah: Daftar PE; daftar per formulir PE (2 tabel); Dasbor: CFR per penyakit, NAR "Perlu tindak lanjut", 7-1-7 (tabel per tahap dan waktu per sinyal); modal daftar kematian; Detail Penyakit: wilayah teratas, EBS terbaru, Kasus PE terbaru; Sinkronisasi EBS (riwayat dan pemetaan); Dokumentasi (tabel indikator dan tabel Markdown); Master provinsi/kabupaten/penyakit.
+- Tangkapan layar: `after12-tables-{pe,dasbor-cfr,penyakit}-{1440,390}.png`.
 
 ## Endpoint baru / berubah
 - `GET /api/v1/signals/pe-deaths`: daftar kematian per formulir/klasifikasi.

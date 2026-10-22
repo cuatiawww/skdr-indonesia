@@ -22,9 +22,10 @@ export type FlightRoutesResponse = {
 };
 
 export const REGION_LABELS: Record<string, string> = {
-  ASEAN: "ASEAN",
-  ASEAN_PLUS_THREE: "ASEAN+3",
-  GLOBAL: "Global",
+  ID: "Indonesia",
+  INDONESIA: "Indonesia",
+  DOMESTIK: "Domestik",
+  NASIONAL: "Nasional",
 };
 
 /** PR 117: the backend answers 503 when the DB pool is busy (retryable). Retry once after a short wait. */

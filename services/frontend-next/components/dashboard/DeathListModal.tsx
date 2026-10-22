@@ -60,13 +60,13 @@ export default function DeathListModal({ title, form, codes, qs, onClose }: { ti
           {err ? <ErrorState message={err} onRetry={() => setTick((x) => x + 1)} /> : null}
           {!rows && !err ? <div className="space-y-2" aria-busy="true">{[0, 1, 2, 3].map((i) => <div key={i} className="h-9 animate-pulse rounded bg-page" />)}</div> : null}
           {rows ? (rows.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-xs">
+            <div className="skdr-table-card">
+              <table className="skdr-table min-w-[640px] text-left text-xs">
                 <thead className="border-b skdr-rule text-[10.5px] uppercase tracking-wide text-slate-500">
                   <tr><th className="py-1.5 pr-2">{t('skdr.cfrList.no')}</th><th className="px-2">{t('skdr.cfrList.unit')}</th><th className="px-2">{t('skdr.cfrList.kab')}</th>
                     <th className="px-2">{t('skdr.cfrList.week')}</th><th className="px-2">{t('skdr.cfrList.date')}</th><th className="px-2">{t('skdr.cfrList.status')}</th><th /></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
                       <td className="py-1.5 pr-2 font-mono font-semibold text-slate-800">{r.no_pe}</td>

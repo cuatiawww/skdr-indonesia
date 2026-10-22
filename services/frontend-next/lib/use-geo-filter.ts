@@ -4,14 +4,16 @@
 // moving between pages keeps the same selection. Empty lists = semua (default).
 import { useCallback, useEffect, useState } from 'react'
 
-export type GeoFilter = { diseases: string[]; provinceIds: number[]; kabkotaIds: number[] }
+/** PR 019: units = Unit pelapor (lower-cased names as recorded in EBS/PE), URL ?unit=a|b */
+export type GeoFilter = { diseases: string[]; provinceIds: number[]; kabkotaIds: number[]; units?: string[] }
 export const GEO_KEY = 'skdr-geo-filter'
 export const EMPTY_GEO: GeoFilter = { diseases: [], provinceIds: [], kabkotaIds: [] }
 
 const ints = (v: string | null) => (v || '').split(',').map(Number).filter((x) => Number.isFinite(x) && x > 0)
 export function geoFromUrl(sp: URLSearchParams): GeoFilter | null {
-  if (!sp.has('penyakit') && !sp.has('prov') && !sp.has('kab')) return null
-  return { diseases: (sp.get('penyakit') || '').split(',').map((x) => x.trim()).filter(Boolean), provinceIds: ints(sp.get('prov')), kabkotaIds: ints(sp.get('kab')) }
+  if (!sp.has('penyakit') && !sp.has('prov') && !sp.has('kab') && !sp.has('unit')) return null
+  return { diseases: (sp.get('penyakit') || '').split(',').map((x) => x.trim()).filter(Boolean), provinceIds: ints(sp.get('prov')), kabkotaIds: ints(sp.get('kab')),
+    units: (sp.get('unit') || '').split('|').map((x) => x.trim()).filter(Boolean) }
 }
 export function loadGeo(): GeoFilter {
   if (typeof window === 'undefined') return EMPTY_GEO
@@ -26,6 +28,7 @@ export function saveGeo(g: GeoFilter) {
   const url = new URL(window.location.href)
   const set = (k: string, v: (string | number)[]) => (v.length ? url.searchParams.set(k, v.join(',')) : url.searchParams.delete(k))
   set('penyakit', g.diseases); set('prov', g.provinceIds); set('kab', g.kabkotaIds)
+  if (g.units?.length) url.searchParams.set('unit', g.units.join('|')); else url.searchParams.delete('unit')
   for (const old of ['disease', 'province_id', 'kabkota_id']) url.searchParams.delete(old)
   window.history.replaceState(window.history.state, '', url.toString())
 }
@@ -34,6 +37,7 @@ export function geoParams(g: GeoFilter, withDisease = true): Record<string, stri
     disease: withDisease && g.diseases.length ? g.diseases.join(',') : undefined,
     province_id: g.provinceIds.length ? g.provinceIds.join(',') : undefined,
     kabkota_id: g.kabkotaIds.length ? g.kabkotaIds.join(',') : undefined,
+    unit: g.units?.length ? g.units.join('|') : undefined,
   }
 }
 

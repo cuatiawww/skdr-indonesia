@@ -56,7 +56,7 @@ export default function PenyakitPage() {
     <div className="w-full space-y-5 bg-page px-4 py-6 sm:px-6 lg:px-8">
       <PageHeader title={t('skdr.penyakit.title')} subtitle={t('skdr.penyakit.subtitleSummary')} />
       <SkdrFilterBar compact value={barValue} sumber={sumber} onSumberChange={setSumber} onChange={() => {}} isLoading={!rows && !err}
-        onApply={(f) => { setGeo({ diseases: f.diseases, provinceIds: f.provinceIds, kabkotaIds: f.kabkotaIds }); setRange({ startYear: f.startYear, startWeek: f.startWeek, endYear: f.endYear, endWeek: f.endWeek }) }} />
+        onApply={(f) => { setGeo({ diseases: f.diseases, provinceIds: f.provinceIds, kabkotaIds: f.kabkotaIds, units: f.units || [] }); setRange({ startYear: f.startYear, startWeek: f.startWeek, endYear: f.endYear, endWeek: f.endWeek }) }} />
       <div className="flex flex-wrap items-center gap-3 border-b skdr-rule pb-3">
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

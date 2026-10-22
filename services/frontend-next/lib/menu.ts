@@ -1,4 +1,6 @@
 import {
+  Hospital,
+  Building2,
   Home,
   Radio,
   Database,
@@ -44,6 +46,8 @@ import {
 
 // Icon registry for serializable navigation configurations
 export const MENU_ICON_MAP: Record<string, any> = {
+  Hospital,
+  Building2,
   Home,
   Radio,
   Database,

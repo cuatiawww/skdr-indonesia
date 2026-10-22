@@ -68,10 +68,10 @@ export default function Markdown({ text }: { text: string }) {
       while (i < lines.length && lines[i].startsWith('|')) { rows.push(lines[i].trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())); i++ }
       const [head, , ...body] = rows
       blocks.push(
-        <div key={k++} className="my-3 overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-left text-xs">
+        <div key={k++} className="skdr-table-card my-3">
+          <table className="skdr-table text-left text-xs">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr>{head.map((h, j) => <th key={j} className="px-3 py-2 font-bold">{inline(h)}</th>)}</tr></thead>
-            <tbody className="divide-y divide-slate-100">{body.map((r, a) => <tr key={a} className="align-top">{r.map((c, j) => <td key={j} className="px-3 py-2 text-slate-700">{inline(c)}</td>)}</tr>)}</tbody>
+            <tbody>{body.map((r, a) => <tr key={a} className="align-top">{r.map((c, j) => <td key={j} className="px-3 py-2 text-slate-700">{inline(c)}</td>)}</tr>)}</tbody>
           </table>
         </div>)
       continue

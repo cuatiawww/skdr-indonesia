@@ -335,8 +335,8 @@ export default function ExecutiveSummary({ query, afterCards, sumber = 'all', uk
                 </ResponsiveContainer></div>
               ) : <Empty>{t('skdr.exec.cfrEmpty')}</Empty>}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-sm">
+            <div className="skdr-table-card">
+              <table className="skdr-table min-w-[560px] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wider text-slate-500">
                   <tr><th className="px-2 py-2">{t('skdr.exec.cfrStatus')}</th><th>{t('skdr.exec.cfrKnown')}</th><th>{t('skdr.exec.cfrDeaths')}</th><th>CFR</th><th>{t('skdr.exec.cfrCi')}</th><th>{t('skdr.exec.cfrUnknown')}</th><th><span className="sr-only">{t('skdr.signal.view')}</span></th></tr>
                 </thead>

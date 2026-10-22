@@ -354,20 +354,8 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
       </div>
       {!collapsed && (
         <div className="max-h-[60vh] space-y-2 overflow-y-auto px-3 py-2 text-[11px]">
-          <div className="flex gap-1">
-            {(data?.regions || ["ASEAN", "ASEAN_PLUS_THREE", "GLOBAL"]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => {
-                  setSelectedIata(null);
-                  setRegion(r);
-                }}
-                className={`flex-1 rounded-lg border px-2 py-1 font-bold ${region === r ? "border-primary bg-blue-50 text-primary" : "border-slate-200 bg-slate-50 text-slate-600"}`}
-              >
-                {REGION_LABELS[r] || r}
-              </button>
-            ))}
+          <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-2.5 py-1 text-center font-bold text-slate-700">
+            {tr("skdr.flights.scopeIndonesia") || "Wilayah Domestik Indonesia"}
           </div>
 
           <div>
@@ -387,8 +375,8 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
               <span className="mt-0.5 inline-block h-3 w-3 shrink-0 rounded-full border-[2.5px]" style={{ borderColor: OUTBREAK_RED }} />
               <span>
                 Within {radius ?? "–"} km of a recent outbreak{data ? ` (${data.near_outbreak_count})` : ""}.
-                <span className="text-slate-500"> {tr("skdr.flights.indication_only_not_a_confirmed_importat")}</span>
-                <span className="mt-1 block text-slate-500" title={tr("skdr.flights.simulated_aircraft_visual_only_not_live_")}>{tr("skdr.flights.simulated_aircraft_visual_only_not_live_")}</span>
+                <span className="text-slate-500"> {tr("skdr.flights.indication_only_not_a_confirmed_importat")} </span>
+                <span className="mt-1 block text-slate-500" title={tr("skdr.flights.simulated_aircraft_visual_only_not_live_")}>{tr("skdr.flights.simulated_aircraft_visual_only_not_live_")} </span>
               </span>
             </div>
           </div>
@@ -410,8 +398,7 @@ export default function FlightRoutesLayer({ map, visible, onStatus }: Props) {
                   </div>
                   <div className="text-slate-500">{routes.origin.name}, {routes.origin.country_iso2}</div>
                   <div className="font-semibold text-primary">
-                    {routes.total} destinations in {REGION_LABELS[routes.region] || routes.region}
-                    {routes.total_all_regions !== routes.total ? ` (${routes.total_all_regions} worldwide)` : ""}
+                    {routes.total} {tr("skdr.flights.destinationsIn") || "destinasi rute di"} {REGION_LABELS[routes.region] || "Indonesia"}
                   </div>
                   {routes.origin.near_outbreak && (
                     <div className="mt-0.5 flex items-center gap-1 text-[#dc2626]">

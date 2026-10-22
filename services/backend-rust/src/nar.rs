@@ -27,7 +27,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
                 COUNT(*) FILTER (WHERE trim(c.nik) ~ $8)::bigint
          FROM pe_cases c JOIN master_diseases d ON d.id = c.disease_id
          WHERE c.deleted_at IS NULL AND c.status = ANY($6) AND {PE_DATE} BETWEEN $1 AND $2
-           AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4))
+           AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor')
            AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))
            AND NOT (COALESCE(c.classification_override, c.classification, '') = ANY($7))
          GROUP BY 1, 2 ORDER BY 2"),

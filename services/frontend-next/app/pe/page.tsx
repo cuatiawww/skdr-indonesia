@@ -139,15 +139,15 @@ export default function DaftarPePage() {
         <div className="ml-auto text-xs font-medium text-slate-500">Total: <span className="font-bold text-slate-800">{total.toLocaleString('id-ID')}</span></div>
       </div>
 
-      <div className="overflow-hidden border-b skdr-rule">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+      <div>
+        <div className="skdr-table-card">
+          <table className="skdr-table text-left text-xs">
             <thead><tr className={tableHeadCls}>
               <th className={thCls}>No. PE</th><th className={thCls}>Penyakit</th><th className={thCls}>Pasien</th><th className={thCls}>Wilayah</th>
               <th className={thCls}>Tgl. Laporan</th><th className={thCls}>Klasifikasi</th><th className={thCls}>Status</th><th className={thCls}>Diperbarui</th>
               <th className={`${thCls} text-right`}>Aksi</th>
             </tr></thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {rows.map((r) => {
                 const fk = r.form_key || ''
                 return (

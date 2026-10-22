@@ -140,7 +140,7 @@ pub async fn pe_deaths(State(s): State<AppState>, Query(q): Query<DeathsQuery>, 
          WHERE p.deleted_at IS NULL AND p.form_key = $1 AND COALESCE(p.classification_override, p.classification) = ANY($2) AND p.outcome = $3
            AND (cardinality($4::text[]) = 0 OR p.status = ANY($4))
            AND ($5::date IS NULL OR COALESCE(p.tgl_laporan, p.created_at::date) >= $5) AND ($6::date IS NULL OR COALESCE(p.tgl_laporan, p.created_at::date) <= $6)
-           AND (cardinality($7::int[]) = 0 OR p.province_id = ANY($7)) AND (cardinality($8::int[]) = 0 OR p.kabkota_id = ANY($8))
+           AND (cardinality($7::int[]) = 0 OR p.province_id = ANY($7)) AND (cardinality($8::int[]) = 0 OR p.kabkota_id = ANY($8)) AND skdr_unit_ok(p.data->>'unit_pelapor')
          ORDER BY 6 DESC, p.id DESC LIMIT 500",
         &[&q.form, &classes, &dead, &counted, &f.start, &f.end, &f.province, &f.kabkota]).await.map_err(internal)?;
     let data: Vec<Value> = rows.iter().map(|r| {

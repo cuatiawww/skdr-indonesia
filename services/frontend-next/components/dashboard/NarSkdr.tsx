@@ -81,12 +81,12 @@ export default function NarSkdr({ qs, sumber }: { qs: string; sumber: Sumber }) 
 
         <div className="skdr-card p-4" data-testid="nar-followup">
           <h3 className="text-sm font-bold text-slate-900">{t('skdr.nar.followTitle')}</h3>
-          <table className="mt-3 w-full text-left text-xs">
+          <div className="skdr-table-card mt-3"><table className="skdr-table text-left text-xs">
             <thead className="text-[11px] uppercase tracking-wider text-slate-500">
               <tr className="border-b border-line"><th className="py-1.5 pr-2">{t('skdr.nar.colAction')}</th><th className="pr-2">{t('skdr.nar.colDisease')}</th><th className="pr-2">{t('skdr.nar.colKab')}</th><th>{t('skdr.nar.colWeek')}</th></tr>
             </thead>
             <tbody><tr><td colSpan={4} className="py-6 text-center text-slate-500">{t('skdr.nar.followEmpty')}</td></tr></tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </Panel>

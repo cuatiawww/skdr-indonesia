@@ -132,7 +132,7 @@ export default function DiseaseDetailPage() {
         <SkdrFilterBar compact showDisease={false} sumber={sumber} onSumberChange={setSumber}
           value={barValue}
           onChange={() => {}}
-          onApply={(f) => { setGeo({ diseases: geo.diseases, provinceIds: f.provinceIds, kabkotaIds: f.kabkotaIds }); setRange({ startYear: f.startYear, startWeek: f.startWeek, endYear: f.endYear, endWeek: f.endWeek }) }} />
+          onApply={(f) => { setGeo({ diseases: geo.diseases, provinceIds: f.provinceIds, kabkotaIds: f.kabkotaIds, units: f.units || [] }); setRange({ startYear: f.startYear, startWeek: f.startWeek, endYear: f.endYear, endWeek: f.endWeek }) }} />
         <p className="mt-2 text-right text-[11px] text-slate-500">{d.scope} · {period}</p>
       </div>
 
@@ -211,7 +211,7 @@ export default function DiseaseDetailPage() {
           <div data-testid="top-regions">
             <h3 className="text-sm font-black text-slate-900">{t('skdr.penyakit.topRegions')}</h3>
             {topRows.length ? (
-              <table className="mt-2 w-full text-sm">
+              <div className="skdr-table-card mt-2"><table className="skdr-table text-sm">
                 <thead className="text-[11px] uppercase tracking-wide text-slate-500"><tr><th /><th className="py-1 text-left font-semibold">{regionWord}</th>
                   {showEbs ? <th className="text-right font-semibold text-ebs">EBS</th> : null}{showPe && hasPe ? <th className="text-right font-semibold text-pe">PE</th> : null}</tr></thead>
                 <tbody>
@@ -229,7 +229,7 @@ export default function DiseaseDetailPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             ) : <MutedNote>{t('skdr.penyakit.emptyRegions')}</MutedNote>}
           </div>
         </div>
@@ -270,7 +270,7 @@ export default function DiseaseDetailPage() {
           {showEbs ? (
             <div data-testid="latest-ebs"><SourceKey source="ebs" label={t('skdr.penyakit.latestEbs')} />
               {d.latest.ebs.length ? (
-                <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
+                <div className="skdr-table-card mt-2"><table className="skdr-table min-w-[520px] text-left text-xs">
                   <thead className="border-b border-slate-200 text-[11px] uppercase text-slate-500"><tr><th className="py-1.5">{t('skdr.penyakit.colNoEbs')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th className="text-right">{t('skdr.penyakit.colCases')}</th><th className="text-right">{t('skdr.penyakit.colDeaths')}</th><th><span className="sr-only">{t('skdr.signal.view')}</span></th></tr></thead>
                   <tbody>{d.latest.ebs.map((r, i) => (
                     <tr key={(r.no_ebs || '') + i} className="border-b border-slate-100"><td className="py-1.5 font-mono">{r.no_ebs || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}<span className="text-slate-400"> · {r.province || ''}</span></td><td>{r.status || '—'}</td><td className="text-right">{fmt(r.cases)}</td><td className="text-right text-red-600">{fmt(r.deaths)}</td>
@@ -282,15 +282,15 @@ export default function DiseaseDetailPage() {
           {showPe ? (
             <div data-testid="latest-pe"><SourceKey source="pe" label={t('skdr.penyakit.latestPe')} />
               {d.latest.pe.length ? (
-                <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs">
+                <><div className="skdr-table-card mt-2"><table className="skdr-table min-w-[520px] text-left text-xs">
                   <thead className="border-b border-slate-200 text-[11px] uppercase text-slate-500"><tr><th className="py-1.5">{t('skdr.penyakit.colNoPe')}</th><th>{t('skdr.penyakit.colPatient')}</th><th>{t('skdr.penyakit.colDate')}</th><th>{t('skdr.penyakit.colRegion')}</th><th>{t('skdr.penyakit.colStatus')}</th><th><span className="sr-only">{t('skdr.signal.view')}</span></th></tr></thead>
                   <tbody>{d.latest.pe.map((r) => (
                     <tr key={r.id} className="border-b border-slate-100"><td className="py-1.5"><Link href={`/pe/${r.form_key}/${r.id}?mode=lihat`} className="font-mono font-semibold text-primary hover:underline">{r.no_pe}</Link></td>
                       <td>{r.patient_initials || '—'}</td><td className="font-mono">{r.date || '—'}</td><td>{r.kabkota || '—'}</td>
                       <td><span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${STATUS_STYLE[r.status] || ''}`}>{r.status}</span></td>
                       <td className="pl-2 text-right"><LihatButton onClick={() => openSignal('pe', r.id)} /></td></tr>
-                  ))}</tbody></table>
-                  <p className="mt-2 text-[11px] text-slate-400">{t('skdr.penyakit.privacy')}</p></div>
+                  ))}</tbody></table></div>
+                  <p className="mt-2 text-[11px] text-slate-400">{t('skdr.penyakit.privacy')}</p></>
               ) : <MutedNote>{noPeText}</MutedNote>}
             </div>
           ) : null}

@@ -91,7 +91,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                  FROM ebs_reports e
                  WHERE ($1::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) <= $2)
-                   AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4))
+                   AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit)
                    AND ($5::text[] IS NULL OR true) AND ($6::text IS NULL OR true)
                  GROUP BY 1",
                 &[&f.start, &f.end, &f.province, &f.kabkota, &f.disease, &f.source, &verified_prefix, &discarded],
@@ -120,7 +120,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                  FROM pe_cases
                  WHERE deleted_at IS NULL AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
-                   AND (cardinality($3::int[]) = 0 OR province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR kabkota_id = ANY($4))
+                   AND (cardinality($3::int[]) = 0 OR province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR kabkota_id = ANY($4)) AND skdr_unit_ok(data->>'unit_pelapor')
                  GROUP BY 1, 2, 3, 4, 5",
                 &[&f.start, &f.end, &f.province, &f.kabkota],
             )
@@ -209,7 +209,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         c.query_one(
             "SELECT COUNT(*)::bigint FROM case_reports r LEFT JOIN master_diseases d ON d.id = r.disease_id
              WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
-               AND (cardinality($3::int[]) = 0 OR r.location_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR r.kabkota_id = ANY($4))
+               AND (cardinality($3::int[]) = 0 OR r.location_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR r.kabkota_id = ANY($4)) AND skdr_unit_ok(NULL::text)
                AND (cardinality($5::text[]) = 0 OR d.name = ANY($5) OR d.code = ANY($5))",
             &[&f.start, &f.end, &f.province, &f.kabkota, &f.disease],
         ).await.map_err(internal)?.get(0)

@@ -22,6 +22,8 @@ pub struct DashQuery {
     /// PR 012: explicit date range (YYYY-MM-DD), used by the disease pages; overrides the epi-week range.
     pub start_date: Option<String>,
     pub end_date: Option<String>,
+    /// PR 019: Unit pelapor (nama unit seperti tercatat di EBS `unit` / PE `unit_pelapor`), dipisah "|".
+    pub unit: Option<String>,
 }
 
 /// MMWR week 1 starts on the Sunday on or before 4 January.
@@ -52,6 +54,8 @@ pub struct Resolved {
     pub(crate) disease_names: Vec<String>,
     pub(crate) source: Option<String>,
     pub(crate) scope: String,
+    /// PR 019: lower-cased unit names; applied in SQL via skdr_unit_ok() (session setting skdr.units).
+    pub(crate) unit: Vec<String>,
 }
 
 impl Resolved {
@@ -66,12 +70,13 @@ impl Resolved {
     }
     fn filter_key(&self) -> String {
         format!(
-            "{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}",
             self.source.clone().unwrap_or_else(|| "all".into()),
             self.start.map(|d| d.to_string()).unwrap_or_default(),
             self.end.map(|d| d.to_string()).unwrap_or_default(),
             self.scope,
-            if self.disease.is_empty() { "all".to_string() } else { self.disease.join(",") }
+            if self.disease.is_empty() { "all".to_string() } else { self.disease.join(",") },
+            self.unit.join("|")
         )
     }
 }
@@ -87,7 +92,7 @@ fn base() -> String {
      LEFT JOIN master_locations l ON l.id = r.location_id
      LEFT JOIN master_kabkota k ON k.id = r.kabkota_id
      WHERE ($1::date IS NULL OR r.report_date >= $1) AND ($2::date IS NULL OR r.report_date <= $2)
-       AND (cardinality($3::int[]) = 0 OR r.location_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR r.kabkota_id = ANY($4))
+       AND (cardinality($3::int[]) = 0 OR r.location_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR r.kabkota_id = ANY($4)) AND skdr_unit_ok(r.unit_name)
        AND (cardinality($5::text[]) = 0 OR d.name = ANY($5) OR d.code = ANY($5) OR (d.id IS NULL AND r.diagnosa = ANY($5)))
        AND ($6::text IS NULL OR r.source = $6)"
         .to_string()
@@ -127,7 +132,10 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
     };
     // PR 012: "pe" = Kasus PE (individual reports); "form" = legacy case_reports (hidden menu, data kept)
     let source = q.source.clone().map(|s| s.trim().to_lowercase()).filter(|s| s == "form" || s == "ebs" || s == "pe");
-    Ok(Resolved { start, end, province, kabkota, disease, disease_ids, disease_names, source, scope: scope.unwrap_or_else(|| COUNTRY.into()) })
+    // PR 019: Unit pelapor — always (re)set on this pooled connection so a previous request's units never leak.
+    let unit: Vec<String> = q.unit.as_deref().unwrap_or("").split('|').map(|u| u.trim().to_lowercase()).filter(|u| !u.is_empty() && !u.contains('\u{1f}')).collect();
+    c.execute("SELECT set_config('skdr.units', $1, false)", &[&unit.join("\u{1f}")]).await.map_err(internal)?;
+    Ok(Resolved { start, end, province, kabkota, disease, disease_ids, disease_names, source, scope: scope.unwrap_or_else(|| COUNTRY.into()), unit })
 }
 
 async fn kpis(c: &Object, f: &Resolved) -> Result<Value, ApiError> {

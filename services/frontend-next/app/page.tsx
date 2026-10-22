@@ -12,6 +12,7 @@ import { getCurrentEpiWeek } from '@/lib/epi-week'
 import { fmt } from '@/lib/analytics-api'
 import { SourceKey } from '@/components/analytics/SourceBadge'
 import { ErrorState, Skeleton } from '@/components/ui/Skeleton'
+import { PUBLIC_BASE_PATH } from '@/lib/public-path'
 
 type Kpi = { ebs: { alerts: number; provinces: number } | null; pe: { cases: number; provinces: number } | null }
 type Trend = { days: string[]; bucket: string; until: string | null; ebs: { alerts: number[]; provinces: number[] } | null; pe: { cases: number[]; provinces: number[] } | null }
@@ -102,8 +103,18 @@ export default function Beranda() {
   return (
     <div className="relative w-full" data-testid="beranda">
       <div className="relative overflow-hidden" data-testid="home-hero">
-      {/* hero background (home.jpg) is drawn by AppShell from the very top, behind the transparent header. */}
-      <div className="relative grid w-full grid-cols-1 gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:px-8 lg:py-14">
+        {/* Hero background: public/home.jpg with soft overlay gradient */}
+        <div
+          aria-hidden
+          data-testid="home-bg"
+          className="pointer-events-none absolute inset-0 -z-10 bg-white bg-cover bg-no-repeat bg-[position:right_top]"
+          style={{ backgroundImage: `url(${PUBLIC_BASE_PATH}/home.jpg)` }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-white/95 via-white/70 to-transparent lg:from-white/90 lg:via-white/45"
+        />
+        <div className="relative grid w-full grid-cols-1 gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:px-8 lg:py-14">
         {/* left: hero */}
         <section className="min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-700">{t('skdr.home.eyebrow')}</div>

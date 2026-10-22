@@ -64,11 +64,11 @@ export default function MasterKabupatenPage() {
           </select>
         </label>
       </MasterToolbar>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <div>
         <TableState loading={list.loading} error={list.error} empty={list.data.length === 0} />
         {list.data.length > 0 && !list.error && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="skdr-table-card">
+            <table className="skdr-table text-left text-xs">
               <thead><tr className={tableHeadCls}>
                 <th className={thCls}>{t('skdr.master.kab.kemendagri')}</th>
                 <th className={thCls}>{t('skdr.master.kab.bps')}</th>
@@ -80,9 +80,9 @@ export default function MasterKabupatenPage() {
                 <th className={`${thCls} text-center`}>{t('skdr.master.status')}</th>
                 <th className={`${thCls} text-right`}>{t('skdr.master.actions')}</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {list.data.map((r) => (
-                  <tr key={r.id} className={`transition hover:bg-blue-50/30 ${r.is_active ? '' : 'opacity-60'}`}>
+                  <tr key={r.id} className={`transition ${r.is_active ? '' : 'opacity-60'}`}>
                     <td className="px-4 py-3 font-mono"><span className="rounded border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-primary">{r.kemendagri_code}</span></td>
                     <td className="px-4 py-3 font-mono"><span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{r.code}</span></td>
                     <td className="px-4 py-3 font-semibold text-slate-800">{r.name}</td>

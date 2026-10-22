@@ -110,8 +110,8 @@ export default function EbsSyncPage() {
 
       <div className="overflow-hidden border-b skdr-rule">
         <div className="skdr-section-head"><div className="skdr-eyebrow">{t('skdr.eyebrow.ebsLog')}</div><h2 className="skdr-section-title">{t('skdr.ebs.logTitle')}</h2></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="skdr-table-card">
+          <table className="skdr-table text-left text-xs">
             <thead><tr className={tableHeadCls}>
               <th className={thCls}>#</th><th className={thCls}>{t('skdr.ebs.trigger')}</th><th className={thCls}>{t('skdr.ebs.years')}</th>
               <th className={thCls}>{t('skdr.ebs.start')}</th><th className={thCls}>{t('skdr.ebs.end')}</th>
@@ -119,10 +119,10 @@ export default function EbsSyncPage() {
               <th className={`${thCls} text-right`}>{t('skdr.ebs.upserted')}</th><th className={`${thCls} text-right`}>{t('skdr.ebs.retries')}</th>
               <th className={thCls}>{t('skdr.master.status')}</th><th className={thCls}>{t('skdr.ebs.error')}</th>
             </tr></thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {(st?.logs || []).length === 0 && <tr><td colSpan={11} className="p-8 text-center text-slate-400">{t('skdr.ebs.noLogs')}</td></tr>}
               {(st?.logs || []).map((l) => (
-                <tr key={l.id} className="hover:bg-blue-50/30">
+                <tr key={l.id} >
                   <td className="px-4 py-2 font-mono text-slate-500">{l.id}</td>
                   <td className="px-4 py-2">{l.trigger === 'manual' ? t('skdr.ebs.manual') : t('skdr.ebs.scheduled')}</td>
                   <td className="px-4 py-2 font-mono">{l.years}</td>
@@ -148,16 +148,16 @@ export default function EbsSyncPage() {
           <div className="relative ml-auto w-full max-w-xs"><SearchInput value={search} onChange={setSearch} placeholder={t('skdr.ebs.mapSearch')} /></div>
           <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={onlyUnmapped} onChange={(e) => setOnlyUnmapped(e.target.checked)} /> {t('skdr.ebs.onlyUnmapped')}</label>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="skdr-table-card">
+          <table className="skdr-table text-left text-xs">
             <thead><tr className={tableHeadCls}>
               <th className={thCls}>{t('skdr.ebs.diagnosa')}</th><th className={`${thCls} text-right`}>{t('skdr.ebs.reports')}</th>
               <th className={`${thCls} text-right`}>{t('skdr.ebs.cases')}</th><th className={thCls}>{t('skdr.ebs.mappedTo')}</th><th className={thCls}>{t('skdr.ebs.matchSource')}</th>
             </tr></thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {rows.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-400">{t('skdr.master.empty')}</td></tr>}
               {rows.map((d) => (
-                <tr key={d.id} className="hover:bg-blue-50/30">
+                <tr key={d.id} >
                   <td className="px-4 py-2 font-medium text-slate-800">{d.diagnosa}</td>
                   <td className="px-4 py-2 text-right font-mono">{nf(d.reports)}</td>
                   <td className="px-4 py-2 text-right font-mono">{nf(d.cases)}</td>

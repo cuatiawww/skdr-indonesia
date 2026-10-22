@@ -11,6 +11,7 @@ import type { Sumber } from '@/lib/use-sumber';
 import { fetchProvinces, fetchFormDiseases, type MasterProvince, type MasterKabkota, type MasterDisease } from '@/lib/skdr-api';
 import { fetchFrom } from '@/lib/api';
 import MultiSelect from '@/components/filters/MultiSelect';
+import { Building2 } from 'lucide-react';
 
 /** API params for a filter state: comma lists, omitted when not narrowed. */
 export function filterParams(f: SkdrFilterState) {
@@ -18,6 +19,7 @@ export function filterParams(f: SkdrFilterState) {
     disease: f.diseases.length ? f.diseases.join(',') : undefined,
     province_id: f.provinceIds.length ? f.provinceIds.join(',') : undefined,
     kabkota_id: f.kabkotaIds.length ? f.kabkotaIds.join(',') : undefined,
+    unit: f.units?.length ? f.units.join('|') : undefined,
   };
 }
 /** Browser URL state: ?penyakit=a,b&prov=11,12&kab=... */
@@ -43,6 +45,8 @@ export interface SkdrFilterState {
   source: string;
   provinceIds: number[];
   kabkotaIds: number[];
+  /** PR 019: Unit pelapor (lower-cased names as recorded in EBS `unit` / PE `unit_pelapor`); empty = semua. */
+  units?: string[];
   startYear: number;
   startWeek: number;
   endYear: number;
@@ -75,10 +79,10 @@ const chev = 'pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -transl
 // PR 018: 3 columns at lg, one row from 2xl (multi-select labels like "3 provinsi dipilih" need the width)
 // static class names so Tailwind can see them: key = <has Sumber><has Penyakit>
 const GRID: Record<string, string> = {
-  '11': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
-  '10': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
-  '01': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
-  '00': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '11': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '10': 'lg:grid-cols-3 2xl:grid-cols-[minmax(15rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '01': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
+  '00': 'lg:grid-cols-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(17rem,1.3fr)_auto]',
 };
 const lbl = 'flex h-4 items-center gap-1 truncate text-[10.5px] font-extrabold uppercase leading-none tracking-wider text-slate-700';
 
@@ -101,6 +105,7 @@ export default function SkdrFilterBar({
   const [provinces, setProvinces] = useState<MasterProvince[]>([]);
   const [kabkota, setKabkota] = useState<MasterKabkota[]>([]);
   const [diseases, setDiseases] = useState<MasterDisease[]>([]);
+  const [units, setUnits] = useState<{ value: string; label: string; kind?: string | null; kabkota?: string | null; ebs: number; pe: number; in_master: boolean }[]>([]);
 
   useEffect(() => setDraft(value), [value]);
   useEffect(() => {
@@ -146,6 +151,25 @@ export default function SkdrFilterBar({
     const keep = draft.kabkotaIds.filter((id) => { const k = kabkota.find((x) => x.id === id); return !k || ps.size === 0 || ps.has(k.province_id); });
     setDraft({ ...draft, provinceIds: ids, kabkotaIds: keep });
   };
+  // PR 019: Unit pelapor options cascade from the checked Provinsi / Kab-Kota (server-side, names as recorded in EBS/PE)
+  const provKey = draft.provinceIds.join(','), kabKey = draft.kabkotaIds.join(',');
+  useEffect(() => {
+    let alive = true;
+    const qs = new URLSearchParams();
+    if (provKey) qs.set('province_id', provKey);
+    if (kabKey) qs.set('kabkota_id', kabKey);
+    fetchFrom<typeof units>(`/api/v1/filters/units${qs.toString() ? `?${qs}` : ''}`).then((u) => alive && setUnits(u || [])).catch(() => alive && setUnits([]));
+    return () => { alive = false };
+  }, [provKey, kabKey]);
+  const unitOptions = useMemo(() => units.map((u) => ({ value: u.value, label: u.label, group: u.kind || t('skdr.filter.unitOther') })), [units, t]);
+  // drop selected units that are no longer offered after narrowing Provinsi / Kab-Kota
+  useEffect(() => {
+    if (!units.length || !draft.units?.length) return;
+    const ok = new Set(units.map((u) => u.value));
+    const keep = draft.units.filter((u) => ok.has(u));
+    if (keep.length !== draft.units.length) setDraft((d) => ({ ...d, units: keep }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units]);
   const ms = { searchPlaceholder: t('skdr.filter.search'), selectAllLabel: t('skdr.filter.selectAll'), clearLabel: t('skdr.filter.clear'), emptyLabel: t('skdr.filter.noOptions') };
 
   const apply = (e?: React.FormEvent) => {
@@ -156,7 +180,7 @@ export default function SkdrFilterBar({
   };
   const reset = () => {
     const d: SkdrFilterState = {
-      diseases: [], source: 'all', provinceIds: [], kabkotaIds: [],
+      diseases: [], source: 'all', provinceIds: [], kabkotaIds: [], units: [],
       startYear: currentEpi.year, startWeek: 1, endYear: currentEpi.year, endWeek: currentEpi.week || 1,
     };
     setDraft(d);
@@ -223,6 +247,13 @@ export default function SkdrFilterBar({
             <MultiSelect id="select-kabkota" options={kabOptions} value={draft.kabkotaIds.map(String)} {...ms}
               onChange={(v) => setDraft({ ...draft, kabkotaIds: v.map(Number) })}
               allLabel={draft.provinceIds.length ? t('skdr.filter.allKabkotaSelected') : t('skdr.filter.allKabkotaMs')} countLabel={(n) => t('skdr.filter.nKabkota', { n })} />
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor="select-unit" className={lbl}><Building2 className="h-3 w-3 text-primary" />{t('skdr.filter.unit')}</label>
+            <MultiSelect id="select-unit" options={unitOptions} value={draft.units || []} {...ms}
+              onChange={(v) => setDraft({ ...draft, units: v })}
+              allLabel={t('skdr.filter.allUnits')} countLabel={(n) => t('skdr.filter.nUnits', { n })} />
           </div>
 
           <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-1">

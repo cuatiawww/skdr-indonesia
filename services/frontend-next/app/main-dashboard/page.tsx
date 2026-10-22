@@ -273,7 +273,7 @@ export default function DashboardPage() {
       // PR 018: multi-select URL state ?penyakit=a,b&prov=11,12&kab=...
       const mf = loadGeo();
       const src = sp.get("source");
-      const any = mf.diseases.length || mf.provinceIds.length || mf.kabkotaIds.length;
+      const any = mf.diseases.length || mf.provinceIds.length || mf.kabkotaIds.length || mf.units?.length;
       if (sY || sW || eY || eW || any || src) {
         // PR 012: URL filters (e.g. ?source=pe from a disease page) are applied immediately, not only pre-filled.
         setFilters((prev) => {
@@ -301,7 +301,7 @@ export default function DashboardPage() {
     const set = (k: string, v: string | number | null | undefined) => (v === null || v === undefined || v === "" || v === "all" ? url.searchParams.delete(k) : url.searchParams.set(k, String(v)));
     set("startYear", applied.startYear); set("startWeek", applied.startWeek); set("endYear", applied.endYear); set("endWeek", applied.endWeek);
     window.history.replaceState(window.history.state, "", url.toString());
-    saveGeo({ diseases: applied.diseases, provinceIds: applied.provinceIds, kabkotaIds: applied.kabkotaIds });
+    saveGeo({ diseases: applied.diseases, provinceIds: applied.provinceIds, kabkotaIds: applied.kabkotaIds, units: applied.units || [] });
   }, [applied]);
   // PR 016: one global Sumber filter (Semua/EBS/Kasus PE, in the URL) drives the whole dashboard; default Semua.
   const { sumber, setSumber, ukuran, setUkuran, ready: sumberReady } = useSumber();
