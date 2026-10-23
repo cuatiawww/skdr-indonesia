@@ -2,21 +2,7 @@
 
 ## Summary
 
-Correct the workflow `runs-on` labels to match the labels actually declared by the registered `act_runner`.
-
-## Root cause
-
-The runner registration metadata uses the `label:executor` format internally:
-
-- `production:host`
-- `docker:host`
-
-However, `act_runner` declares the effective labels to Gitea as:
-
-- `production`
-- `docker`
-
-The workflow must therefore use `production` and `docker`. Using the internal registration strings causes jobs to remain queued because no runner matches those labels.
+Correct the workflow `runs-on` value to the label proven to work with the registered `act_runner`: `production`. The runner executes Docker commands on the host, so a separate `docker` label is not required for job selection.
 
 ## Changes
 
