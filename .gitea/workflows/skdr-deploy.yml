@@ -19,8 +19,8 @@ jobs:
   validate:
     name: Validate
     runs-on:
-      - production:host
-      - docker:host
+      - production
+      - docker
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -49,8 +49,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on:
-      - production:host
-      - docker:host
+      - production
+      - docker
     steps:
       - name: Checkout deployment script
         uses: actions/checkout@v4
