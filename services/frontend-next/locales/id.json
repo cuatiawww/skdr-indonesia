@@ -856,7 +856,19 @@
       "disease": "Penyakit",
       "deathsCases": "Mati/Kasus",
       "total4": "4 penyakit",
-      "note": "Kasus, kematian dan CFR dari Alert SKDR (IK 95% Wilson, sama dengan kartu CFR dasbor utama). Peta: sinyal EBS dan kasus PE pada periode. Klik kartu atau chip untuk fokus peta."
+      "note": "Kasus, kematian dan CFR dari Alert SKDR (IK 95% Wilson, sama dengan kartu CFR dasbor utama). Peta: sinyal EBS dan kasus PE pada periode. Klik kartu untuk melihat satu penyakit saja (klik lagi = semua).",
+      "lastWeeks": "{n} mg",
+      "province": "Provinsi",
+      "allProvinces": "Seluruh Indonesia",
+      "reset": "Reset",
+      "layerBirds": "Burung migran",
+      "layerBirdsHint": "Observasi burung air & pantai (Anseriformes, Charadriiformes) di Indonesia pada periode ini dari GBIF: konteks reservoir Flu Burung. Bukan data kasus.",
+      "layerMosq": "Nyamuk",
+      "layerMosqHint": "Observasi nyamuk (Culicidae) di Indonesia pada periode ini dari iNaturalist. Hanya konteks vektor: nyamuk bukan vektor Antraks, Rabies, Leptospirosis maupun Flu Burung.",
+      "vectorContext": "Konteks vektor",
+      "legendBirds": "Burung air & pantai (migran) · GBIF · konteks Flu Burung",
+      "legendMosq": "Nyamuk (Culicidae) · iNaturalist · konteks vektor, bukan vektor 4 penyakit ini",
+      "layerPeriod": "Observasi publik {period}, seluruh Indonesia"
     },
     "time": {
       "min": "mnt"

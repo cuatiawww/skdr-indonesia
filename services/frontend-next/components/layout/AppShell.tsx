@@ -31,6 +31,8 @@ export default function AppShell({
   const authenticated = true; // SKDR: no auth
   const isDirectoryPage = false;
   const isHome = pathname === "/";
+  // PR 027: Dasbor Zoonosis Lite has its own header title/subtitle (the page body carries no title).
+  const isLite = pathname === "/dasbor/zoonosis-lite";
   const homeWrapRef = useRef<HTMLDivElement>(null);
   const [homeBgH, setHomeBgH] = useState(0);
   useEffect(() => {
@@ -108,12 +110,13 @@ export default function AppShell({
             authenticated={authenticated}
             consoleMode={consoleMode}
             transparent={isHome}
+            {...(isLite ? { title: t("skdr.lite.title"), subtitle: t("skdr.lite.subtitle"), compact: true } : {})}
             onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
           />
         </div>
         <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'pb-3 md:pb-5'}`}>
           {/* PR 018: no breadcrumb on Dasbor Utama or Beranda; PR 027: nor on the one-screen Dasbor Zoonosis Lite */}
-          {pathname === "/main-dashboard" || pathname === "/dasbor/zoonosis-lite" || isHome ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
+          {pathname === "/main-dashboard" || isLite || isHome ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
           <div className={isHome ? "" : "pt-3 md:pt-4"}>{children}</div>
         </div>
       </div>

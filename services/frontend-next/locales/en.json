@@ -856,7 +856,19 @@
       "disease": "Disease",
       "deathsCases": "Deaths/Cases",
       "total4": "4 diseases",
-      "note": "Cases, deaths and CFR from Alert SKDR (Wilson 95% CI, same as the main dashboard CFR card). Map: EBS signals and PE cases in the period. Click a card or chip to focus the map."
+      "note": "Cases, deaths and CFR from Alert SKDR (Wilson 95% CI, same as the main dashboard CFR card). Map: EBS signals and PE cases in the period. Click a card to show only that disease (click again = all).",
+      "lastWeeks": "{n} wk",
+      "province": "Province",
+      "allProvinces": "All of Indonesia",
+      "reset": "Reset",
+      "layerBirds": "Migratory birds",
+      "layerBirdsHint": "Waterbird and shorebird (Anseriformes, Charadriiformes) observations in Indonesia for this period from GBIF: avian influenza reservoir context. Not case data.",
+      "layerMosq": "Mosquitoes",
+      "layerMosqHint": "Mosquito (Culicidae) observations in Indonesia for this period from iNaturalist. Vector context only: mosquitoes are not vectors of anthrax, rabies, leptospirosis or avian influenza.",
+      "vectorContext": "Vector context",
+      "legendBirds": "Waterbirds & shorebirds (migratory) · GBIF · avian influenza context",
+      "legendMosq": "Mosquitoes (Culicidae) · iNaturalist · vector context, not a vector of these 4 diseases",
+      "layerPeriod": "Public observations {period}, all of Indonesia"
     },
     "time": {
       "min": "min"

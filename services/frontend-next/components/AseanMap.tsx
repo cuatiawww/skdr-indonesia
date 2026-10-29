@@ -38,6 +38,7 @@ import type {
   FireHotspot,
   MapLayerStatus,
   WildlifeOccurrence,
+  VectorSightingsResponse,
 } from "@/types";
 import {
   fetchVectorSightings,
@@ -105,6 +106,9 @@ type Props = {
   hazardEvents?: HazardEvent[];
   showHazards?: boolean;
   intelLayers?: ExternalIntelLayers;
+  /** PR 027: optional custom loaders for the vectors / wildlife intel layers (e.g. period-filtered public APIs on
+   *  Dasbor Zoonosis Lite). Without them the layers use the backend map-layer endpoints as before; a new `key` refetches. */
+  intelLoaders?: IntelLoaders;
   onLayerStatus?: (key: string, status: MapLayerStatus) => void;
   onSelectCountry?: (country: string) => void;
   /** PR 018: reports the admin level whose polygons are coloured (1 = provinsi, 2 = kab/kota, …). */
@@ -476,6 +480,13 @@ function statusFromCatch(err: unknown): MapLayerStatus {
   return classified as MapLayerStatus;
 }
 
+/** PR 027: `wildlife` resolves to a GBIF occurrence-search payload ({ results: [...] }). */
+export type IntelLoaders = {
+  key?: string;
+  vectors?: (signal: AbortSignal) => Promise<VectorSightingsResponse>;
+  wildlife?: (signal: AbortSignal) => Promise<{ results?: any[]; source?: string; error?: string; status?: string; cached?: boolean; stale?: boolean }>;
+};
+
 export default function AseanMap({
   onAdminLevel,
   onChoroClasses,
@@ -499,6 +510,7 @@ export default function AseanMap({
   borderNeighbors,
   regionLinks,
   intelLayers,
+  intelLoaders,
   hazardEvents,
   showHazards = true,
   onLayerStatus,
@@ -536,6 +548,8 @@ export default function AseanMap({
   const tileRef = useRef<TileLayer<OSM | XYZ> | null>(null);
   const bnpbRef = useRef<Record<string, TileLayer<TileArcGISRest>>>({});
   const vectorSightingsRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const intelLoadersRef = useRef<IntelLoaders | undefined>(intelLoaders);
+  intelLoadersRef.current = intelLoaders;
   const wildlifeRef = useRef<VectorLayer<VectorSource> | null>(null);
   const flightsRef = useRef<VectorLayer<VectorSource> | null>(null);
   const firesRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -1603,7 +1617,8 @@ export default function AseanMap({
     const ac = new AbortController();
     let cancelled = false;
     reportStatus("vectors", { state: "loading", message: tr("skdr.amap.loading_inaturalist_observations") });
-    fetchVectorSightings({ signal: ac.signal })
+    const vectorLoader = intelLoadersRef.current?.vectors;
+    (vectorLoader ? vectorLoader(ac.signal) : fetchVectorSightings({ signal: ac.signal }))
       .then((res) => {
         if (cancelled) return;
         src.clear();
@@ -1626,7 +1641,7 @@ export default function AseanMap({
       cancelled = true;
       ac.abort();
     };
-  }, [intelLayers?.vectors]);
+  }, [intelLayers?.vectors, intelLoaders?.key]);
 
   // GBIF wildlife (bird) occurrences across ASEAN — avian influenza early warning.
   useEffect(() => {
@@ -1643,7 +1658,8 @@ export default function AseanMap({
     const ac = new AbortController();
     let cancelled = false;
     reportStatus("wildlife", { state: "loading", message: tr("skdr.amap.loading_gbif_bird_occurrences") });
-    fetchWildlifeOccurrences({ preset: "map" }, { signal: ac.signal })
+    const wildlifeLoader = intelLoadersRef.current?.wildlife;
+    (wildlifeLoader ? wildlifeLoader(ac.signal) : fetchWildlifeOccurrences({ preset: "map" }, { signal: ac.signal }))
       .then((payload) => {
         if (cancelled) return;
         src.clear();
@@ -1658,6 +1674,8 @@ export default function AseanMap({
               eventDate: r.eventDate || null,
               latitude: r.decimalLatitude,
               longitude: r.decimalLongitude,
+              place: [r.locality, r.stateProvince].filter(Boolean).join(", ") || null,
+              url: r.key ? `https://www.gbif.org/occurrence/${r.key}` : null,
             };
             const f = new Feature({ geometry: new Point(fromLonLat([data.longitude, data.latitude])) });
             f.set("intelType", "wildlife");
@@ -1679,7 +1697,7 @@ export default function AseanMap({
       cancelled = true;
       ac.abort();
     };
-  }, [intelLayers?.wildlife]);
+  }, [intelLayers?.wildlife, intelLoaders?.key]);
 
   // PR 117: OpenSky live aircraft removed (no OpenSky API). Flight Connection — Routes draws simulated aircraft instead.
   useEffect(() => {
@@ -3066,6 +3084,11 @@ function IntelPopup({
             ) : (
               <IntelRow label={tr("skdr.amap.photo")} value={tr("skdr.amap.no_data")} />
             )}
+            {selected.data.url ? (
+              <a href={selected.data.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline">
+                {tr("skdr.amap.openSource")} <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : null}
           </>
         )}
         {selected.type === "wildlife" && (
@@ -3073,7 +3096,13 @@ function IntelPopup({
             <IntelRow label={tr("skdr.amap.species")} value={fieldOrNone(selected.data.species)} />
             <IntelRow label={tr("skdr.amap.scientific_name")} value={fieldOrNone(selected.data.scientificName)} />
             <IntelRow label={tr("skdr.amap.country")} value={fieldOrNone(selected.data.country)} />
+            {selected.data.place ? <IntelRow label={tr("skdr.amap.place")} value={selected.data.place} /> : null}
             <IntelRow label={tr("skdr.amap.observed")} value={fieldOrNone(selected.data.eventDate)} />
+            {selected.data.url ? (
+              <a href={selected.data.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline">
+                {tr("skdr.amap.openSource")} <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : null}
           </>
         )}
         {selected.type === "fire_hotspot" && (
