@@ -96,6 +96,8 @@ type Props = {
   showWind?: boolean;
   ewsRadiusKm?: number | null;
   markerLookbackDays?: 7 | 14 | 30 | 90;
+  /** PR 026: when both dates are set (YYYY-MM-DD), markers follow this period instead of the rolling markerLookbackDays window. */
+  markerPeriod?: MarkerPeriod | null;
   embedded?: boolean;
   highlightCountry?: string;
   borderNeighbors?: BorderNeighborShape[];
@@ -397,6 +399,17 @@ function geometryInside(child: Geometry, parent: Geometry): boolean {
 /** PR 120: official IBS (MoH) points. */
 const IBS_MARKER_COLOR = "#0F766E";
 
+/** PR 026: inclusive date period (YYYY-MM-DD) used to filter outbreak markers. */
+export type MarkerPeriod = { start?: string | null; end?: string | null };
+
+/** PR 026: true when the item's date (first 10 chars, YYYY-MM-DD) lies within [start, end], inclusive. */
+function isWithinPeriod(value: string | null | undefined, start: string, end: string): boolean {
+  if (!value) return false;
+  const day = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  return day >= start.slice(0, 10) && day <= end.slice(0, 10);
+}
+
 function isWithinRecentWindowForDays(value: string | null | undefined, days: 7 | 14 | 30 | 90): boolean {
   if (!value) return false;
   const timestamp = Date.parse(value);
@@ -480,6 +493,7 @@ export default function AseanMap({
   showWind,
   ewsRadiusKm,
   markerLookbackDays = 30,
+  markerPeriod,
   embedded,
   highlightCountry,
   borderNeighbors,
@@ -1770,6 +1784,9 @@ export default function AseanMap({
     });
   }, [hazardEvents, showHazards]);
 
+  const periodStart = markerPeriod?.start || null;
+  const periodEnd = markerPeriod?.end || null;
+
   useEffect(() => {
     const vectorLayer = vectorRef.current;
     const markerLayer = markerRef.current;
@@ -1784,7 +1801,10 @@ export default function AseanMap({
       // Public pins are intentionally limited to the rolling recent window
       // calculated by the backend. Historical aggregates remain available to
       // the choropleth and dashboard totals, but do not become live markers.
-      const isRecent = isWithinRecentWindowForDays(item.latest_date, markerLookbackDays);
+      // PR 026: when the dashboard passes its active period, markers follow that period instead.
+      const isRecent = periodStart && periodEnd
+        ? isWithinPeriod(item.latest_date, periodStart, periodEnd)
+        : isWithinRecentWindowForDays(item.latest_date, markerLookbackDays);
       if (!isRecent || item.latitude == null || item.longitude == null) return;
       const feature = new GeoJSON().readFeature(
         {
@@ -1900,7 +1920,7 @@ export default function AseanMap({
           duration: 500,
         });
     }
-  }, [countryData, result, effectiveOutbreaks, highlightCountry, borderNeighbors, markerLookbackDays, initialCenter, initialZoom]);
+  }, [countryData, result, effectiveOutbreaks, highlightCountry, borderNeighbors, markerLookbackDays, periodStart, periodEnd, initialCenter, initialZoom]);
 
   // PR 018: follow the province / kab-kota multi-select — fit after the default country framing above.
   const fitKey = fitTo ? fitTo.map((v) => v.toFixed(3)).join(",") : "";

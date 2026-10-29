@@ -497,6 +497,7 @@ export default function DashboardPage() {
                 initialZoom={5}
                 sourceMode={sumber}
                 fitTo={fitTo}
+                markerPeriod={data.filters?.start_date && data.filters?.end_date ? { start: data.filters.start_date, end: data.filters.end_date } : null}
               />} />
             </div>
           </article>

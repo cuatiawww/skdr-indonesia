@@ -908,6 +908,8 @@
     "map": {
       "mapLayers": "Lapisan Peta",
       "markerRange": "Rentang waktu penanda",
+      "markerRangeFollowsPeriod": "Mengikuti periode dasbor",
+      "markerPeriod": "Penanda: {period}",
       "3months": "3 Bulan",
       "days": "{days} Hari",
       "base_osm": "OSM",

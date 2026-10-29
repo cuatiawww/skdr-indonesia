@@ -6,7 +6,7 @@ import type { ExternalIntelLayers, MapLayerStatus } from "@/types";
 import { useEffect, useState } from "react";
 import ChoroLegend from "./ChoroLegend";
 import { buildChoroClasses, useChoroConfig, type ChoroClass } from "@/lib/choropleth-classes";
-import AseanMap, { type BorderNeighborShape, type HazardEvent, type RegionBorderLink } from "./AseanMap";
+import AseanMap, { type BorderNeighborShape, type HazardEvent, type MarkerPeriod, type RegionBorderLink } from "./AseanMap";
 import type { OutbreakLocation } from "@/types";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { classifyLayerError } from "@/lib/map-layer-client.mjs";
@@ -32,6 +32,7 @@ export default function SpatialOutbreakMap({
   hideSpreadRoute,
   sourceMode = "all",
   fitTo,
+  markerPeriod,
 }: {
   countries: { name: string; cases: number; deaths?: number }[];
   locations: OutbreakLocation[];
@@ -52,8 +53,18 @@ export default function SpatialOutbreakMap({
   sourceMode?: "all" | "ebs" | "pe";
   /** PR 018: bounds of the filtered provinces / kab-kota (auto-fit). */
   fitTo?: [number, number, number, number] | null;
+  /** PR 026: active dashboard period (YYYY-MM-DD); when set, markers follow it instead of the 7/14/30/90-day window. */
+  markerPeriod?: MarkerPeriod | null;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const periodActive = !!(markerPeriod?.start && markerPeriod?.end);
+  const fmtDay = (v: string) => {
+    const d = new Date(`${v.slice(0, 10)}T00:00:00Z`);
+    return Number.isNaN(d.getTime())
+      ? v
+      : d.toLocaleDateString(locale === "id" ? "id-ID" : "en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  };
+  const periodLabel = periodActive ? `${fmtDay(markerPeriod!.start!)} – ${fmtDay(markerPeriod!.end!)}` : "";
   const [settings, setSettings] = useState(false),
     [windLegend, setWindLegend] = useState(false),
     [adminLevel, setAdminLevel] = useState(1),
@@ -124,6 +135,7 @@ export default function SpatialOutbreakMap({
         countryData={choropleth ? countries : undefined}
         outbreakLocations={locations}
         markerLookbackDays={markerLookbackDays}
+        markerPeriod={periodActive ? markerPeriod : null}
         bnpbLayers={bnpb}
         showWind={wind}
         highlightCountry={highlightCountry}
@@ -157,6 +169,7 @@ export default function SpatialOutbreakMap({
 
       {/* PR 016: single map legend — symbol shape + colour per source, choropleth meaning labelled. */}
       <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-md" data-testid="map-legend">
+        {periodActive && markers ? <span className="text-slate-500" data-testid="map-marker-period">{tr("skdr.map.markerPeriod", { period: periodLabel })}</span> : null}
         {sourceMode !== "pe" ? <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full border-2 border-white bg-ebs shadow" />{tr("skdr.map.legendEbs")}</span> : null}
         {sourceMode !== "ebs" ? <span className="flex items-center gap-1.5"><span className="mx-0.5 h-2.5 w-2.5 rotate-45 border border-white bg-pe shadow" />{tr("skdr.map.legendPe")}</span> : null}
         {choropleth ? <span className="text-slate-500">{tr(sourceMode === "all" ? "skdr.map.legendChoroAll" : sourceMode === "ebs" ? "skdr.map.legendChoroEbs" : "skdr.map.legendChoroPe")}</span> : null}
@@ -229,6 +242,11 @@ export default function SpatialOutbreakMap({
                   />
                   <div className="ml-10 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
                     <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{tr("skdr.map.markerRange")}</p>
+                    {periodActive ? (
+                      <p className="mt-2 text-[11px] font-semibold text-slate-700" data-testid="map-marker-range-period">
+                        {tr("skdr.map.markerRangeFollowsPeriod")}: {periodLabel}
+                      </p>
+                    ) : (
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
                       {([7, 14, 30, 90] as const).map((days) => (
                         <button
@@ -241,6 +259,7 @@ export default function SpatialOutbreakMap({
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                   <Row
                     icon={<Layers className="h-4 w-4" />}
