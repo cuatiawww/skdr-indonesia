@@ -125,6 +125,14 @@ type Props = {
   /** PR 016: global Sumber filter (all | ebs | pe), drives the region popup split. */
   sourceMode?: "all" | "ebs" | "pe";
   hideSpreadRoute?: boolean;
+  /** PR 027: per-layer opacity (0–1) for markers, GBIF birds, iNat vectors and the province/kab-kota choropleth. */
+  layerOpacity?: { markers?: number; wildlife?: number; vectors?: number; regions?: number };
+  /** PR 027: the region hover card shows cases / deaths / CFR of the mapped reports instead of cross-border pairs. */
+  regionHoverStats?: boolean;
+  /** PR 027: a click on a province / kab-kota polygon (after the zoom), e.g. to filter the page by it. */
+  onSelectRegion?: (region: { name: string; level: number; code: string | null }) => void;
+  /** PR 027: bump to reset the view (same as the reset button: back to the initial frame, drill-down cleared). */
+  resetSignal?: number;
 };
 
 type RegionMetric = {
@@ -523,6 +531,10 @@ export default function AseanMap({
   ebsOnly = false,
   sourceMode = "all",
   hideSpreadRoute = false,
+  layerOpacity,
+  regionHoverStats = false,
+  onSelectRegion,
+  resetSignal,
 }: Props) {
   const isEbsOnly = prototypeMode || ebsOnly;
   const isNoSpread = prototypeMode || hideSpreadRoute;
@@ -598,6 +610,7 @@ export default function AseanMap({
     subtitle: string;
     lines: { label: string; value: string; note?: string }[];
     empty: string;
+    stats?: { cases: number; deaths: number; cfr: number | null; ebs: number; pe: number; hint: string };
   } | null>(null);
   const hoverKeyRef = useRef("");
   const hoverCardRef = useRef<HTMLDivElement | null>(null);
@@ -652,12 +665,12 @@ export default function AseanMap({
   const skipOutlineFitRef = useRef(false);
   const catalogRef = useRef<MasterCountry[]>([]);
 
-  const latestPropsRef = useRef({ countryData, outbreakLocations: effectiveOutbreaks, locationsData, onSelectCountry });
+  const latestPropsRef = useRef({ countryData, outbreakLocations: effectiveOutbreaks, locationsData, onSelectCountry, onSelectRegion, regionHoverStats });
   const regionLinksRef = useRef<RegionBorderLink[]>(regionLinks || []);
   const adminCrumbsRef = useRef<{ name: string; level: number }[]>([]);
   useEffect(() => {
-    latestPropsRef.current = { countryData, outbreakLocations: effectiveOutbreaks, locationsData, onSelectCountry };
-  }, [countryData, effectiveOutbreaks, locationsData, onSelectCountry]);
+    latestPropsRef.current = { countryData, outbreakLocations: effectiveOutbreaks, locationsData, onSelectCountry, onSelectRegion, regionHoverStats };
+  }, [countryData, effectiveOutbreaks, locationsData, onSelectCountry, onSelectRegion, regionHoverStats]);
   useEffect(() => {
     regionLinksRef.current = regionLinks || [];
   }, [regionLinks]);
@@ -1297,6 +1310,11 @@ export default function AseanMap({
         if (latestPropsRef.current.onSelectCountry && regionCountry) {
           latestPropsRef.current.onSelectCountry(regionCountry);
         }
+        latestPropsRef.current.onSelectRegion?.({
+          name: unitName,
+          level: clickedLevel,
+          code: String(feature.get("id_provinsi") || feature.get("id_kabupaten") || feature.get("kode") || "") || null,
+        });
         return;
       }
 
@@ -1426,6 +1444,7 @@ export default function AseanMap({
       let subtitle = "";
       let lines: { label: string; value: string; note?: string }[] = [];
       let empty = tr("skdr.amap.no_cross_border_province_pair_for_this_u");
+      let stats: { cases: number; deaths: number; cfr: number | null; ebs: number; pe: number; hint: string } | undefined;
       if (regionHit) {
         const unit = String(regionHit.get("regionName") || tr("skdr.amap.region"));
         const country = String(regionHit.get("regionCountry") || "");
@@ -1445,6 +1464,21 @@ export default function AseanMap({
           note: row.notes[0],
         }));
         if (level > 1 && parent) empty = tr("skdr.amap.noAcross", { parent });
+        if (latestPropsRef.current.regionHoverStats) {
+          const m = (regionHit.get("regionMetric") as RegionMetric | undefined) || { cases: 0, deaths: 0, eventCount: 0 };
+          const cases = (m.ebsCases || 0) + (m.peCases || 0);
+          const deaths = (m.ebsDeaths || 0) + (m.peDeaths || 0);
+          stats = {
+            cases,
+            deaths,
+            cfr: cases > 0 ? (deaths / cases) * 100 : null,
+            ebs: m.ebsSignals || 0,
+            pe: m.peCases || 0,
+            hint: tr(level === 1 ? "skdr.amap.hoverClickProvince" : "skdr.amap.hoverClickRegion"),
+          };
+          subtitle = level > 1 && parent ? `${adminLevelCode(level)} · ${parent}` : tr("skdr.amap.province");
+          key = `${key}:${cases}:${deaths}`;
+        }
       } else if (neighborHit) {
         const country = String(neighborHit.get("borderName") || tr("skdr.amap.neighbor"));
         const touched = linksTouchingCountry(links, country);
@@ -1469,7 +1503,7 @@ export default function AseanMap({
         return;
       }
       hoverKeyRef.current = key;
-      setHoverCard({ x: left, y: top, title, subtitle, lines, empty });
+      setHoverCard({ x: left, y: top, title, subtitle, lines, empty, stats });
     });
 
     mapRef.current = map;
@@ -1595,6 +1629,18 @@ export default function AseanMap({
     regionRef.current?.setVisible(Boolean(showAdmin && hasRegionBoundary));
     markerRef.current?.setVisible(showMarkers);
   }, [showAdmin, showMarkers, selected?.name, adminDrill?.countryName, catalogTick]);
+
+  // PR 027: per-layer opacity (only when the page asks for it).
+  useEffect(() => {
+    if (!layerOpacity) return;
+    const set = (layer: { setOpacity: (v: number) => void } | null | undefined, v?: number) => {
+      if (layer && v != null && Number.isFinite(v)) layer.setOpacity(Math.min(1, Math.max(0, v)));
+    };
+    set(markerRef.current, layerOpacity.markers);
+    set(wildlifeRef.current, layerOpacity.wildlife);
+    set(vectorSightingsRef.current, layerOpacity.vectors);
+    set(regionRef.current, layerOpacity.regions);
+  }, [layerOpacity?.markers, layerOpacity?.wildlife, layerOpacity?.vectors, layerOpacity?.regions, mapReady]);
 
   useEffect(() => {
     Object.entries(bnpbRef.current).forEach(([key, layer]) =>
@@ -2311,6 +2357,14 @@ export default function AseanMap({
     }
   };
 
+  // PR 027: page-driven reset (e.g. the Lite page's "reset view" button / filter reset).
+  const resetRef = useRef(resetView);
+  resetRef.current = resetView;
+  useEffect(() => {
+    if (!resetSignal) return;
+    resetRef.current();
+  }, [resetSignal]);
+
   const showAdminLevel = (level: number) => {
     if (!adminDrill) return;
     drillParentRef.current = level <= 1 ? null : drillGeomRef.current[level - 1] || null;
@@ -2409,7 +2463,17 @@ export default function AseanMap({
         >
           <p className="text-[10px] font-black uppercase tracking-wider text-primary">{hoverCard.subtitle}</p>
           <p className="mt-0.5 text-sm font-black text-slate-900">{hoverCard.title}</p>
-          {hoverCard.lines.length > 0 ? (
+          {hoverCard.stats ? (
+            <div data-testid="map-hover-stats">
+              <div className="mt-2 grid grid-cols-3 gap-1 border-t border-slate-100 pt-2 text-center">
+                <div><div className="text-[9px] font-black uppercase tracking-wider text-slate-500">{tr("skdr.amap.hoverCases")}</div><div className="text-base font-black leading-tight text-slate-900">{hoverCard.stats.cases.toLocaleString("id-ID")}</div></div>
+                <div><div className="text-[9px] font-black uppercase tracking-wider text-slate-500">{tr("skdr.amap.hoverDeaths")}</div><div className="text-base font-black leading-tight text-red-600">{hoverCard.stats.deaths.toLocaleString("id-ID")}</div></div>
+                <div><div className="text-[9px] font-black uppercase tracking-wider text-slate-500">CFR</div><div className={`text-base font-black leading-tight ${hoverCard.stats.cfr == null ? "text-slate-400" : hoverCard.stats.cfr >= 5 ? "text-red-600" : hoverCard.stats.cfr >= 1 ? "text-amber-600" : "text-teal-700"}`}>{hoverCard.stats.cfr == null ? "—" : `${hoverCard.stats.cfr.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`}</div></div>
+              </div>
+              <p className="mt-1.5 text-[10px] font-semibold text-slate-500">{tr("skdr.amap.hoverSplit", { ebs: hoverCard.stats.ebs.toLocaleString("id-ID"), pe: hoverCard.stats.pe.toLocaleString("id-ID") })}</p>
+              <p className="mt-0.5 text-[10px] font-bold text-primary">{hoverCard.stats.hint}</p>
+            </div>
+          ) : hoverCard.lines.length > 0 ? (
             <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2">
               {hoverCard.lines.map((line) => (
                 <li key={`${line.label}-${line.value}`} title={line.note} className="text-[11px] font-semibold leading-4 text-slate-700">

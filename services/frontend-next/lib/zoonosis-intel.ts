@@ -12,6 +12,9 @@ export const GBIF_BIRD_ORDERS = [{ key: 1108, name: 'Anseriformes' }, { key: 719
 export const INAT_MOSQUITO_TAXON = 52134
 export const INAT_PLACE_INDONESIA = 6966
 
+/** Optional [minLon, minLat, maxLon, maxLat] box (e.g. the filtered province) to keep the context layers on that area. */
+export type BBox = [number, number, number, number]
+
 export type GbifBirds = { results: any[]; count: number; source: string }
 export type InatMosquitoes = VectorSightingsResponse & { total: number }
 
@@ -22,9 +25,13 @@ const getJson = async (url: string, signal: AbortSignal) => {
 }
 
 /** GBIF bird occurrences in Indonesia between start and end (YYYY-MM-DD); pages of 300, at most `max` records. */
-export async function fetchGbifWaterbirds(start: string, end: string, signal: AbortSignal, max = 900): Promise<GbifBirds> {
+export async function fetchGbifWaterbirds(start: string, end: string, signal: AbortSignal, max = 900, bbox?: BBox | null): Promise<GbifBirds> {
   const qs = (offset: number) => {
     const p = new URLSearchParams({ country: 'ID', hasCoordinate: 'true', hasGeospatialIssue: 'false', occurrenceStatus: 'PRESENT', eventDate: `${start},${end}`, limit: '300', offset: String(offset) })
+    if (bbox) {
+      p.set('decimalLongitude', `${bbox[0].toFixed(3)},${bbox[2].toFixed(3)}`)
+      p.set('decimalLatitude', `${bbox[1].toFixed(3)},${bbox[3].toFixed(3)}`)
+    }
     GBIF_BIRD_ORDERS.forEach((o) => p.append('orderKey', String(o.key)))
     return `${GBIF}?${p}`
   }
@@ -38,10 +45,11 @@ export async function fetchGbifWaterbirds(start: string, end: string, signal: Ab
 }
 
 /** iNaturalist mosquito (Culicidae) observations in Indonesia between start and end; sequential pages of 200 (iNat asks ≤1 req/s). */
-export async function fetchInatMosquitoes(start: string, end: string, signal: AbortSignal, max = 400): Promise<InatMosquitoes> {
+export async function fetchInatMosquitoes(start: string, end: string, signal: AbortSignal, max = 400, bbox?: BBox | null): Promise<InatMosquitoes> {
   const qs = (page: number) => `${INAT}?${new URLSearchParams({
     taxon_id: String(INAT_MOSQUITO_TAXON), place_id: String(INAT_PLACE_INDONESIA), d1: start, d2: end, geo: 'true', verifiable: 'true',
     per_page: '200', page: String(page), order: 'desc', order_by: 'observed_on',
+    ...(bbox ? { swlng: bbox[0].toFixed(3), swlat: bbox[1].toFixed(3), nelng: bbox[2].toFixed(3), nelat: bbox[3].toFixed(3) } : {}),
   })}`
   const raw: any[] = []
   let total = 0

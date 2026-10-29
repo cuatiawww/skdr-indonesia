@@ -36,3 +36,19 @@ None. No backend or database change; only existing read-only GET endpoints plus 
 
 ## Verification
 Open `/skdr/dasbor/zoonosis-lite` (sidebar: Dasbor → Dasbor Zoonosis Lite, directly under Dasbor Utama). The header shows "Dasbor Zoonosis Lite" and the subtitle; other pages still show SKDR INDONESIA. Click 4/8/12 mg or YTD, or change year/weeks: cards, CFR panel and markers update and the legend shows the period. Toggle disease chips and the province; Reset restores the defaults. Turn on "Burung migran" and "Nyamuk" on the map: points appear with counts, legend entries and popups with a source link.
+
+## Iterasi 3: filter bar & panel lapisan peta
+
+- **Filter bar satu baris** (gaya sama dengan filter dasbor utama): Sumber data (Semua / EBS / Kasus PE), Penyakit (4 zoonosis), Provinsi, Kabupaten/Kota, Periode Minggu Epi awal–akhir (bisa lintas tahun) dengan preset 4/8/12 mg dan YTD, tombol Terapkan (menampilkan "Memuat data..." saat memuat) dan tombol reset. Dropdown berlaku setelah Terapkan; preset, Sumber data, klik kartu dan klik peta langsung berlaku.
+- **Sumber data** diteruskan ke `/api/v1/public-dashboard` (`source=ebs|pe`) dan titik peta difilter per `source_type`. Kartu dan CFR tetap Alert SKDR (endpoint alert-skdr tidak memisahkan sumber).
+- **Kab/Kota** memakai `/api/v1/master/kabkota?province_id=` dan dikirim sebagai `kabkota_id` ke semua endpoint.
+- **Panel lapisan peta** (kiri atas, bisa dilipat): Kasus EBS/PE, Arsiran wilayah, Burung migran (GBIF), Nyamuk (iNaturalist); masing-masing dengan saklar, opasitas, warna dan jumlah titik. Lapisan publik mengikuti periode serta provinsi/kab-kota (kotak batas dari titik master kab/kota).
+- **Peta**: hover provinsi menampilkan kasus, kematian dan CFR; klik provinsi memperbesar dan memfilter provinsi tersebut (klik kab/kota di provinsi terfilter memfilter kab/kota); tombol layar penuh dan reset tampilan; legenda skala kasus tetap di kiri bawah.
+
+### Iterasi 4: kontrol lapisan terpusat, tanpa Sumber data, filter multi-pilih
+
+- Semua kontrol lapisan (Kasus EBS/PE, Arsiran wilayah, Burung migran, Nyamuk, slider opasitas, petunjuk) hanya ada di panel kanan **Pengaturan Peta & Lapisan** (`layerPanel`, `hideBuiltinLayers`, `choroplethOverride` di `SpatialOutbreakMap`). Panel lapisan kiri dihapus; kiri bawah tinggal **Legenda** ringkas (baca saja, bisa dilipat) dengan baris Burung/Nyamuk saat aktif.
+- Pilihan **Sumber data** dihapus (data hanya EBS SKDR; peta tetap menampilkan seluruh titik EBS + PE).
+- Satu baris filter responsif (flex-wrap; hanya membungkus di layar sempit): Penyakit, Provinsi, Kab/Kota, Periode Minggu Epi + preset, Terapkan, Reset.
+- Penyakit, Provinsi, dan Kab/Kota memakai komponen `MultiSelect` yang sama dengan Dasbor Utama (cari, pilih semua/hapus, ringkasan jumlah). Kab/Kota dikelompokkan per provinsi dan dibatasi ke provinsi yang dicentang; mencabut provinsi ikut membuang kab/kotanya.
+- Query mengirim daftar koma: `province_id=1,2`, `kabkota_id=…` (sama seperti `filterParams` Dasbor Utama). Bbox lapisan Burung/Nyamuk = gabungan wilayah terpilih.

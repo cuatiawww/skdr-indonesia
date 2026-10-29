@@ -39,6 +39,15 @@ export default function SpatialOutbreakMap({
   legendCollapsible = false,
   legendDefaultOpen = true,
   onLayerStatus,
+  markersOverride,
+  layerOpacity,
+  regionHoverStats,
+  onSelectRegion,
+  resetSignal,
+  layerPanel,
+  layerPanelTitle,
+  hideBuiltinLayers = false,
+  choroplethOverride,
 }: {
   countries: { name: string; cases: number; deaths?: number }[];
   locations: OutbreakLocation[];
@@ -71,6 +80,23 @@ export default function SpatialOutbreakMap({
   legendCollapsible?: boolean;
   legendDefaultOpen?: boolean;
   onLayerStatus?: (key: string, status: MapLayerStatus) => void;
+  /** PR 027: page-controlled case-marker visibility (Lite layer panel); wins over the settings drawer. */
+  markersOverride?: boolean;
+  /** PR 027: per-layer opacity, passed through to AseanMap. */
+  layerOpacity?: { markers?: number; wildlife?: number; vectors?: number; regions?: number };
+  /** PR 027: hover card with cases / deaths / CFR per province (AseanMap). */
+  regionHoverStats?: boolean;
+  /** PR 027: province / kab-kota polygon click, e.g. to filter the page. */
+  onSelectRegion?: (region: { name: string; level: number; code: string | null }) => void;
+  /** PR 027: bump to reset the map view. */
+  resetSignal?: number;
+  /** PR 027: page layer controls shown at the top of the "Pengaturan Peta & Lapisan" drawer (single place for layer settings). */
+  layerPanel?: ReactNode;
+  layerPanelTitle?: string;
+  /** PR 027: hide drawer rows the page already controls (markers + range, choropleth, wildlife). */
+  hideBuiltinLayers?: boolean;
+  /** PR 027: page-controlled choropleth visibility; wins over the drawer. */
+  choroplethOverride?: boolean;
 }) {
   const { t, locale } = useTranslation();
   const periodActive = !!(markerPeriod?.start && markerPeriod?.end);
@@ -138,6 +164,7 @@ export default function SpatialOutbreakMap({
 
 
 
+  const choroOn = choroplethOverride ?? choropleth;
   const choroClasses = admin && regionClasses ? regionClasses : buildChoroClasses(choroCfg, (countries || []).map((c) => c.cases || 0));
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl">
@@ -148,9 +175,9 @@ export default function SpatialOutbreakMap({
         hideSpreadRoute={hideSpreadRoute ?? prototypeMode}
         sourceMode={sourceMode}
         baseMap={base}
-        showMarkers={markers}
+        showMarkers={markersOverride ?? markers}
         showAdmin={admin}
-        countryData={choropleth ? countries : undefined}
+        countryData={choroOn ? countries : undefined}
         outbreakLocations={locations}
         markerLookbackDays={markerLookbackDays}
         markerPeriod={periodActive ? markerPeriod : null}
@@ -173,11 +200,17 @@ export default function SpatialOutbreakMap({
         }}
         onSelectCountry={onSelectCountry}
         onAdminLevel={setAdminLevel}
+        layerOpacity={layerOpacity}
+        regionHoverStats={regionHoverStats}
+        onSelectRegion={onSelectRegion}
+        resetSignal={resetSignal}
         onChoroClasses={setRegionClasses}
       />
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
         <button
           onClick={() => setSettings(true)}
+          data-testid="map-settings-open"
+          aria-expanded={settings}
           className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-slate-700 shadow-md transition hover:border-blue-300 hover:bg-blue-50 hover:text-primary"
         >
           <Settings className="h-3.5 w-3.5 text-primary" />
@@ -195,12 +228,12 @@ export default function SpatialOutbreakMap({
           </button>
         ) : null}
         {legendCollapsible && !legendOpen ? null : <>
-        {periodActive && markers ? <span className="text-slate-500" data-testid="map-marker-period">{tr("skdr.map.markerPeriod", { period: periodLabel })}</span> : null}
+        {periodActive && (markersOverride ?? markers) ? <span className="text-slate-500" data-testid="map-marker-period">{tr("skdr.map.markerPeriod", { period: periodLabel })}</span> : null}
         {sourceMode !== "pe" ? <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full border-2 border-white bg-ebs shadow" />{tr("skdr.map.legendEbs")}</span> : null}
         {sourceMode !== "ebs" ? <span className="flex items-center gap-1.5"><span className="mx-0.5 h-2.5 w-2.5 rotate-45 border border-white bg-pe shadow" />{tr("skdr.map.legendPe")}</span> : null}
-        {choropleth ? <span className="text-slate-500">{tr(sourceMode === "all" ? "skdr.map.legendChoroAll" : sourceMode === "ebs" ? "skdr.map.legendChoroEbs" : "skdr.map.legendChoroPe")}</span> : null}
+        {choroOn ? <span className="text-slate-500">{tr(sourceMode === "all" ? "skdr.map.legendChoroAll" : sourceMode === "ebs" ? "skdr.map.legendChoroEbs" : "skdr.map.legendChoroPe")}</span> : null}
         {legendExtra}
-        {choropleth && choroClasses ? <ChoroLegend classes={choroClasses} label={tr(adminLevel >= 3 ? "skdr.map.perKecamatan" : adminLevel === 2 ? "skdr.map.perKabkota" : "skdr.map.perProvinsi")} /> : null}
+        {choroOn && choroClasses ? <ChoroLegend classes={choroClasses} label={tr(adminLevel >= 3 ? "skdr.map.perKecamatan" : adminLevel === 2 ? "skdr.map.perKabkota" : "skdr.map.perProvinsi")} /> : null}
         </>}
       </div>
 
@@ -242,7 +275,7 @@ export default function SpatialOutbreakMap({
             className="absolute inset-0 z-20 bg-black/10"
             aria-label={t("common.close")}
           />
-          <aside className="absolute right-0 top-0 z-30 flex h-full w-[min(360px,100%)] flex-col border-l border-slate-200 bg-white/95 shadow-[-8px_0_40px_rgba(0,0,0,.08)] backdrop-blur-md">
+          <aside data-testid="map-settings" className="absolute right-0 top-0 z-30 flex h-full w-[min(360px,100%)] flex-col border-l border-slate-200 bg-white/95 shadow-[-8px_0_40px_rgba(0,0,0,.08)] backdrop-blur-md">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div className="flex items-center gap-2">
                 <Settings className="h-4 w-4 text-primary" />
@@ -259,8 +292,12 @@ export default function SpatialOutbreakMap({
               </button>
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto p-4">
+              {layerPanel ? (
+                <Group title={layerPanelTitle || tr("skdr.map.mapLayers")}>{layerPanel}</Group>
+              ) : null}
               {!prototypeMode && (
                 <Group title={tr("skdr.map.mapLayers")}>
+                  {hideBuiltinLayers ? null : <>
                   <Row
                     icon={<MapPin className="h-4 w-4" />}
                     title={t("map.outbreakMarkers")}
@@ -289,6 +326,7 @@ export default function SpatialOutbreakMap({
                     </div>
                     )}
                   </div>
+                  </>}
                   <Row
                     icon={<Layers className="h-4 w-4" />}
                     title={t("map.adminBoundaries")}
@@ -296,13 +334,13 @@ export default function SpatialOutbreakMap({
                     value={admin}
                     set={setAdmin}
                   />
-                  <Row
+                  {hideBuiltinLayers ? null : <Row
                     icon={<Layers className="h-4 w-4" />}
                     title={t("map.casesChoropleth")}
                     sub={t("map.casesChoroplethSub")}
                     value={choropleth}
                     set={setChoropleth}
-                  />
+                  />}
                   <Row
                     icon={<Wind className="h-4 w-4" />}
                     title={t("map.windFlow")}
@@ -353,14 +391,14 @@ export default function SpatialOutbreakMap({
                       set={(v) => setIntel((p) => ({ ...p, fires: v }))}
                       status={layerStatus.fires}
                     />
-                    <Row
+                    {hideBuiltinLayers ? null : <Row
                       icon={<Bird className="h-4 w-4 text-teal-600" />}
                       title={tr("skdr.map.wildlifeTitle")}
                       sub={tr("skdr.map.wildlifeSub")}
                       value={Boolean(intel.wildlife)}
                       set={(v) => setIntel((p) => ({ ...p, wildlife: v }))}
                       status={layerStatus.wildlife}
-                    />
+                    />}
                   </Group>
 
                   <Group title={t("map.bnpbInarisk")}>

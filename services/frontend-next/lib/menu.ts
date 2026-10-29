@@ -361,7 +361,7 @@ export const ZOONOSIS_LITE_MENU_ITEM: SidebarItemConfig = {
   labelKey: 'skdr.lite.menu',
   icon: 'Activity',
   href: '/dasbor/zoonosis-lite',
-  description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran dalam satu layar',
+  description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
   order: 1.5,
   enabled: true,
 }
