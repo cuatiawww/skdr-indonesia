@@ -908,6 +908,8 @@
     "map": {
       "mapLayers": "Map Layers",
       "markerRange": "Marker time range",
+      "markerRangeFollowsPeriod": "Follows dashboard period",
+      "markerPeriod": "Markers: {period}",
       "3months": "3 Months",
       "days": "{days} Days",
       "base_osm": "OSM",
