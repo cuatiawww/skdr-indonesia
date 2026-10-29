@@ -103,6 +103,7 @@ Keputusan yang diambil (disetujui Yosua: "Ya coba di improve da nalar ya tolong"
 
 ### Isi tab
 - **Laboratorium**: "Bacaan cepat" (otomatis: % alert berspesimen, % positif tertinggi untuk penyakit dengan ≥10 hasil, provinsi positif terbanyak, catatan bila hasil > spesimen); matriks penyakit × hasil (heat per kolom + baris total); matriks provinsi × penyakit dengan pilihan metrik (positif/spesimen/% positif), warna per kolom; lalu `LabSection` lengkap. Bila backend belum punya `by_province_disease` (backend lama), matriks disusun di frontend dari `/laboratorium?disease=` per penyakit.
+- Kedua matriks lab punya **legenda warna** (gradasi rendah → tinggi per keluarga warna: Alert abu, Spesimen/% diperiksa teal, Positif/% positif merah, Negatif hijau, Proses/lain biru; matriks provinsi mengikuti metrik terpilih) dengan catatan bahwa intensitas relatif dalam tiap kolom (kolom persen skala tetap 0–100%) dan "·" = tidak ada alert. Setiap sel punya tooltip: nilai, artinya, dan dasar skala warnanya.
 - **7-1-7**: `T717` dari `/analytics/summary` + `AlertT717` + `EbsResponsCard`.
 - **Alert & verifikasi**: `AlertSection` + `EbsAlertPanel`.
 - **Klaster & epi curve**: `EpiCurve` + `KlasterSection`.
