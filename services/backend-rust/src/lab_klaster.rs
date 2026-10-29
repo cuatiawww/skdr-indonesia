@@ -76,6 +76,13 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
                 COUNT(*) FILTER (WHERE {cls} = 'positif')::bigint
          FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_locations l ON l.id = a.province_id WHERE {AW}
          GROUP BY 1 ORDER BY 3 DESC, 2 DESC LIMIT {top}"), &p).await.map_err(internal)?;
+    // PR 028: matriks provinsi × penyakit, untuk provinsi teratas yang sama dengan by_province (urut spesimen, lalu alert).
+    let by_pd = c.query(&format!(
+        "WITH b AS (SELECT COALESCE(l.name, a.provinsi, 'Tidak diketahui') AS prov, {LBL} AS dis, {spec} AS sp, {cls} AS kl
+                    FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_locations l ON l.id = a.province_id WHERE {AW}),
+              tp AS (SELECT prov FROM b GROUP BY 1 ORDER BY COUNT(*) FILTER (WHERE sp) DESC, COUNT(*) DESC LIMIT {top})
+         SELECT b.prov, b.dis, COUNT(*)::bigint, COUNT(*) FILTER (WHERE b.sp)::bigint, COUNT(*) FILTER (WHERE b.kl = 'positif')::bigint
+         FROM b JOIN tp USING (prov) GROUP BY 1, 2"), &p).await.map_err(internal)?;
     let trend = c.query(&format!(
         "SELECT a.tahun, a.minggu, COUNT(*)::bigint, COUNT(*) FILTER (WHERE {spec})::bigint, COUNT(*) FILTER (WHERE {cls} = 'positif')::bigint
          {from} GROUP BY 1, 2 ORDER BY 1, 2"), &p).await.map_err(internal)?;
@@ -102,6 +109,7 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
         "by_disease": by_disease.iter().map(|r| json!({ "disease": r.get::<_, String>(0), "alerts": n(r,1), "with_specimen": n(r,2),
             "positive": n(r,3), "negative": n(r,4), "other": n(r,5) })).collect::<Vec<_>>(),
         "by_province": by_prov.iter().map(|r| json!({ "province": r.get::<_, String>(0), "alerts": n(r,1), "with_specimen": n(r,2), "positive": n(r,3) })).collect::<Vec<_>>(),
+        "by_province_disease": province_disease(by_pd.iter().map(|r| PdRow { province: r.get(0), disease: r.get(1), alerts: n(r,2), with_specimen: n(r,3), positive: n(r,4) }).collect()),
         "trend": trend.iter().map(|r| json!({ "year": r.get::<_, i32>(0), "week": r.get::<_, i32>(1), "alerts": n(r,2), "with_specimen": n(r,3), "positive": n(r,4) })).collect::<Vec<_>>(),
         "specimens": specimens.iter().map(|r| json!({ "specimen": r.get::<_, Option<String>>(0), "count": n(r,1) })).collect::<Vec<_>>(),
         "recent": recent.iter().map(|r| {
@@ -113,6 +121,26 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
         "ebs_lab": e.iter().map(|r| json!({ "diagnosa": r.get::<_, String>(0), "reports": n(r,1), "cases": n(r,2) })).collect::<Vec<_>>(),
         "filters": { "scope": f.scope, "disease": f.disease_label() },
     }})))
+}
+
+/// PR 028: one cell of the province × disease lab matrix.
+pub(crate) struct PdRow { pub(crate) province: String, pub(crate) disease: String, pub(crate) alerts: i64, pub(crate) with_specimen: i64, pub(crate) positive: i64 }
+
+/// PR 028: pivot flat (province, disease) rows into a matrix. Provinces and diseases are ordered by total specimens (then alerts, then name);
+/// `cells[i][j]` is null when the province has no alert for that disease.
+pub(crate) fn province_disease(rows: Vec<PdRow>) -> Value {
+    fn order(rows: &[PdRow], key: impl Fn(&PdRow) -> &String) -> Vec<String> {
+        let mut t: std::collections::BTreeMap<String, (i64, i64)> = Default::default();
+        for r in rows { let e = t.entry(key(r).clone()).or_default(); e.0 += r.with_specimen; e.1 += r.alerts; }
+        let mut v: Vec<(String, (i64, i64))> = t.into_iter().collect();
+        v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then(b.1 .1.cmp(&a.1 .1)).then(a.0.cmp(&b.0)));
+        v.into_iter().map(|x| x.0).collect()
+    }
+    let provs = order(&rows, |r| &r.province);
+    let dis = order(&rows, |r| &r.disease);
+    let cells: Vec<Vec<Value>> = provs.iter().map(|p| dis.iter().map(|d| rows.iter().find(|r| &r.province == p && &r.disease == d)
+        .map(|r| json!({ "alerts": r.alerts, "with_specimen": r.with_specimen, "positive": r.positive })).unwrap_or(Value::Null)).collect()).collect();
+    json!({ "provinces": provs, "diseases": dis, "cells": cells })
 }
 
 struct EP { d0: Option<chrono::NaiveDate>, d1: Option<chrono::NaiveDate>, prov: Vec<i32>, kab: Vec<i32>, dis: Vec<i32>, none: bool, units: Vec<String> }
@@ -181,4 +209,23 @@ pub async fn klaster(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
             "status": r.get::<_, Option<String>>(7), "latitude": r.get::<_, Option<f64>>(8), "longitude": r.get::<_, Option<f64>>(9) })).collect::<Vec<_>>(),
         "filters": { "scope": f.scope, "disease": f.disease_label() },
     }})))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn r(p: &str, d: &str, a: i64, s: i64, pos: i64) -> PdRow { PdRow { province: p.into(), disease: d.into(), alerts: a, with_specimen: s, positive: pos } }
+    #[test]
+    fn province_disease_matrix() {
+        let m = province_disease(vec![r("Bali", "Rabies", 50, 10, 3), r("Jawa Timur", "Leptospirosis", 40, 30, 20), r("Jawa Timur", "Rabies", 5, 1, 0)]);
+        assert_eq!(m["provinces"], json!(["Jawa Timur", "Bali"]));
+        assert_eq!(m["diseases"], json!(["Leptospirosis", "Rabies"]));
+        assert_eq!(m["cells"][0][0]["positive"], json!(20));
+        assert_eq!(m["cells"][0][1]["with_specimen"], json!(1));
+        assert!(m["cells"][1][0].is_null(), "Bali has no Leptospirosis alert");
+        assert_eq!(m["cells"][1][1]["alerts"], json!(50));
+        let e = province_disease(vec![]);
+        assert_eq!(e["provinces"], json!([]));
+        assert_eq!(e["cells"], json!([]));
+    }
 }

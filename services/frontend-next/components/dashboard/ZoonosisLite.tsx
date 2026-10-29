@@ -11,10 +11,11 @@
 // and iNaturalist mosquitoes ("konteks vektor": not a vector of these 4 diseases), each with a toggle, opacity and count.
 // The two public layers follow the period and the province / kab-kota filter (bounding box from the master kab/kota points).
 // Map: hover a province = cases / deaths / CFR, click = zoom + filter by that province, fullscreen and reset-view buttons.
+// PR 028: two buttons under the CFR panel ("Analisis Laboratorium", "Detail Lainnya") open ZoonosisLiteModal with the active filters.
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ReactNode } from 'react'
-import { Bird, Bug, CalendarDays, ChevronDown, ChevronUp, Layers, Loader2, Map as MapIcon, MapPin, Maximize2, Minimize2, RotateCcw, Shapes, Crosshair } from 'lucide-react'
+import { Bird, Bug, CalendarDays, ChevronDown, ChevronUp, FlaskConical, LayoutList, Layers, Loader2, Map as MapIcon, MapPin, Maximize2, Minimize2, RotateCcw, Shapes, Crosshair } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchFrom } from '@/lib/api'
 import { fetchAlertSkdr, nf, pf, toQs, type AlertSkdr, type Ci } from '@/lib/alert-skdr'
@@ -25,6 +26,8 @@ import { fetchGbifWaterbirds, fetchInatMosquitoes, type BBox } from '@/lib/zoono
 import { ErrorState, SkeletonMap } from '@/components/ui/Skeleton'
 import MultiSelect from '@/components/filters/MultiSelect'
 import type { IntelLoaders } from '@/components/AseanMap'
+import ZoonosisLiteModal, { TAB_ORDER, TAB_SECTION, type LiteTab } from '@/components/dashboard/ZoonosisLiteModal'
+import { useDashboardSections } from '@/lib/dashboard-sections'
 import type { MapLayerStatus, PublicDashboard } from '@/types'
 
 const SpatialOutbreakMap = dynamic(() => import('@/components/SpatialOutbreakMap'), { ssr: false })
@@ -406,6 +409,27 @@ export default function ZoonosisLite() {
     </span>
   ) : null
 
+  // PR 028: detail modal, same filters as the page (selected diseases only); tabs hidden with their dashboard section
+  const [modal, setModal] = useState<{ open: boolean; tab: LiteTab }>({ open: false, tab: 'lab' })
+  const sections = useDashboardSections()
+  const shownTabs = TAB_ORDER.filter((x) => !sections.hidden.includes(TAB_SECTION[x]))
+  const otherTab = shownTabs.find((x) => x !== 'lab')
+  const modalQuery = useMemo(() => ({
+    kategori: 'ZOONOSIS',
+    disease: sel.join(','),
+    start_year: period.startYear, start_week: period.startWeek, end_year: period.endYear, end_week: period.endWeek, year: period.endYear,
+    province_id: provs.length ? provs.join(',') : undefined,
+    kabkota_id: kabs.length ? kabs.join(',') : undefined,
+  }), [period, provs, kabs, sel])
+  const modalDiseases = useMemo(() => LITE_DISEASES.filter((d) => sel.includes(d.code)).map((d) => ({ code: d.code as string, name: d.name as string, color: d.color as string })), [sel])
+  const modalChips = {
+    diseases: allSel ? t('skdr.lite.allDiseases') : modalDiseases.map((d) => d.name).join(', '),
+    area: areaName ?? t('skdr.lite.allProvinces'),
+    period: `M${period.startWeek}/${period.startYear} – M${period.endWeek}/${period.endYear} (${range.label})`,
+  }
+  const closeModal = useCallback(() => setModal((m) => ({ ...m, open: false })), [])
+  const onModalTab = useCallback((tab: LiteTab) => setModal((m) => ({ ...m, tab })), [])
+
   return (
     <div className="flex w-full flex-col gap-2 bg-page px-4 sm:px-6 lg:h-[calc(100vh-128px)] lg:min-h-[560px] lg:px-6" data-testid="zoonosis-lite">
       {/* filter bar (SkdrFilterBar look), one auto-layout row (wraps only on narrow screens): Penyakit · Provinsi · Kab/Kota · Periode (Minggu Epi) + presets · Terapkan · Reset */}
@@ -574,9 +598,26 @@ export default function ZoonosisLite() {
               <tr className="border-t border-slate-300 font-black"><td className="py-0.5">{t('skdr.lite.total4')}</td><td className="text-right">{nf(overall?.num)}/{nf(overall?.den)}</td><td className="text-right">{overall && overall.den ? pf(overall.pct) : '—'}</td><td className="text-right font-normal text-slate-600">{ciText(overall)}</td></tr>
             </tbody>
           </table>
+          {shownTabs.length ? (
+            <div className="mt-2 grid grid-cols-2 gap-1.5" data-testid="lite-detail-buttons">
+              {shownTabs.includes('lab') ? (
+                <button type="button" onClick={() => setModal({ open: true, tab: 'lab' })} data-testid="lite-open-lab"
+                  className="flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl border border-primary-dark py-1 bg-primary px-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-primary-dark">
+                  <FlaskConical className="h-3.5 w-3.5 shrink-0" /><span className="text-center leading-tight">{t('skdr.lite.modal.btnLab')}</span>
+                </button>
+              ) : null}
+              {otherTab ? (
+                <button type="button" onClick={() => setModal({ open: true, tab: otherTab })} data-testid="lite-open-more"
+                  className={`flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl border border-brand-200 py-1 bg-brand-50 px-2 text-[11px] font-bold text-primary transition hover:bg-brand-100 ${shownTabs.includes('lab') ? '' : 'col-span-2'}`}>
+                  <LayoutList className="h-3.5 w-3.5 shrink-0" /><span className="text-center leading-tight">{t('skdr.lite.modal.btnMore')}</span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <p className="mt-1 text-[10px] leading-snug text-slate-500">{t('skdr.lite.note')}</p>
         </div>
       </section>
+      <ZoonosisLiteModal open={modal.open} tab={modal.tab} onTab={onModalTab} onClose={closeModal} query={modalQuery} diseases={modalDiseases} chips={modalChips} />
     </div>
   )
 }

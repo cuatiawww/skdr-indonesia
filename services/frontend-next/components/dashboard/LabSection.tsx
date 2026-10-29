@@ -15,7 +15,10 @@ type T = {
   specimens: { specimen: string | null; count: number }[]
   recent: { year: number; week: number; disease: string; unit: string | null; kabkota: string | null; province: string | null; specimen: string | null; result: string | null; result_class: string; cases: number }[]
   ebs_lab: { diagnosa: string; reports: number; cases: number }[]
+  /** PR 028: province × disease matrix (newer backends only) */
+  by_province_disease?: { provinces: string[]; diseases: string[]; cells: ({ alerts: number; with_specimen: number; positive: number } | null)[][] }
 }
+export type LabData = T
 const nf = (n: number) => (n ?? 0).toLocaleString('id-ID')
 const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '-')
 const CLS: Record<string, string> = { positif: 'bg-red-50 text-red-700 border-red-200', negatif: 'bg-emerald-50 text-emerald-700 border-emerald-200', lainnya: 'bg-slate-50 text-slate-600 border-slate-200', proses: 'bg-blue-50 text-blue-700 border-blue-200', belum: 'bg-amber-50 text-amber-700 border-amber-200' }
@@ -32,11 +35,13 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 }
 
 /** PR 021: seksi Laboratorium - dipakai di Dasbor Utama / dasbor kategori (query = filter dasbor) dan halaman /laboratorium. */
-export default function LabSection({ query, showHeader = true }: { query: Record<string, unknown>; showHeader?: boolean }) {
-  const [d, setD] = useState<T | null>(null)
+/** PR 028: `data` = already-loaded /laboratorium response (Zoonosis Lite modal); then this section does not fetch again. */
+export default function LabSection({ query, showHeader = true, data }: { query: Record<string, unknown>; showHeader?: boolean; data?: T | null }) {
+  const [own, setD] = useState<T | null>(null)
+  const d = data !== undefined ? data : own
   const [error, setError] = useState(false)
   const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'all').map(([k, v]) => [k, String(v)])).toString()
-  const load = () => { setError(false); fetchFrom<T>(`/api/v1/laboratorium?${qs}`).then(setD).catch(() => setError(true)) }
+  const load = () => { if (data !== undefined) return; setError(false); fetchFrom<T>(`/api/v1/laboratorium?${qs}`).then(setD).catch(() => setError(true)) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [qs])
   const k = d?.kpis
