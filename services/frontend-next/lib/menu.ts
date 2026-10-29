@@ -353,6 +353,33 @@ export function ensureBorderCountriesMenu(menu: SidebarGroupConfig[]): SidebarGr
   })
 }
 
+// PR 027: "Dasbor Zoonosis Lite" sits directly under Dasbor Utama. Injected on the client (display only, never saved)
+// so no navigation_menu migration is needed; skipped when the DB menu already has the item.
+export const ZOONOSIS_LITE_MENU_ITEM: SidebarItemConfig = {
+  id: 'mod_zoonosis_lite',
+  label: 'Dasbor Zoonosis Lite',
+  labelKey: 'skdr.lite.menu',
+  icon: 'Activity',
+  href: '/dasbor/zoonosis-lite',
+  description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran dalam satu layar',
+  order: 1.5,
+  enabled: true,
+}
+
+export function ensureZoonosisLiteMenu(menu: SidebarGroupConfig[]): SidebarGroupConfig[] {
+  if (menu.some((group) => (group.items || []).some((item) => item.id === ZOONOSIS_LITE_MENU_ITEM.id || item.href === ZOONOSIS_LITE_MENU_ITEM.href))) {
+    return menu
+  }
+  let inserted = false
+  return menu.map((group) => {
+    if (inserted) return group
+    const main = (group.items || []).find((item) => item.href === '/main-dashboard' || item.id === 'mod_main_dashboard')
+    if (!main) return group
+    inserted = true
+    return { ...group, items: [...(group.items || []), { ...ZOONOSIS_LITE_MENU_ITEM, order: (main.order || 0) + 0.5 }] }
+  })
+}
+
 export const sidebarMenu: SidebarGroup[] = convertConfigToSidebarGroups(DEFAULT_NAVIGATION_CONFIG)
 
 // Dedicated Console Menu in Full English

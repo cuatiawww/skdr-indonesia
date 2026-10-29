@@ -834,6 +834,30 @@
     "low": "Rendah"
   },
   "skdr": {
+    "lite": {
+      "menu": "Dasbor Zoonosis Lite",
+      "title": "Dasbor Zoonosis Lite",
+      "subtitle": "Antraks, Rabies, Leptospirosis dan Flu Burung (zoonosis dengan Form PE): kasus, kematian, CFR dan peta sebaran dalam satu layar.",
+      "period": "Periode",
+      "year": "Tahun",
+      "weekFrom": "Dari minggu",
+      "weekTo": "Sampai minggu",
+      "week": "M{n}",
+      "apply": "Terapkan",
+      "refresh": "Muat ulang",
+      "sourceAlert": "Alert SKDR",
+      "cases": "Kasus",
+      "deaths": "Kematian",
+      "ci": "IK 95%",
+      "ebsPe": "EBS {ebs} sinyal · PE {pe} kasus",
+      "all": "Semua",
+      "cfrTitle": "Perbandingan CFR (IK 95%)",
+      "cfrEmpty": "Tidak ada kasus Alert SKDR pada periode ini.",
+      "disease": "Penyakit",
+      "deathsCases": "Mati/Kasus",
+      "total4": "4 penyakit",
+      "note": "Kasus, kematian dan CFR dari Alert SKDR (IK 95% Wilson, sama dengan kartu CFR dasbor utama). Peta: sinyal EBS dan kasus PE pada periode. Klik kartu atau chip untuk fokus peta."
+    },
     "time": {
       "min": "mnt"
     },

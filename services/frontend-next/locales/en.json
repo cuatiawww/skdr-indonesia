@@ -834,6 +834,30 @@
     "low": "Low"
   },
   "skdr": {
+    "lite": {
+      "menu": "Zoonosis Lite Dashboard",
+      "title": "Zoonosis Lite Dashboard",
+      "subtitle": "Anthrax, Rabies, Leptospirosis and Avian Influenza (zoonoses with a Form PE): cases, deaths, CFR and spread map on one screen.",
+      "period": "Period",
+      "year": "Year",
+      "weekFrom": "From week",
+      "weekTo": "To week",
+      "week": "W{n}",
+      "apply": "Apply",
+      "refresh": "Refresh",
+      "sourceAlert": "Alert SKDR",
+      "cases": "Cases",
+      "deaths": "Deaths",
+      "ci": "95% CI",
+      "ebsPe": "EBS {ebs} signals · PE {pe} cases",
+      "all": "All",
+      "cfrTitle": "CFR comparison (95% CI)",
+      "cfrEmpty": "No Alert SKDR cases in this period.",
+      "disease": "Disease",
+      "deathsCases": "Deaths/Cases",
+      "total4": "4 diseases",
+      "note": "Cases, deaths and CFR from Alert SKDR (Wilson 95% CI, same as the main dashboard CFR card). Map: EBS signals and PE cases in the period. Click a card or chip to focus the map."
+    },
     "time": {
       "min": "min"
     },

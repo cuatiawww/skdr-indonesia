@@ -112,8 +112,8 @@ export default function AppShell({
           />
         </div>
         <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'pb-3 md:pb-5'}`}>
-          {/* PR 018: no breadcrumb on Dasbor Utama or Beranda */}
-          {pathname === "/main-dashboard" || isHome ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
+          {/* PR 018: no breadcrumb on Dasbor Utama or Beranda; PR 027: nor on the one-screen Dasbor Zoonosis Lite */}
+          {pathname === "/main-dashboard" || pathname === "/dasbor/zoonosis-lite" || isHome ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
           <div className={isHome ? "" : "pt-3 md:pt-4"}>{children}</div>
         </div>
       </div>
