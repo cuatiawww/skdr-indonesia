@@ -192,10 +192,12 @@ pub async fn classify(c: &deadpool_postgres::Object, all: bool) -> anyhow::Resul
     let l = |k: &str| -> Vec<String> { v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_lowercase())).collect()).unwrap_or_default() };
     let pat = |k: &str| -> Vec<String> { l(k).into_iter().filter(|w| !w.is_empty()).map(|w| format!("%{}%", w.replace('%', "\\%").replace('_', "\\_"))).collect() };
     let map: Value = v.get("lab_result_map").cloned().unwrap_or_else(|| json!({}));
+    // PR 028: coded specimen answers ("1"/"2") mapped to words before the empty-value test (lab_klaster_config.lab_specimen_map)
+    let smap: Value = v.get("lab_specimen_map").cloned().unwrap_or_else(|| json!({}));
     let (empty, pos, neg, klb, r24) = (l("lab_empty_values"), pat("lab_positive_words"), pat("lab_negative_words"), l("klb_values"), l("respon24_ok"));
     c.execute(
         "UPDATE skdr_alerts a SET
-            ada_spesimen = lower(trim(COALESCE(a.spesimen_diperiksa,''))) <> ALL($1),
+            ada_spesimen = COALESCE($8::jsonb ->> lower(trim(a.spesimen_diperiksa)), lower(trim(COALESCE(a.spesimen_diperiksa,'')))) <> ALL($1),
             lab_kelas = CASE WHEN lower(trim(COALESCE(a.hasil_pemeriksaan,''))) = ANY($1) THEN 'belum'
                              WHEN ($6::jsonb ? lower(trim(a.hasil_pemeriksaan))) THEN $6::jsonb ->> lower(trim(a.hasil_pemeriksaan))
                              WHEN lower(a.hasil_pemeriksaan) LIKE ANY($3) THEN 'negatif'
@@ -203,26 +205,30 @@ pub async fn classify(c: &deadpool_postgres::Object, all: bool) -> anyhow::Resul
             is_klb = lower(trim(COALESCE(a.klb,''))) = ANY($4),
             respon24_ok = lower(trim(COALESCE(a.respon24,''))) = ANY($5)
          WHERE $7 OR a.lab_kelas IS NULL OR a.synced_at > now() - interval '1 day'",
-        &[&empty, &pos, &neg, &klb, &r24, &map, &all],
+        &[&empty, &pos, &neg, &klb, &r24, &map, &all, &smap],
     )
     .await?;
-    // narrow copy for the Laboratorium / Klaster aggregates (skdr_alert_fakta)
-    c.batch_execute(
-        "BEGIN;
-         DELETE FROM skdr_alert_fakta;
-         INSERT INTO skdr_alert_fakta (alert_id, tahun, minggu, yw, province_id, kabkota_id, disease_id, kode_penyakit, nama_penyakit,
+    // narrow copy for the Laboratorium / Klaster aggregates (skdr_alert_fakta); one transaction on this connection
+    c.batch_execute("BEGIN; DELETE FROM skdr_alert_fakta;").await?;
+    let ins = c.execute(
+        "INSERT INTO skdr_alert_fakta (alert_id, tahun, minggu, yw, province_id, kabkota_id, disease_id, kode_penyakit, nama_penyakit,
                 provinsi, kota, unit, unit_key, unit_id, kasus, jml_kematian, latitude, longitude, ada_spesimen, spesimen, lab_kelas,
                 is_klb, respon24_ok, is_case, sts_verif, tgl_verifikasi, klb_kode)
          SELECT a.id, a.tahun, a.minggu, a.tahun*100 + a.minggu, a.province_id, a.kabkota_id, a.disease_id, a.kode_penyakit, a.nama_penyakit,
                 a.provinsi, a.kota, a.unit, lower(trim(a.unit)), a.unit_id, a.kasus, a.jml_kematian, a.latitude, a.longitude,
-                COALESCE(a.ada_spesimen, false), CASE WHEN a.ada_spesimen THEN initcap(lower(trim(a.spesimen_diperiksa))) END,
+                COALESCE(a.ada_spesimen, false),
+                CASE WHEN a.ada_spesimen THEN initcap(COALESCE($1::jsonb ->> lower(trim(a.spesimen_diperiksa)), lower(trim(a.spesimen_diperiksa)))) END,
                 COALESCE(a.lab_kelas, 'belum'), COALESCE(a.is_klb, false), COALESCE(a.respon24_ok, false), COALESCE(m.is_case, true),
                 trim(COALESCE(a.sts_verifikasi,'')) = '1', a.tgl_verifikasi, trim(a.klb)
-         FROM skdr_alerts a LEFT JOIN skdr_penyakit_map m ON m.kode_penyakit = a.kode_penyakit;
-         COMMIT;
-         ANALYZE skdr_alert_fakta;",
+         FROM skdr_alerts a LEFT JOIN skdr_penyakit_map m ON m.kode_penyakit = a.kode_penyakit",
+        &[&smap],
     )
-    .await?;
+    .await;
+    if let Err(e) = ins {
+        let _ = c.batch_execute("ROLLBACK").await;
+        return Err(e.into());
+    }
+    c.batch_execute("COMMIT; ANALYZE skdr_alert_fakta;").await?;
     Ok(())
 }
 

@@ -21,12 +21,20 @@ export default function DashboardHeader({
   authenticated = true,
   consoleMode = false,
   transparent = false,
+  title,
+  subtitle,
+  compact = false,
 }: {
   onToggleSidebar: () => void;
   authenticated?: boolean;
   consoleMode?: boolean;
   /** PR 018: Beranda — no own background/border; the page background shows through. */
   transparent?: boolean;
+  /** PR 027: page-specific title/subtitle (Dasbor Zoonosis Lite) instead of the app name/tagline. */
+  title?: string;
+  subtitle?: string;
+  /** PR 027: shorter banner so a one-screen page keeps its height. */
+  compact?: boolean;
 }) {
   const pathname = usePathname();
   const { t } = useTranslation();
@@ -35,17 +43,17 @@ export default function DashboardHeader({
   const logoSrc = settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/Logo-Kemenkes.png`;
   
 
-  const appTitle = consoleMode
+  const appTitle = title ? title : consoleMode
     ? tr("skdr.layout.console")
     : (settings.app_name || tr("skdr.layout.appName"));
     
-  const appSubtitle = consoleMode
+  const appSubtitle = subtitle ? subtitle : consoleMode
     ? tr("skdr.layout.consoleSub")
     : (settings.app_tagline || tr("skdr.layout.appTagline"));
 
   return (
     <header className={`w-full ${transparent ? "bg-transparent" : "border-b border-rule bg-white"}`} data-testid="app-header">
-      <div className={`relative flex min-h-[118px] items-stretch overflow-visible ${transparent ? "bg-transparent" : "bg-white"}`}>
+      <div className={`relative flex ${compact ? "min-h-[84px]" : "min-h-[118px]"} items-stretch overflow-visible ${transparent ? "bg-transparent" : "bg-white"}`}>
         {transparent ? null : (
           <>
             {/* Banner header (public/bg-header.jpg), right-aligned so the map/illustrations stay visible;
@@ -58,7 +66,7 @@ export default function DashboardHeader({
             <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 md:via-white/50 md:to-transparent" />
           </>
         )}
-        <div className="relative grid w-full gap-5 px-4 py-4 md:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className={`relative grid w-full gap-5 px-4 md:px-6 ${compact ? "py-2.5" : "py-4"} lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center`}>
           <div className="flex min-w-0 items-center gap-4">
             <button
               type="button"
@@ -77,14 +85,14 @@ export default function DashboardHeader({
               <img
                 src={logoSrc}
                 alt={tr("skdr.layout.logo")}
-                className="h-auto max-h-[62px] w-[132px] shrink-0 object-contain md:w-[168px]"
+                className={`h-auto shrink-0 object-contain ${compact ? "max-h-[52px] w-[120px] md:w-[140px]" : "max-h-[62px] w-[132px] md:w-[168px]"}`}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
               <div className="min-w-0 border-brand-200 md:border-l md:pl-5">
                 <div className="flex items-center gap-2">
-                  <h1 className="max-w-[720px] text-lg font-extrabold uppercase leading-tight text-brand-900 sm:text-2xl md:text-3xl">
+                  <h1 className={`font-extrabold leading-tight text-brand-900 ${title ? "max-w-[900px] text-lg sm:text-xl md:text-2xl" : "max-w-[720px] text-lg uppercase sm:text-2xl md:text-3xl"}`} data-testid="app-header-title">
                     {appTitle}
                   </h1>
                   {consoleMode && (
@@ -93,7 +101,7 @@ export default function DashboardHeader({
                     </span>
                   )}
                 </div>
-                <p className="mt-2 hidden max-w-[760px] text-xs leading-relaxed text-slate-600 sm:block md:text-sm lg:text-base">
+                <p className={`hidden text-xs leading-relaxed text-slate-600 sm:block md:text-sm ${subtitle ? "mt-1 max-w-[980px]" : "mt-2 max-w-[760px] lg:text-base"}`} data-testid="app-header-subtitle">
                   {appSubtitle}
                 </p>
               </div>

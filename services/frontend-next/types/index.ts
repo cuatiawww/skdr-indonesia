@@ -615,6 +615,8 @@ export type VectorSighting = {
   observed_on: string;
   photo_url?: string;
   place?: string;
+  /** PR 027: link to the source record (e.g. the iNaturalist observation). */
+  url?: string | null;
 };
 
 export type MapLayerCacheFlags = {
@@ -689,6 +691,9 @@ export type WildlifeOccurrence = {
   eventDate?: string | null;
   latitude: number;
   longitude: number;
+  /** PR 027: province / locality and the GBIF occurrence link (Dasbor Zoonosis Lite). */
+  place?: string | null;
+  url?: string | null;
 };
 
 export type MapLayerStatusState =
