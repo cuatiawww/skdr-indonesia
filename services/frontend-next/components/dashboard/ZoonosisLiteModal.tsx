@@ -78,6 +78,29 @@ function Block({ title, desc, children, testId, right }: { title: string; desc?:
   )
 }
 
+type Rgb = [number, number, number]
+/** Colour key: one low → high ramp per column family, same colours as the heat cells. */
+function HeatLegend({ items, notes, testId }: { items: { rgb: Rgb; label: string; meaning: string }[]; notes: string[]; testId?: string }) {
+  const { t } = useTranslation()
+  const lo = (rgb: Rgb) => heat(rgb, 0.0001).background, hi = (rgb: Rgb) => heat(rgb, 1).background
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2" data-testid={testId}>
+      <div className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">{t('skdr.lite.modal.legendTitle')}</div>
+      <ul className="grid gap-x-3 gap-y-1 sm:grid-cols-2">
+        {items.map((x) => (
+          <li key={x.label} className="flex items-center gap-1.5 text-[10.5px] leading-tight text-slate-600">
+            <span className="text-[9.5px] text-slate-400">{t('skdr.lite.modal.legendLow')}</span>
+            <span className="h-2.5 w-14 shrink-0 rounded-sm border border-slate-200" style={{ background: `linear-gradient(to right, ${lo(x.rgb)}, ${hi(x.rgb)})` }} aria-hidden />
+            <span className="text-[9.5px] text-slate-400">{t('skdr.lite.modal.legendHigh')}</span>
+            <span className="min-w-0"><b className="text-slate-800">{x.label}</b>: {x.meaning}</span>
+          </li>
+        ))}
+      </ul>
+      {notes.map((n) => <p key={n} className="mt-1 text-[10.5px] leading-snug text-slate-500">{n}</p>)}
+    </div>
+  )
+}
+
 type Pd = NonNullable<LabData['by_province_disease']>
 type PdRow = { province: string; disease: string; alerts: number; with_specimen: number; positive: number }
 /** Same pivot as the backend (lab_klaster::province_disease): order by total specimens, then alerts, then name. */
@@ -138,6 +161,10 @@ function LabTab({ query, diseases }: { query: Record<string, unknown>; diseases:
   }))) : []
   const cellVal = (c: Pd['cells'][number][number]) => !c ? null : metric === 'positive' ? c.positive : metric === 'with_specimen' ? c.with_specimen : ratio(c.positive, c.with_specimen)
 
+  const tip = (row: string, col: string, val: string, meaning: string, relative: boolean) =>
+    `${row} · ${col}: ${val}\n${t(`skdr.lite.modal.${meaning}`)}\n(${t(relative ? 'skdr.lite.modal.tipRelative' : 'skdr.lite.modal.tipAbsolute')})`
+  const pdRgb = metric === 'with_specimen' ? TEAL : metric === 'rate' ? AMBER : RED
+  const pdMeaning = metric === 'with_specimen' ? 'lg_spec' : metric === 'rate' ? 'lg_pd_rate' : 'lg_pos'
   return (
     <div className="space-y-3">
       <Block title={t('skdr.lite.modal.labReading')} testId="lm-lab-notes">
@@ -156,13 +183,13 @@ function LabTab({ query, diseases }: { query: Record<string, unknown>; diseases:
                 {rows.map((r) => (
                   <tr key={r.disease} className="border-b border-slate-100">
                     <td className="px-2 py-1.5 font-bold text-slate-900"><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: colorOf(r.disease) }} />{r.disease}</td>
-                    <td className="px-2 text-right" style={heat(SLATE, r.alerts / mx.alerts)}>{nf(r.alerts)}</td>
-                    <td className="px-2 text-right" style={heat(TEAL, r.with_specimen / mx.spec)}>{nf(r.with_specimen)}</td>
-                    <td className="px-2 text-right" style={heat(TEAL, (r.exam ?? 0) / 100)}>{pf(r.exam)}</td>
-                    <td className="px-2 text-right font-bold" style={heat(RED, r.positive / mx.pos)}>{nf(r.positive)}</td>
-                    <td className="px-2 text-right" style={heat(GREEN, r.negative / mx.neg)}>{nf(r.negative)}</td>
-                    <td className="px-2 text-right" style={heat(BLUE, r.other / mx.oth)}>{nf(r.other)}</td>
-                    <td className="px-2 text-right font-bold" style={heat(RED, (r.posRate ?? 0) / 100)}>{pf(r.posRate)}</td>
+                    <td className="px-2 text-right" style={heat(SLATE, r.alerts / mx.alerts)} title={tip(r.disease, 'Alert', nf(r.alerts), 'lg_alerts', true)}>{nf(r.alerts)}</td>
+                    <td className="px-2 text-right" style={heat(TEAL, r.with_specimen / mx.spec)} title={tip(r.disease, t('skdr.lite.modal.specimen'), nf(r.with_specimen), 'lg_spec', true)}>{nf(r.with_specimen)}</td>
+                    <td className="px-2 text-right" style={heat(TEAL, (r.exam ?? 0) / 100)} title={tip(r.disease, t('skdr.lite.modal.examined'), pf(r.exam), 'lg_exam', false)}>{pf(r.exam)}</td>
+                    <td className="px-2 text-right font-bold" style={heat(RED, r.positive / mx.pos)} title={tip(r.disease, t('skdr.lite.modal.positive'), nf(r.positive), 'lg_pos', true)}>{nf(r.positive)}</td>
+                    <td className="px-2 text-right" style={heat(GREEN, r.negative / mx.neg)} title={tip(r.disease, t('skdr.lite.modal.negative'), nf(r.negative), 'lg_neg', true)}>{nf(r.negative)}</td>
+                    <td className="px-2 text-right" style={heat(BLUE, r.other / mx.oth)} title={tip(r.disease, t('skdr.lite.modal.process'), nf(r.other), 'lg_oth', true)}>{nf(r.other)}</td>
+                    <td className="px-2 text-right font-bold" style={heat(RED, (r.posRate ?? 0) / 100)} title={tip(r.disease, t('skdr.lite.modal.posRate'), pf(r.posRate), 'lg_rate', false)}>{pf(r.posRate)}</td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-slate-300 font-black">
@@ -173,6 +200,13 @@ function LabTab({ query, diseases }: { query: Record<string, unknown>; diseases:
               </tbody>
             </table>
           </div>
+          <HeatLegend testId="lm-legend-disease" items={[
+            { rgb: SLATE, label: 'Alert', meaning: t('skdr.lite.modal.lg_alerts') },
+            { rgb: TEAL, label: `${t('skdr.lite.modal.specimen')} / ${t('skdr.lite.modal.examined')}`, meaning: `${t('skdr.lite.modal.lg_spec')}; ${t('skdr.lite.modal.lg_exam')}` },
+            { rgb: RED, label: `${t('skdr.lite.modal.positive')} / ${t('skdr.lite.modal.posRate')}`, meaning: `${t('skdr.lite.modal.lg_pos')}; ${t('skdr.lite.modal.lg_rate')}` },
+            { rgb: GREEN, label: t('skdr.lite.modal.negative'), meaning: t('skdr.lite.modal.lg_neg') },
+            { rgb: BLUE, label: t('skdr.lite.modal.process'), meaning: t('skdr.lite.modal.lg_oth') },
+          ]} notes={[t('skdr.lite.modal.legendRelative'), t('skdr.lite.modal.legendAbsolute')]} />
           <p className="mt-2 text-[10.5px] leading-snug text-slate-500">{t('skdr.lite.modal.matrixDiseaseNote')}</p>
         </Block>
         <Block title={t('skdr.lite.modal.matrixProvince')} desc={t('skdr.lite.modal.matrixProvinceDesc')} testId="lm-lab-matrix-province"
@@ -196,8 +230,8 @@ function LabTab({ query, diseases }: { query: Record<string, unknown>; diseases:
                       {pd.diseases.map((x, j) => {
                         const c = pd.cells[i][j], v = cellVal(c)
                         const k01 = v == null ? 0 : metric === 'rate' ? v / 100 : v / colMax[j]
-                        return <td key={x} className="px-2 py-1 text-right" style={heat(metric === 'with_specimen' ? TEAL : metric === 'rate' ? AMBER : RED, k01)}
-                          title={c ? `${p} · ${x}: ${nf(c.alerts)} alert, ${nf(c.with_specimen)} ${t('skdr.lite.modal.specimen').toLowerCase()}, ${nf(c.positive)} ${t('skdr.lite.modal.positive').toLowerCase()}` : t('skdr.lite.modal.noAlert')}>
+                        return <td key={x} className="px-2 py-1 text-right" style={heat(pdRgb, k01)}
+                          title={c ? `${tip(p + ' · ' + x, t(`skdr.lite.modal.metric_${metric}`), v == null ? '—' : metric === 'rate' ? pf(v) : nf(v), pdMeaning, metric !== 'rate')}\n${nf(c.alerts)} alert · ${nf(c.with_specimen)} ${t('skdr.lite.modal.specimen').toLowerCase()} · ${nf(c.positive)} ${t('skdr.lite.modal.positive').toLowerCase()}` : `${p} · ${x}: ${t('skdr.lite.modal.legendDot')}`}>
                           {v == null ? <span className="text-slate-300">·</span> : metric === 'rate' ? pf(v) : nf(v)}</td>
                       })}
                     </tr>
@@ -207,6 +241,9 @@ function LabTab({ query, diseases }: { query: Record<string, unknown>; diseases:
             </div>
           ) : <p className="py-6 text-center text-xs text-slate-500">{t('skdr.lite.modal.empty')}</p>)
             : fb.err ? <ErrorState message={fb.err} onRetry={fb.retry} /> : <SkeletonTable rows={6} cols={5} />}
+          {pd && pd.provinces.length ? <HeatLegend testId="lm-legend-province"
+            items={[{ rgb: pdRgb, label: t(`skdr.lite.modal.metric_${metric}`), meaning: t(`skdr.lite.modal.${pdMeaning}`) }]}
+            notes={[t(metric === 'rate' ? 'skdr.lite.modal.legendAbsolutePd' : 'skdr.lite.modal.legendRelativePd'), t('skdr.lite.modal.legendDot')]} /> : null}
           <p className="mt-2 text-[10.5px] leading-snug text-slate-500">{t(metric === 'rate' ? 'skdr.lite.modal.matrixProvinceNoteRate' : 'skdr.lite.modal.matrixProvinceNote')}
             {needFb ? ` ${t('skdr.lite.modal.matrixFallback', { n: diseases.length })}` : ''}</p>
         </Block>
