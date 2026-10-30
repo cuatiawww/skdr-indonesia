@@ -39,10 +39,9 @@ function steps(max: number) {
   return out
 }
 
-/** Sum every province row of one heatmap list into a single weekly series. */
-function sumRows(list: HeatRow[] | undefined, n: number): Series {
-  const values = Array.from({ length: n }, () => 0)
-  for (const r of list || []) r.values.forEach((v, i) => { if (i < n) values[i] += v || 0 })
+/** One weekly trend array as a heatmap series (padded / cut to the week axis). */
+function vec(xs: number[] | undefined, n: number): Series {
+  const values = Array.from({ length: n }, (_, i) => xs?.[i] || 0)
   return { values, total: values.reduce((s, v) => s + v, 0) }
 }
 const ser = (r?: HeatRow): Series | undefined => (r ? { values: r.values, total: r.total } : undefined)
@@ -99,16 +98,18 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
           rows: { alert: merge(ov.heatmap.ebs_alerts, undefined), kasus: merge(ov.heatmap.ebs_cases, ov.heatmap.pe_cases) },
         }
       }
-      // Rows = Penyakit: one call per selected Lite disease (same filters), provinces summed per week.
-      const list = await Promise.all(diseases.map((d) => getOv({ ...base, disease: d.code }).then((ov) => ({ d, ov }))))
-      const weeks = list[0]?.ov.weeks || []
-      const ebs = list.some((x) => x.ov.sources.ebs), pe = list.some((x) => x.ov.sources.pe)
-      const mk = (withPe: boolean, alert: boolean) => list.map(({ d, ov }): Row => ({
-        id: d.code, name: d.name, color: d.color,
-        e: ebs ? sumRows(alert ? ov.heatmap.ebs_alerts : ov.heatmap.ebs_cases, weeks.length) : undefined,
-        p: pe && withPe ? sumRows(ov.heatmap.pe_cases, weeks.length) : undefined,
-      }))
-      return { weeks, ebs, pe, notFound: false, rows: { alert: mk(false, true), kasus: mk(true, false) } }
+      // Rows = Penyakit: one call (same filters), per-disease weekly trend (all provinces). Same numbers as the Lite cards.
+      const ov = await getOv(base)
+      const weeks = ov.weeks, n = weeks.length, ebs = ov.sources.ebs, pe = ov.sources.pe
+      const mk = (withPe: boolean, alert: boolean) => diseases.map((d): Row => {
+        const es = ov.trend.ebs.find((x) => x.code === d.code), ps = ov.trend.pe.find((x) => x.code === d.code)
+        return {
+          id: d.code, name: d.name, color: d.color,
+          e: ebs ? vec(alert ? es?.alerts : es?.cases, n) : undefined,
+          p: pe && withPe ? vec(ps?.cases, n) : undefined,
+        }
+      })
+      return { weeks, ebs, pe, notFound: !!ov.disease_not_found, rows: { alert: mk(false, true), kasus: mk(true, false) } }
     }
     load().then((d) => alive && setData(d)).catch((e) => alive && setErr(String(e?.message || e)))
     return () => { alive = false }
