@@ -1,7 +1,7 @@
 // PR 012: types for /api/v1/analytics/*
 export type Week = { start: string; year: number; week: number; label: string }
 export type Rate = { num: number; den: number; pct: number | null; as_fraction: boolean; ci_low: number | null; ci_high: number | null }
-export type EbsSeries = { disease_id: number; code: string; name: string; total: number; alerts: number[]; cases: number[] }
+export type EbsSeries = { disease_id: number; code: string; name: string; total: number; alerts: number[]; cases: number[]; /** EBS deaths per week (jml_kematian, capped at jml_kasus); newer backends only. */ deaths?: number[] }
 export type PeSeries = { disease_id: number; code: string; name: string; total: number; cases: number[]; deaths: number[] }
 export type HeatRow = { province_id: number; code: string; name: string; total: number; values: number[] }
 export type Overview = {

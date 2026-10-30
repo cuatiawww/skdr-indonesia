@@ -868,18 +868,16 @@
       "week": "M{n}",
       "apply": "Terapkan",
       "refresh": "Muat ulang",
-      "sourceAlert": "Alert SKDR",
       "cases": "Kasus",
       "deaths": "Kematian",
       "ci": "IK 95%",
-      "ebsPe": "EBS {ebs} sinyal · PE {pe} kasus",
       "all": "Semua",
       "cfrTitle": "Perbandingan CFR (IK 95%)",
-      "cfrEmpty": "Tidak ada kasus Alert SKDR pada periode ini.",
+      "cfrEmpty": "Tidak ada kasus EBS / Kasus PE pada filter ini.",
       "disease": "Penyakit",
       "deathsCases": "Mati/Kasus",
       "total4": "4 penyakit",
-      "note": "Kasus, kematian dan CFR dari Alert SKDR (IK 95% Wilson, sama dengan kartu CFR dasbor utama). Peta: sinyal EBS dan kasus PE pada periode. Klik kartu untuk melihat satu penyakit saja (klik lagi = semua).",
+      "note": "Kasus = kasus EBS (jml_kasus) + Kasus PE; kematian = kematian EBS + PE meninggal; CFR = kematian/kasus dengan IK 95% Wilson. Semua angka mengikuti filter (periode, provinsi, kab/kota, penyakit, sumber) dan sama dengan heatmap di bawah peta. Klik kartu untuk melihat satu penyakit saja (klik lagi = semua).",
       "lastWeeks": "{n} mg",
       "province": "Provinsi",
       "allProvinces": "Seluruh Indonesia",
@@ -977,7 +975,11 @@
         "classification": "Klasifikasi",
         "deathDate": "Tgl meninggal",
         "deathsNote": "Maksimal 500 baris per penyakit. Tombol Lihat membuka detail laporan PE."
-      }
+      },
+      "sourceEbsPe": "EBS + Kasus PE",
+      "sourceEbs": "EBS",
+      "sourcePe": "Kasus PE",
+      "ebsPeCases": "EBS {ebsCases} kasus ({ebs} sinyal) · PE {pe} kasus"
     },
     "time": {
       "min": "mnt"

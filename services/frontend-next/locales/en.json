@@ -868,18 +868,16 @@
       "week": "W{n}",
       "apply": "Apply",
       "refresh": "Refresh",
-      "sourceAlert": "Alert SKDR",
       "cases": "Cases",
       "deaths": "Deaths",
       "ci": "95% CI",
-      "ebsPe": "EBS {ebs} signals · PE {pe} cases",
       "all": "All",
       "cfrTitle": "CFR comparison (95% CI)",
-      "cfrEmpty": "No Alert SKDR cases in this period.",
+      "cfrEmpty": "No EBS / PE cases for these filters.",
       "disease": "Disease",
       "deathsCases": "Deaths/Cases",
       "total4": "4 diseases",
-      "note": "Cases, deaths and CFR from Alert SKDR (Wilson 95% CI, same as the main dashboard CFR card). Map: EBS signals and PE cases in the period. Click a card to show only that disease (click again = all).",
+      "note": "Cases = EBS cases (jml_kasus) + PE cases; deaths = EBS deaths + PE deaths; CFR = deaths/cases with Wilson 95% CI. All numbers follow the filters (period, province, district, disease, source) and match the heatmap below the map. Click a card to show only that disease (click again = all).",
       "lastWeeks": "{n} wk",
       "province": "Province",
       "allProvinces": "All of Indonesia",
@@ -977,7 +975,11 @@
         "classification": "Classification",
         "deathDate": "Date of death",
         "deathsNote": "Up to 500 rows per disease. View opens the PE report detail."
-      }
+      },
+      "sourceEbsPe": "EBS + PE cases",
+      "sourceEbs": "EBS",
+      "sourcePe": "PE cases",
+      "ebsPeCases": "EBS {ebsCases} cases ({ebs} signals) · PE {pe} cases"
     },
     "time": {
       "min": "min"

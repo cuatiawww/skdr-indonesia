@@ -1,11 +1,12 @@
 'use client'
 // PR 027: Dasbor Zoonosis Lite. One screen (no long scroll) for the 4 zoonoses that have a Form PE:
 // one horizontal filter bar (Sumber data · Penyakit · Provinsi · Kab/Kota · Periode Minggu Epi + presets · Terapkan · Reset,
-// same look as SkdrFilterBar), 4 disease cards (Alert SKDR cases, deaths, CFR with Wilson 95% CI, weekly sparkline),
+// same look as SkdrFilterBar), 4 disease cards (EBS + Kasus PE cases, deaths, CFR with Wilson 95% CI, weekly sparkline),
 // the spread map (SpatialOutbreakMap) with a floating layer panel and a compact CFR comparison.
 // The page title lives in the app header (AppShell → DashboardHeader title/subtitle), not in the body.
 // Data comes only from existing read-only endpoints, always with an explicit epi-week period (+ optional province_id /
-// kabkota_id): /api/v1/alert-skdr (same CFR source as AlertCfr), /api/v1/epicurve (weekly per disease),
+// kabkota_id): /api/v1/analytics/overview (cards, CFR and sparklines: EBS cases/deaths/signals + Kasus PE per disease per week,
+// the same rows as the heatmap below; honours source=ebs|pe), Alert SKDR is a separate dataset and is no longer used for the cards,
 // /api/v1/public-dashboard (map markers, honours source=ebs|pe), /api/v1/dashboard/executive (EBS signals + Kasus PE).
 // Map layer panel (top-left of the map): Kasus EBS/PE markers, region shading, GBIF waterbirds (context for Flu Burung)
 // and iNaturalist mosquitoes ("konteks vektor": not a vector of these 4 diseases), each with a toggle, opacity and count.
@@ -19,7 +20,8 @@ import { type ReactNode } from 'react'
 import { Bird, Bug, CalendarDays, ChevronDown, ChevronUp, FlaskConical, LayoutList, Layers, Loader2, Map as MapIcon, MapPin, Maximize2, Minimize2, RotateCcw, Shapes, Crosshair } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, ErrorBar, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchFrom } from '@/lib/api'
-import { fetchAlertSkdr, nf, pf, toQs, type AlertSkdr, type Ci } from '@/lib/alert-skdr'
+import { nf, pf, toQs, type Ci } from '@/lib/alert-skdr'
+import type { Overview } from '@/lib/analytics-api'
 import { getCurrentEpiWeek, getEpiWeekDateRange, getWeeksInYear } from '@/lib/epi-week'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { fetchProvinces, type MasterKabkota, type MasterProvince } from '@/lib/skdr-api'
@@ -53,13 +55,20 @@ type Src = 'all' | 'ebs' | 'pe'
 type Filters = { src: Src; sel: LiteCode[]; provs: number[]; kabs: number[]; period: Period }
 type Opacity = { markers: number; regions: number; wildlife: number; vectors: number }
 type Preset = 4 | 8 | 12 | 'ytd'
-type Epi = { weeks: { year: number; week: number; label: string }[]; groups: { label: string; cases: number[]; deaths: number[] }[] }
-type ExecCard = { code: string; label: string; color: string; disease_code?: string | null; ebs: { alerts: number }[]; individual: { total: number } }
+type ExecCard = { code: string; label: string; color: string; disease_code?: string | null }
 type Exec = { cards: ExecCard[] }
 type LayerKey = 'wildlife' | 'vectors'
 type LayerInfo = { state?: MapLayerStatus['state']; shown?: number; total?: number }
 
 const cfrTone = (pct: number | null | undefined) => (pct == null ? '#94a3b8' : pct >= 5 ? '#dc2626' : pct >= 1 ? '#d97706' : '#0f766e')
+/** Wilson score interval (z = 1.96) for deaths / cases, in percent (same method as the main dashboard CFR card). */
+function wilsonCi(num: number, den: number, z = 1.96): Ci {
+  if (den <= 0) return { num, den, pct: null, ci_low: null, ci_high: null }
+  const p = num / den, z2 = z * z, d = 1 + z2 / den
+  const mid = (p + z2 / (2 * den)) / d, half = (z * Math.sqrt((p * (1 - p)) / den + z2 / (4 * den * den))) / d
+  return { num, den, pct: p * 100, ci_low: Math.max(0, mid - half) * 100, ci_high: Math.min(1, mid + half) * 100 }
+}
+const sumArr = (xs?: number[]) => (xs || []).reduce((a, v) => a + (v || 0), 0)
 const ciText = (c?: Ci) => (c && c.den > 0 && c.ci_low != null && c.ci_high != null ? `${pf(c.ci_low)}–${pf(c.ci_high)}` : '—')
 const hexA = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`
 /** Same field styles as SkdrFilterBar (main dashboard filter). */
@@ -124,8 +133,7 @@ export default function ZoonosisLite() {
   const mapBoxRef = useRef<HTMLDivElement>(null)
   const [layerInfo, setLayerInfo] = useState<Record<LayerKey, LayerInfo>>({ wildlife: {}, vectors: {} })
   const [tick, setTick] = useState(0)
-  const [alert, setAlert] = useState<AlertSkdr | null>(null)
-  const [epi, setEpi] = useState<Epi | null>(null)
+  const [ov, setOv] = useState<Overview | null>(null)
   const [map, setMap] = useState<PublicDashboard | null>(null)
   const [exec, setExec] = useState<Exec | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -144,12 +152,11 @@ export default function ZoonosisLite() {
     kabkota_id: kabs.length ? kabs.join(',') : undefined,
   }), [period, provs, kabs])
 
-  const load = useCallback((fresh: boolean) => {
+  const load = useCallback((_fresh: boolean) => {
     let alive = true
     setLoading(true); setErr(null)
     Promise.allSettled([
-      fetchAlertSkdr(qs, fresh).then((x) => alive && setAlert(x)),
-      fetchFrom<Epi>(`/api/v1/epicurve?${qs}`).then((x) => alive && setEpi(x)),
+      fetchFrom<Overview>(`/api/v1/analytics/overview?${qs}${src !== 'all' ? `&source=${src}` : ''}`).then((x) => alive && setOv(x)),
       fetchFrom<PublicDashboard>(`/api/v1/public-dashboard?${qs}${src !== 'all' ? `&source=${src}` : ''}`).then((x) => alive && setMap(x)),
       fetchFrom<Exec>(`/api/v1/dashboard/executive?${qs}`).then((x) => alive && setExec(x)),
     ]).then((rs) => {
@@ -162,21 +169,25 @@ export default function ZoonosisLite() {
   }, [qs, src])
   useEffect(() => load(tick > 0), [load, tick])
 
+  // Cards + CFR: the same EBS / Kasus PE rows as the heatmap (analytics/overview, all Lite filters + Sumber).
+  // Kasus = EBS cases (jml_kasus) + Kasus PE, Kematian = EBS deaths + PE deaths (outcome Meninggal), CFR = Wilson 95% CI.
   const rows = useMemo(() => LITE_DISEASES.map((d) => {
-    const a = alert?.by_disease.find((x) => x.disease === d.name)
-    const cfr = alert?.cfr.by_disease.find((x) => x.disease === d.name)?.cfr
-    const g = epi?.groups.find((x) => x.label === d.name)
+    const e = ov?.trend.ebs.find((x) => x.code === d.code)
+    const p = ov?.trend.pe.find((x) => x.code === d.code)
     const card = exec?.cards.find((c) => c.disease_code === d.code)
+    const ebsCases = sumArr(e?.cases), ebsDeaths = sumArr(e?.deaths), ebsAlerts = sumArr(e?.alerts)
+    const peCases = sumArr(p?.cases), peDeaths = sumArr(p?.deaths)
+    const cases = ebsCases + peCases, deaths = ebsDeaths + peDeaths
+    const n = ov?.weeks.length ?? 0
     return {
       ...d,
       color: card?.color || d.color,
       label: card?.label || d.label,
-      cases: a?.cases ?? 0, deaths: a?.deaths ?? 0, alerts: a?.alerts ?? 0, cfr,
-      spark: g?.cases ?? [],
-      ebs: card ? card.ebs.reduce((s, e) => s + (e.alerts || 0), 0) : null,
-      pe: card ? card.individual.total : null,
+      cases, deaths, alerts: ebsAlerts, cfr: wilsonCi(deaths, cases),
+      spark: Array.from({ length: n }, (_, i) => (e?.cases[i] || 0) + (p?.cases[i] || 0)),
+      ebs: ov ? ebsAlerts : null, ebsCases, pe: ov ? peCases : null,
     }
-  }), [alert, epi, exec])
+  }), [ov, exec])
 
   const allSel = sel.length === ALL_CODES.length
   const isSel = (c: LiteCode) => sel.includes(c)
@@ -277,7 +288,8 @@ export default function ZoonosisLite() {
   })
   // (upper whisker ≥ 1e-6: Recharts ErrorBar keys its lines by coordinates, so a zero-width bar would repeat a key)
   const cfrMax = Math.max(1, ...cfrData.map((x) => (x.den ? x.pct + x.err[1] : 0)))
-  const overall = alert?.cfr.overall
+  const overall = ov ? wilsonCi(rows.reduce((a, r) => a + r.deaths, 0), rows.reduce((a, r) => a + r.cases, 0)) : undefined
+  const srcLabel = t(src === 'ebs' ? 'skdr.lite.sourceEbs' : src === 'pe' ? 'skdr.lite.sourcePe' : 'skdr.lite.sourceEbsPe')
 
   const years = useMemo(() => {
     const ys = new Set<number>([now.year, now.year - 1, now.year - 2, ...(map?.available_years ?? [])])
@@ -512,17 +524,17 @@ export default function ZoonosisLite() {
               <div className="absolute inset-x-0 top-0 h-1" style={{ background: r.color }} />
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate text-sm font-black text-slate-900">{r.label}</span>
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('skdr.lite.sourceAlert')}</span>
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">{srcLabel}</span>
               </div>
               <div className="mt-1 grid grid-cols-[auto_auto_minmax(0,1fr)] gap-3">
-                <div><div className="text-[10px] font-bold uppercase text-slate-500">{t('skdr.lite.cases')}</div><div className="text-lg font-black leading-tight text-slate-900">{alert ? nf(r.cases) : '…'}</div></div>
-                <div><div className="text-[10px] font-bold uppercase text-slate-500">{t('skdr.lite.deaths')}</div><div className="text-lg font-black leading-tight text-red-600">{alert ? nf(r.deaths) : '…'}</div></div>
+                <div><div className="text-[10px] font-bold uppercase text-slate-500">{t('skdr.lite.cases')}</div><div className="text-lg font-black leading-tight text-slate-900">{ov ? nf(r.cases) : '…'}</div></div>
+                <div><div className="text-[10px] font-bold uppercase text-slate-500">{t('skdr.lite.deaths')}</div><div className="text-lg font-black leading-tight text-red-600">{ov ? nf(r.deaths) : '…'}</div></div>
                 <div><div className="text-[10px] font-bold uppercase text-slate-500">CFR</div>
                   <div className="text-lg font-black leading-tight" style={{ color: cfrTone(r.cfr && r.cfr.den > 0 ? r.cfr.pct : null) }}>{r.cfr && r.cfr.den > 0 ? pf(r.cfr.pct) : '—'}</div>
                   <div className="truncate text-[9px] leading-tight text-slate-500" title={`${t('skdr.lite.ci')} ${ciText(r.cfr)}`}>({ciText(r.cfr)})</div>
                 </div>
               </div>
-              <div className="truncate text-[10px] text-slate-500">{r.ebs !== null ? t('skdr.lite.ebsPe', { ebs: nf(r.ebs), pe: nf(r.pe) }) : '\u00a0'}</div>
+              <div className="truncate text-[10px] text-slate-500">{r.ebs !== null ? t('skdr.lite.ebsPeCases', { ebsCases: nf(r.ebsCases), ebs: nf(r.ebs), pe: nf(r.pe) }) : '\u00a0'}</div>
               <Sparkline values={r.spark} color={r.color} />
             </button>
           )
@@ -575,10 +587,10 @@ export default function ZoonosisLite() {
         <div className="skdr-card flex min-h-[320px] flex-col p-3 lg:min-h-0" data-testid="lite-cfr">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-sm font-black text-slate-900">{t('skdr.lite.cfrTitle')}</h2>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('skdr.lite.sourceAlert')}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{srcLabel}</span>
           </div>
           <div className="relative min-h-[150px] flex-1">
-            {alert && cfrData.some((x) => x.den > 0) ? (
+            {ov && cfrData.some((x) => x.den > 0) ? (
               <div className="absolute inset-0"><ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cfrData} layout="vertical" margin={{ top: 6, left: 0, right: 14, bottom: 0 }} barCategoryGap="25%">
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
@@ -591,7 +603,7 @@ export default function ZoonosisLite() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer></div>
-            ) : <div className="flex h-full items-center justify-center text-xs text-slate-500">{alert ? t('skdr.lite.cfrEmpty') : '…'}</div>}
+            ) : <div className="flex h-full items-center justify-center text-xs text-slate-500">{ov ? t('skdr.lite.cfrEmpty') : '…'}</div>}
           </div>
           <table className="mt-1 w-full text-[11px]" data-testid="lite-cfr-table">
             <thead className="text-[10px] uppercase tracking-wider text-slate-500"><tr><th className="text-left">{t('skdr.lite.disease')}</th><th className="text-right">{t('skdr.lite.deathsCases')}</th><th className="text-right">CFR</th><th className="text-right">{t('skdr.lite.ci')}</th></tr></thead>

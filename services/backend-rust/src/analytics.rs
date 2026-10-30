@@ -67,28 +67,30 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
     // PR 018: multi-select — disease codes/names resolved to ids once in resolve()
     let dis: Vec<i32> = f.disease_ids.clone();
     let dis_missing = !f.disease.is_empty() && dis.is_empty();
-    let mut series: HashMap<(String, i32), (String, String, Vec<i64>, Vec<i64>)> = HashMap::new();
+    // (code, name, a, b, c): EBS = alerts, cases, deaths; PE = cases, deaths, unused
+    let mut series: HashMap<(String, i32), (String, String, Vec<i64>, Vec<i64>, Vec<i64>)> = HashMap::new();
     let mut heat: HashMap<(String, i32), Vec<i64>> = HashMap::new(); // (metric, province) -> per week
     let mut unmapped = 0i64;
     let n = ws.len();
     if show_ebs && !dis_missing {
         let sql = format!(
-            "SELECT {w} wk, e.disease_id, d.code, d.name, e.province_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint
+            "SELECT {w} wk, e.disease_id, d.code, d.name, e.province_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint,
+                    COALESCE(SUM(LEAST(COALESCE(e.jml_kematian,0), COALESCE(e.jml_kasus,0))),0)::bigint
              FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id
              WHERE {dt} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit)
                AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))
              GROUP BY 1, 2, 3, 4, 5", w = week_of(EBS_DATE), dt = EBS_DATE);
         for r in c.query(&sql, &[&w0, &w1, &f.province, &f.kabkota, &dis]).await.map_err(internal)? {
             let Some(&i) = idx.get(&r.get::<_, NaiveDate>(0)) else { continue };
-            let (alerts, cases): (i64, i64) = (r.get(5), r.get(6));
+            let (alerts, cases, deaths): (i64, i64, i64) = (r.get(5), r.get(6), r.get(7));
             if let Some(p) = r.get::<_, Option<i32>>(4) {
                 heat.entry(("ebs_alerts".into(), p)).or_insert_with(|| vec![0; n])[i] += alerts;
                 heat.entry(("ebs_cases".into(), p)).or_insert_with(|| vec![0; n])[i] += cases;
             }
             match r.get::<_, Option<i32>>(1) {
                 Some(d) => {
-                    let e = series.entry(("ebs".into(), d)).or_insert_with(|| (r.get(2), r.get(3), vec![0; n], vec![0; n]));
-                    e.2[i] += alerts; e.3[i] += cases;
+                    let e = series.entry(("ebs".into(), d)).or_insert_with(|| (r.get(2), r.get(3), vec![0; n], vec![0; n], vec![0; n]));
+                    e.2[i] += alerts; e.3[i] += cases; e.4[i] += deaths;
                 }
                 None => unmapped += alerts,
             }
@@ -106,16 +108,16 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
             let (cases, deaths): (i64, i64) = (r.get(5), r.get(6));
             if let Some(p) = r.get::<_, Option<i32>>(4) { heat.entry(("pe_cases".into(), p)).or_insert_with(|| vec![0; n])[i] += cases; }
             if let Some(d) = r.get::<_, Option<i32>>(1) {
-                let e = series.entry(("pe".into(), d)).or_insert_with(|| (r.get(2), r.get(3), vec![0; n], vec![0; n]));
+                let e = series.entry(("pe".into(), d)).or_insert_with(|| (r.get(2), r.get(3), vec![0; n], vec![0; n], vec![]));
                 e.2[i] += cases; e.3[i] += deaths;
             }
         }
     }
     let mut out_series: Map<String, Value> = Map::new();
     for key in ["ebs", "pe"] {
-        let mut v: Vec<(i64, Value)> = series.iter().filter(|((s, _), _)| s == key).map(|((_, id), (code, name, a, b))| {
+        let mut v: Vec<(i64, Value)> = series.iter().filter(|((s, _), _)| s == key).map(|((_, id), (code, name, a, b, dth))| {
             let tot: i64 = a.iter().sum();
-            (tot, if key == "ebs" { json!({ "disease_id": id, "code": code, "name": name, "total": tot, "alerts": a, "cases": b }) }
+            (tot, if key == "ebs" { json!({ "disease_id": id, "code": code, "name": name, "total": tot, "alerts": a, "cases": b, "deaths": dth }) }
                   else { json!({ "disease_id": id, "code": code, "name": name, "total": tot, "cases": a, "deaths": b }) })
         }).collect();
         v.sort_by(|a, b| b.0.cmp(&a.0));
