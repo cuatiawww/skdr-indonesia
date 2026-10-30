@@ -11,6 +11,7 @@
 // and iNaturalist mosquitoes ("konteks vektor": not a vector of these 4 diseases), each with a toggle, opacity and count.
 // The two public layers follow the period and the province / kab-kota filter (bounding box from the master kab/kota points).
 // Map: hover a province = cases / deaths / CFR, click = zoom + filter by that province, fullscreen and reset-view buttons.
+// Heatmap epi week x province (ZoonosisLiteHeatmap) directly under the map; the map screen above keeps its one-screen height.
 // PR 028: two buttons under the CFR panel ("Analisis Laboratorium", "Detail Lainnya") open ZoonosisLiteModal with the active filters.
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -26,6 +27,7 @@ import { fetchGbifWaterbirds, fetchInatMosquitoes, type BBox } from '@/lib/zoono
 import { ErrorState, SkeletonMap } from '@/components/ui/Skeleton'
 import MultiSelect from '@/components/filters/MultiSelect'
 import type { IntelLoaders } from '@/components/AseanMap'
+import ZoonosisLiteHeatmap from '@/components/dashboard/ZoonosisLiteHeatmap'
 import ZoonosisLiteModal, { TAB_ORDER, TAB_SECTION, type LiteTab } from '@/components/dashboard/ZoonosisLiteModal'
 import { useDashboardSections } from '@/lib/dashboard-sections'
 import type { MapLayerStatus, PublicDashboard } from '@/types'
@@ -431,7 +433,9 @@ export default function ZoonosisLite() {
   const onModalTab = useCallback((tab: LiteTab) => setModal((m) => ({ ...m, tab })), [])
 
   return (
-    <div className="flex w-full flex-col gap-2 bg-page px-4 sm:px-6 lg:h-[calc(100vh-128px)] lg:min-h-[560px] lg:px-6" data-testid="zoonosis-lite">
+    <div className="flex w-full flex-col gap-2 bg-page px-4 pb-4 sm:px-6 lg:px-6" data-testid="zoonosis-lite">
+      {/* first screen (filters, cards, map + CFR) keeps the one-screen height; the heatmap follows right under the map */}
+      <div className="flex flex-col gap-2 lg:h-[calc(100vh-128px)] lg:min-h-[560px]">
       {/* filter bar (SkdrFilterBar look), one auto-layout row (wraps only on narrow screens): Penyakit · Provinsi · Kab/Kota · Periode (Minggu Epi) + presets · Terapkan · Reset */}
       <section className="skdr-card px-3 pb-2.5 pt-2" data-testid="lite-filters">
         <div className="flex flex-wrap items-end gap-x-2.5 gap-y-2">
@@ -617,6 +621,9 @@ export default function ZoonosisLite() {
           <p className="mt-1 text-[10px] leading-snug text-slate-500">{t('skdr.lite.note')}</p>
         </div>
       </section>
+      </div>
+      {/* heatmap epi week x province, same filters as the map (period, provinsi, kab/kota, penyakit, sumber) */}
+      <ZoonosisLiteHeatmap query={modalQuery} src={src} period={period} tick={tick} chips={modalChips} />
       <ZoonosisLiteModal open={modal.open} tab={modal.tab} onTab={onModalTab} onClose={closeModal} query={modalQuery} diseases={modalDiseases} chips={modalChips} />
     </div>
   )

@@ -835,6 +835,23 @@
   },
   "skdr": {
     "lite": {
+      "heat": {
+        "title": "Heatmap epi week × province",
+        "metric": "Heatmap measure",
+        "cases": "Cases",
+        "alerts": "EBS alerts",
+        "casesHint": "EBS reported cases and PE cases (never summed)",
+        "alertHint": "Number of EBS alerts/signals (PE cases have no alerts)",
+        "alertPeOnly": "PE cases have no alerts; choose All or EBS",
+        "emptyTitle": "No data for this filter",
+        "emptyBody": "No {metric} for the selected diseases, area and period. Change the filters above and click Apply.",
+        "splitNote": "Split cells: EBS top, PE cases bottom (each with its own colour scale).",
+        "showAll": "Show all ({n} provinces)",
+        "showTop": "Show top {n}",
+        "axis": "Columns = epi weeks {from} – {to} ({n} weeks)",
+        "cut": "(limited to the last {n} weeks)",
+        "weekLabel": "Epi week {week}/{year}"
+      },
       "menu": "Zoonosis Lite Dashboard",
       "title": "Zoonosis Lite Dashboard",
       "subtitle": "Anthrax, Rabies, Leptospirosis and Avian Influenza (zoonoses with a Form PE): cases, deaths, CFR and spread map.",
