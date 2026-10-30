@@ -836,6 +836,12 @@
   "skdr": {
     "lite": {
       "heat": {
+        "titleDisease": "Heatmap epi week × disease",
+        "titleProvince": "Heatmap epi week × province",
+        "rowsBy": "Heatmap rows",
+        "byDisease": "Disease",
+        "byProvince": "Province",
+        "disease": "Disease",
         "title": "Heatmap epi week × province",
         "metric": "Heatmap measure",
         "cases": "Cases",

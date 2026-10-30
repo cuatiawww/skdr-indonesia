@@ -1,10 +1,12 @@
 'use client'
-// Dasbor Zoonosis Lite: heatmap epi week x province for the 4 Lite zoonoses, directly under the map.
+// Dasbor Zoonosis Lite: heatmap epi week (columns) x province OR disease (rows) for the 4 Lite zoonoses, directly under the map.
 // Same data and colour scale as the main dashboard heatmap (TrendHeatmap, PR 012/016): GET /api/v1/analytics/overview,
 // heatmap.ebs_alerts / ebs_cases / pe_cases, shade() sequential palette. The shared TrendHeatmap is not touched.
 // Fully driven by the Lite filters: the week columns are the weeks of the applied period (start..end, end clamped to the
 // current week by the API), rows / values / colour scale are recomputed for the selected diseases, provinces, kab/kota
-// and Sumber. EBS and Kasus PE are never summed: with Sumber = Semua each cell is split (EBS top, PE bottom).
+// and Sumber. Rows = Penyakit (default): one overview call per selected Lite disease (parallel), provinces summed per week.
+// Rows = Provinsi: one overview call for all selected diseases. EBS and Kasus PE are never summed: with Sumber = Semua
+// each cell is split (EBS top, PE bottom).
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { Grid3x3 } from 'lucide-react'
 import { peFetch } from '@/lib/pe-api'
@@ -14,10 +16,14 @@ import { ErrorState, SkeletonChart } from '@/components/ui/Skeleton'
 import { Empty, SourceKey } from '@/components/analytics/SourceBadge'
 
 export type LiteHeatMetric = 'kasus' | 'alert'
+export type LiteHeatRows = 'disease' | 'province'
 type Src = 'all' | 'ebs' | 'pe'
 type Period = { startYear: number; startWeek: number; endYear: number; endWeek: number }
-type Row = { id: number; name: string; e?: HeatRow; p?: HeatRow }
+type LiteDisease = { code: string; name: string; color: string }
+type Series = { values: number[]; total: number }
+type Row = { id: string; name: string; color?: string; e?: Series; p?: Series }
 type Hover = { row: Row; i: number; x: number; y: number }
+type Data = { weeks: Week[]; ebs: boolean; pe: boolean; notFound: boolean; rows: { alert: Row[]; kasus: Row[] } }
 
 const TOP_N = 12
 const MAX_WEEKS = 104
@@ -33,6 +39,14 @@ function steps(max: number) {
   return out
 }
 
+/** Sum every province row of one heatmap list into a single weekly series. */
+function sumRows(list: HeatRow[] | undefined, n: number): Series {
+  const values = Array.from({ length: n }, () => 0)
+  for (const r of list || []) r.values.forEach((v, i) => { if (i < n) values[i] += v || 0 })
+  return { values, total: values.reduce((s, v) => s + v, 0) }
+}
+const ser = (r?: HeatRow): Series | undefined => (r ? { values: r.values, total: r.total } : undefined)
+
 const dayFmt = (iso: string, locale: string, withYear = false) => {
   const d = new Date(`${iso}T00:00:00`)
   return d.toLocaleDateString(locale === 'en' ? 'en-GB' : 'id-ID', { day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}) })
@@ -41,58 +55,84 @@ const addDays = (iso: string, n: number) => {
   const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }
+const ovUrl = (q: Record<string, unknown>) => `/api/v1/analytics/overview?${qs(q)}`
+const getOv = (q: Record<string, unknown>) => peFetch<{ data: Overview }>(ovUrl(q)).then((j) => j.data)
 
-export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chips }: {
+export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chips, diseases }: {
   /** Same query as the Lite modal: kategori ZOONOSIS, disease = selected Lite codes, epi-week period, province_id, kabkota_id. */
   query: Record<string, unknown>
   src: Src
   period: Period
   tick?: number
   chips: { diseases: string; area: string; period: string }
+  /** Selected Lite diseases (rows in "Penyakit" mode). */
+  diseases: LiteDisease[]
 }) {
   const { t, locale } = useTranslation()
+  const [rowsBy, setRowsBy] = useState<LiteHeatRows>('disease')
   const [metric, setMetric] = useState<LiteHeatMetric>('kasus')
-  const [ov, setOv] = useState<Overview | null>(null)
+  const [data, setData] = useState<Data | null>(null)
   const [err, setErr] = useState('')
   const [retry, setRetry] = useState(0)
   const [all, setAll] = useState(false)
   const [hover, setHover] = useState<Hover | null>(null)
   const m: LiteHeatMetric = src === 'pe' ? 'kasus' : metric
-  const q = qs({ ...query, source: src === 'all' ? undefined : src })
+  const base = useMemo(() => ({ ...query, source: src === 'all' ? undefined : src }), [query, src])
+  const key = `${rowsBy}|${qs(base)}|${diseases.map((d) => d.code).join(',')}`
 
   useEffect(() => {
     let alive = true
-    setErr(''); setOv(null); setHover(null)
-    peFetch<{ data: Overview }>(`/api/v1/analytics/overview?${q}`).then((j) => alive && setOv(j.data)).catch((e) => alive && setErr(String(e?.message || e)))
+    setErr(''); setData(null); setHover(null)
+    const load = async (): Promise<Data> => {
+      if (rowsBy === 'province') {
+        const ov = await getOv(base)
+        const merge = (eList: HeatRow[] | undefined, pList: HeatRow[] | undefined) => {
+          const byId = new Map<string, Row>()
+          if (ov.sources.ebs) for (const r of eList || []) byId.set(String(r.province_id), { id: String(r.province_id), name: r.name, e: ser(r) })
+          if (ov.sources.pe) for (const r of pList || []) { const id = String(r.province_id); byId.set(id, { ...(byId.get(id) || { id, name: r.name }), p: ser(r) }) }
+          return [...byId.values()]
+            .filter((r) => (r.e?.total || 0) + (r.p?.total || 0) > 0)
+            .sort((a, b) => (b.e?.total || 0) - (a.e?.total || 0) || (b.p?.total || 0) - (a.p?.total || 0) || a.name.localeCompare(b.name, 'id'))
+        }
+        return {
+          weeks: ov.weeks, ebs: ov.sources.ebs, pe: ov.sources.pe, notFound: !!ov.disease_not_found,
+          rows: { alert: merge(ov.heatmap.ebs_alerts, undefined), kasus: merge(ov.heatmap.ebs_cases, ov.heatmap.pe_cases) },
+        }
+      }
+      // Rows = Penyakit: one call per selected Lite disease (same filters), provinces summed per week.
+      const list = await Promise.all(diseases.map((d) => getOv({ ...base, disease: d.code }).then((ov) => ({ d, ov }))))
+      const weeks = list[0]?.ov.weeks || []
+      const ebs = list.some((x) => x.ov.sources.ebs), pe = list.some((x) => x.ov.sources.pe)
+      const mk = (withPe: boolean, alert: boolean) => list.map(({ d, ov }): Row => ({
+        id: d.code, name: d.name, color: d.color,
+        e: ebs ? sumRows(alert ? ov.heatmap.ebs_alerts : ov.heatmap.ebs_cases, weeks.length) : undefined,
+        p: pe && withPe ? sumRows(ov.heatmap.pe_cases, weeks.length) : undefined,
+      }))
+      return { weeks, ebs, pe, notFound: false, rows: { alert: mk(false, true), kasus: mk(true, false) } }
+    }
+    load().then((d) => alive && setData(d)).catch((e) => alive && setErr(String(e?.message || e)))
     return () => { alive = false }
-  }, [q, tick, retry])
+    // key already encodes rowsBy + query + source + disease list
+  }, [key, tick, retry])
 
   const view = useMemo(() => {
-    if (!ov) return null
-    const weeks: Week[] = ov.weeks
-    const showEbs = src !== 'pe' && ov.sources.ebs
-    const showPe = m === 'kasus' && src !== 'ebs' && ov.sources.pe
-    const ebsList = (m === 'alert' ? ov.heatmap.ebs_alerts : ov.heatmap.ebs_cases) || []
-    const peList = ov.heatmap.pe_cases || []
-    const byId = new Map<number, Row>()
-    if (showEbs) for (const r of ebsList) byId.set(r.province_id, { id: r.province_id, name: r.name, e: r })
-    if (showPe) for (const r of peList) byId.set(r.province_id, { ...(byId.get(r.province_id) || { id: r.province_id, name: r.name }), p: r })
-    const rows = [...byId.values()]
-      .filter((r) => (r.e?.total || 0) + (r.p?.total || 0) > 0)
-      .sort((a, b) => (b.e?.total || 0) - (a.e?.total || 0) || (b.p?.total || 0) - (a.p?.total || 0) || a.name.localeCompare(b.name, 'id'))
+    if (!data) return null
+    const showEbs = src !== 'pe' && data.ebs
+    const showPe = m === 'kasus' && src !== 'ebs' && data.pe
+    const rows = data.rows[m].map((r) => ({ ...r, e: showEbs ? r.e : undefined, p: showPe ? r.p : undefined }))
     const maxE = Math.max(0, ...rows.flatMap((r) => r.e?.values || []))
     const maxP = Math.max(0, ...rows.flatMap((r) => r.p?.values || []))
-    const totE = rows.reduce((s, r) => s + (r.e?.total || 0), 0)
-    const totP = rows.reduce((s, r) => s + (r.p?.total || 0), 0)
-    return { weeks, rows, maxE, maxP, totE, totP, showEbs, showPe, both: showEbs && showPe }
-  }, [ov, src, m])
+    const any = rows.some((r) => (r.e?.total || 0) + (r.p?.total || 0) > 0)
+    return { weeks: data.weeks, rows, maxE, maxP, any, showEbs, showPe, both: showEbs && showPe }
+  }, [data, src, m])
 
   const ebsLabel = m === 'alert' ? t('skdr.charts.metricAlerts') : t('skdr.charts.metricEbsCases')
   const peLabel = t('skdr.charts.metricPeCases')
   // The API clamps the end to the current week and keeps at most 104 weeks; say so when the columns are cut.
   const first = view?.weeks[0]
   const cut = !!first && (first.year !== period.startYear || first.week !== period.startWeek) && (view?.weeks.length || 0) >= MAX_WEEKS
-  const shown = view ? (all ? view.rows : view.rows.slice(0, TOP_N)) : []
+  const byProv = rowsBy === 'province'
+  const shown = view ? (all || !byProv ? view.rows : view.rows.slice(0, TOP_N)) : []
 
   const onMove = (row: Row, i: number) => (e: MouseEvent) => setHover({ row, i, x: e.clientX, y: e.clientY })
   const weekRange = (w: Week) => `${dayFmt(w.start, locale)} \u2013 ${dayFmt(addDays(w.start, 6), locale, true)}`
@@ -110,33 +150,42 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
     </span>
   )
 
+  const seg = <T extends string>(label: string, value: T, opts: { k: T; label: string; title?: string; disabled?: boolean }[], set: (v: T) => void, testid: string) => (
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 text-[11px] font-bold" data-testid={testid}>
+      {opts.map((o) => (
+        <button key={o.k} type="button" role="radio" aria-checked={value === o.k} disabled={o.disabled} onClick={() => set(o.k)} data-value={o.k} title={o.title}
+          className={`rounded-lg px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-40 ${value === o.k ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-brand-50'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
-    <section className="skdr-card relative p-3" data-testid="lite-heatmap">
+    <section className="skdr-card relative p-3" data-testid="lite-heatmap" data-rows={rowsBy}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900"><Grid3x3 className="h-4 w-4 text-primary" />{t('skdr.lite.heat.title')}</h2>
+          <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900"><Grid3x3 className="h-4 w-4 text-primary" />{byProv ? t('skdr.lite.heat.titleProvince') : t('skdr.lite.heat.titleDisease')}</h2>
           <p className="mt-0.5 text-[11px] leading-snug text-slate-500" data-testid="lite-heat-scope">
             {chips.diseases}{' \u00b7 '}{chips.area}{' \u00b7 '}{chips.period}
           </p>
         </div>
-        <div role="radiogroup" aria-label={t('skdr.lite.heat.metric')} className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 text-[11px] font-bold" data-testid="lite-heat-metric">
-          {(['kasus', 'alert'] as const).map((k) => {
-            const disabled = k === 'alert' && src === 'pe'
-            return (
-              <button key={k} type="button" role="radio" aria-checked={m === k} disabled={disabled} onClick={() => setMetric(k)} data-value={k}
-                title={disabled ? t('skdr.lite.heat.alertPeOnly') : k === 'alert' ? t('skdr.lite.heat.alertHint') : t('skdr.lite.heat.casesHint')}
-                className={`rounded-lg px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-40 ${m === k ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-brand-50'}`}>
-                {k === 'kasus' ? t('skdr.lite.heat.cases') : t('skdr.lite.heat.alerts')}
-              </button>
-            )
-          })}
+        <div className="flex flex-wrap items-center gap-2">
+          {seg<LiteHeatRows>(t('skdr.lite.heat.rowsBy'), rowsBy, [
+            { k: 'disease', label: t('skdr.lite.heat.byDisease') },
+            { k: 'province', label: t('skdr.lite.heat.byProvince') },
+          ], (v) => { setRowsBy(v); setAll(false) }, 'lite-heat-rows')}
+          {seg<LiteHeatMetric>(t('skdr.lite.heat.metric'), m, [
+            { k: 'kasus', label: t('skdr.lite.heat.cases'), title: t('skdr.lite.heat.casesHint') },
+            { k: 'alert', label: t('skdr.lite.heat.alerts'), title: src === 'pe' ? t('skdr.lite.heat.alertPeOnly') : t('skdr.lite.heat.alertHint'), disabled: src === 'pe' },
+          ], setMetric, 'lite-heat-metric')}
         </div>
       </div>
 
       <div className="mt-2">
         {err ? <ErrorState message={err} onRetry={() => setRetry((x) => x + 1)} className="py-2" />
-          : !view ? <SkeletonChart height={180} />
-          : ov?.disease_not_found || !view.rows.length || !view.weeks.length ? (
+          : !view ? <SkeletonChart height={byProv ? 180 : 120} />
+          : data?.notFound || !view.any || !view.weeks.length ? (
             <Empty>
               <span data-testid="lite-heat-empty">
                 <b className="block text-slate-700">{t('skdr.lite.heat.emptyTitle')}</b>
@@ -149,7 +198,7 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
                 <table className="w-full border-separate text-[11px]" style={{ borderSpacing: 2 }} data-testid="lite-heat-table">
                   <thead>
                     <tr>
-                      <th className="sticky left-0 z-10 min-w-[130px] bg-card text-left font-semibold text-slate-500">{t('skdr.charts.province')}</th>
+                      <th className="sticky left-0 z-10 min-w-[130px] bg-card text-left font-semibold text-slate-500">{byProv ? t('skdr.charts.province') : t('skdr.lite.heat.disease')}</th>
                       {view.weeks.map((w, i) => {
                         const newYear = i === 0 || w.year !== view.weeks[i - 1].year
                         return (
@@ -165,8 +214,11 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
                   </thead>
                   <tbody>
                     {shown.map((r) => (
-                      <tr key={r.id} data-testid="lite-heat-row">
-                        <td className="sticky left-0 z-10 max-w-[180px] truncate bg-card pr-2 font-semibold text-slate-700" title={r.name}>{r.name}</td>
+                      <tr key={r.id} data-testid="lite-heat-row" data-row={r.id}>
+                        <td className="sticky left-0 z-10 max-w-[180px] truncate bg-card pr-2 font-semibold text-slate-700" title={r.name}>
+                          {r.color ? <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: r.color }} /> : null}
+                          {r.name}
+                        </td>
                         {view.weeks.map((w, i) => {
                           const e = r.e?.values[i] || 0, p = r.p?.values[i] || 0
                           const on = hover?.row.id === r.id && hover.i === i
@@ -193,7 +245,7 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
                 {view.showEbs ? legend('ebs', view.maxE, ebsLabel) : null}
                 {view.showPe ? legend('pe', view.maxP, peLabel) : null}
                 {view.both ? <span>{t('skdr.lite.heat.splitNote')}</span> : null}
-                {view.rows.length > TOP_N ? (
+                {byProv && view.rows.length > TOP_N ? (
                   <button type="button" onClick={() => setAll((x) => !x)} className="font-bold text-primary hover:underline" data-testid="lite-heat-more">
                     {all ? t('skdr.lite.heat.showTop', { n: TOP_N }) : t('skdr.lite.heat.showAll', { n: view.rows.length })}
                   </button>
@@ -214,7 +266,11 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
         return (
           <div role="tooltip" data-testid="lite-heat-tooltip" className="pointer-events-none fixed z-50 w-[214px] rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[11px] shadow-lg backdrop-blur"
             style={{ left, top: hover.y + 14 }}>
-            <div className="truncate text-xs font-black text-slate-900">{hover.row.name}</div>
+            <div className="flex items-center gap-1.5 truncate text-xs font-black text-slate-900">
+              {hover.row.color ? <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: hover.row.color }} /> : null}
+              {hover.row.name}
+            </div>
+            {!byProv ? <div className="truncate text-slate-500">{chips.area}</div> : null}
             <div className="text-slate-500">{t('skdr.lite.heat.weekLabel', { week: w.week, year: w.year })}{' \u00b7 '}{weekRange(w)}</div>
             <div className="mt-1 space-y-0.5">
               {view.showEbs ? <div className="flex items-center justify-between gap-2"><SourceKey source="ebs" label={ebsLabel} /><b className="tabular-nums text-slate-900">{fmt(e)}</b></div> : null}
