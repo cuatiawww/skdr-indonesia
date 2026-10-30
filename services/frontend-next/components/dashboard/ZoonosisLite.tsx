@@ -11,7 +11,7 @@
 // and iNaturalist mosquitoes ("konteks vektor": not a vector of these 4 diseases), each with a toggle, opacity and count.
 // The two public layers follow the period and the province / kab-kota filter (bounding box from the master kab/kota points).
 // Map: hover a province = cases / deaths / CFR, click = zoom + filter by that province, fullscreen and reset-view buttons.
-// Heatmap epi week x province (ZoonosisLiteHeatmap) directly under the map; the map screen above keeps its one-screen height.
+// Heatmap epi week x disease / province (ZoonosisLiteHeatmap) directly under the map; the map screen above keeps its one-screen height.
 // PR 028: two buttons under the CFR panel ("Analisis Laboratorium", "Detail Lainnya") open ZoonosisLiteModal with the active filters.
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -623,7 +623,7 @@ export default function ZoonosisLite() {
       </section>
       </div>
       {/* heatmap epi week x province, same filters as the map (period, provinsi, kab/kota, penyakit, sumber) */}
-      <ZoonosisLiteHeatmap query={modalQuery} src={src} period={period} tick={tick} chips={modalChips} />
+      <ZoonosisLiteHeatmap query={modalQuery} src={src} period={period} tick={tick} chips={modalChips} diseases={modalDiseases} />
       <ZoonosisLiteModal open={modal.open} tab={modal.tab} onTab={onModalTab} onClose={closeModal} query={modalQuery} diseases={modalDiseases} chips={modalChips} />
     </div>
   )

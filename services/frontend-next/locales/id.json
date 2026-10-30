@@ -836,6 +836,12 @@
   "skdr": {
     "lite": {
       "heat": {
+        "titleDisease": "Heatmap minggu epi × penyakit",
+        "titleProvince": "Heatmap minggu epi × provinsi",
+        "rowsBy": "Baris heatmap",
+        "byDisease": "Penyakit",
+        "byProvince": "Provinsi",
+        "disease": "Penyakit",
         "title": "Heatmap minggu epi × provinsi",
         "metric": "Ukuran heatmap",
         "cases": "Kasus",

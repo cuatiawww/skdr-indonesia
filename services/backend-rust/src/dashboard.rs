@@ -35,6 +35,11 @@ pub fn mmwr_week_start(year: i32, week: i32) -> NaiveDate {
     jan4 - Duration::days(back) + Duration::days(((week.max(1) - 1) as i64) * 7)
 }
 
+/// Number of MMWR weeks in a year (52 or 53).
+pub fn mmwr_weeks_in_year(year: i32) -> i32 {
+    ((mmwr_week_start(year + 1, 1) - mmwr_week_start(year, 1)).num_days() / 7) as i32
+}
+
 pub fn current_mmwr(today: NaiveDate) -> (i32, i32) {
     for y in [today.year() + 1, today.year(), today.year() - 1] {
         let s = mmwr_week_start(y, 1);
@@ -102,11 +107,11 @@ fn base() -> String {
 
 pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiError> {
     let start = match (q.start_year, q.start_week) {
-        (Some(y), Some(w)) => Some(mmwr_week_start(y, w)),
+        (Some(y), Some(w)) => Some(mmwr_week_start(y, w.clamp(1, mmwr_weeks_in_year(y)))),
         _ => None,
     };
     let end = match (q.end_year, q.end_week) {
-        (Some(y), Some(w)) => Some(mmwr_week_start(y, w) + Duration::days(6)),
+        (Some(y), Some(w)) => Some(mmwr_week_start(y, w.clamp(1, mmwr_weeks_in_year(y))) + Duration::days(6)),
         _ => None,
     };
     let pd = |s: &Option<String>| s.as_deref().and_then(|s| NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d").ok());
@@ -221,8 +226,8 @@ async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
         "SELECT '{COUNTRY}', {LOC}, MAX(l.name), {DN},
                 (array_agg(r.latitude ORDER BY r.created_at DESC) FILTER (WHERE r.latitude IS NOT NULL))[1],
                 (array_agg(r.longitude ORDER BY r.created_at DESC) FILTER (WHERE r.longitude IS NOT NULL))[1],
-                SUM(r.cases)::bigint, SUM(r.deaths)::bigint, COUNT(*)::bigint, MAX(r.report_date)::text,
-                {}, BOOL_AND(r.is_reviewed), r.source
+                COALESCE(SUM(r.cases),0)::bigint, COALESCE(SUM(r.deaths),0)::bigint, COUNT(*)::bigint, COALESCE(MAX(r.report_date)::text, ''),
+                COALESCE({}, ''), COALESCE(BOOL_AND(r.is_reviewed), false), r.source
          {} GROUP BY 2, 4, r.source ORDER BY 7 DESC LIMIT 1000",
         iso("MAX(r.created_at)"),
         base()
@@ -242,8 +247,8 @@ async fn locations(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
 
 async fn signal_feed(c: &Object, f: &Resolved) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-        "SELECT r.id::text, '{COUNTRY}', {LOC}, l.name, {DN}, r.latitude, r.longitude, r.cases, r.deaths,
-                r.report_date::text, {}, r.is_reviewed, r.notes, r.source
+        "SELECT r.id::text, '{COUNTRY}', {LOC}, l.name, {DN}, r.latitude, r.longitude, COALESCE(r.cases, 0), COALESCE(r.deaths, 0),
+                COALESCE(r.report_date::text, ''), COALESCE({}, ''), COALESCE(r.is_reviewed, false), r.notes, r.source
          {} ORDER BY r.report_date DESC, r.created_at DESC LIMIT 200",
         iso("r.created_at"),
         base()
