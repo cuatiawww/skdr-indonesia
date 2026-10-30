@@ -835,6 +835,23 @@
   },
   "skdr": {
     "lite": {
+      "heat": {
+        "title": "Heatmap minggu epi × provinsi",
+        "metric": "Ukuran heatmap",
+        "cases": "Kasus",
+        "alerts": "Alert EBS",
+        "casesHint": "Kasus dilaporkan EBS dan Kasus PE (tidak dijumlahkan)",
+        "alertHint": "Jumlah alert/sinyal EBS (Kasus PE tidak punya alert)",
+        "alertPeOnly": "Sumber Kasus PE tidak punya alert; pilih Semua atau EBS",
+        "emptyTitle": "Belum ada data untuk filter ini",
+        "emptyBody": "Tidak ada {metric} untuk penyakit, wilayah dan periode yang dipilih. Ubah filter di atas lalu klik Terapkan.",
+        "splitNote": "Sel dibagi: atas EBS, bawah Kasus PE (skala warna masing-masing).",
+        "showAll": "Tampilkan semua ({n} provinsi)",
+        "showTop": "Tampilkan {n} teratas",
+        "axis": "Kolom = minggu epi {from} – {to} ({n} minggu)",
+        "cut": "(dibatasi {n} minggu terakhir)",
+        "weekLabel": "Minggu epi {week}/{year}"
+      },
       "menu": "Dasbor Zoonosis Lite",
       "title": "Dasbor Zoonosis Lite",
       "subtitle": "Antraks, Rabies, Leptospirosis dan Flu Burung (zoonosis dengan Form PE): kasus, kematian, CFR dan peta sebaran.",
