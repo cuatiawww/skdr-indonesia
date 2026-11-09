@@ -15,6 +15,7 @@ import { PUBLIC_BASE_PATH } from "@/lib/public-path";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useSettings } from "@/lib/settings-context";
+import UserMenu, { AreaSwitch } from "@/components/layout/UserMenu";
 
 export default function DashboardHeader({
   onToggleSidebar,
@@ -167,7 +168,9 @@ export default function DashboardHeader({
               </div>
             ) : null}
 
-            {/* SKDR: no login/logout yet; NLP user menu removed. */}
+            {/* PR 029: Dasbor ↔ Tata Kelola switch + user menu (or Masuk button) */}
+            <AreaSwitch />
+            <UserMenu />
           </div>
         </div>
       </div>

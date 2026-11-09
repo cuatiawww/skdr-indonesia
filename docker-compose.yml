@@ -36,6 +36,8 @@ services:
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://skdr-indonesia-backend:8091}
       NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/skdr}
       NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-id}
+      # PR 029: same cookie name as the backend (middleware.ts login redirect)
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-skdr_session}
       WATCHPACK_POLLING: "true"
     volumes:
       - ./services/frontend-next:/app

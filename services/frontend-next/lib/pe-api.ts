@@ -1,15 +1,17 @@
 // PR 006: PE form API client.
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
+import { notifyUnauthorized } from '@/lib/skdr-auth'
 
 export class ApiError extends Error { constructor(msg: string, public status: number, public body: any) { super(msg) } }
 
 export async function peFetch<T = any>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
-  const role = typeof window !== 'undefined' ? window.localStorage.getItem('skdr_pe_role') : null
+  // PR 029: the PE role comes from the logged-in user (backend sets X-SKDR-Role from the session).
   const res = await fetch(`${PUBLIC_BASE_PATH}${path}`, {
     method: init?.method || 'GET', cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', ...(role ? { 'X-SKDR-Role': role } : {}) },
+    headers: { 'Content-Type': 'application/json' },
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   })
+  if (res.status === 401) notifyUnauthorized()
   const j = await res.json().catch(() => ({}))
   if (!res.ok || j.success === false) throw new ApiError(j.error || `HTTP ${res.status}`, res.status, j)
   return j as T

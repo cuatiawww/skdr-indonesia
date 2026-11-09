@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useNavGroups, useNavMatch } from "@/lib/nav";
 import DashboardSidebar from "./DashboardSidebar";
@@ -9,6 +9,8 @@ import { PUBLIC_BASE_PATH } from "@/lib/public-path";
 import Breadcrumbs from "./Breadcrumbs";
 import Footer from "./Footer";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
+import { useAuth } from "@/lib/skdr-auth";
+import { hasPerm, routeArea } from "@/lib/access";
 
 export default function AppShell({
   children,
@@ -28,7 +30,9 @@ export default function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => { setCollapsed(window.localStorage.getItem("skdr_sidebar_collapsed") === "1"); }, []);
   const toggleCollapse = () => setCollapsed((c) => { window.localStorage.setItem("skdr_sidebar_collapsed", c ? "0" : "1"); return !c; });
-  const authenticated = true; // SKDR: no auth
+  // PR 029: login state from AuthProvider (HttpOnly session cookie)
+  const { user } = useAuth();
+  const authenticated = !!user;
   const isDirectoryPage = false;
   const isHome = pathname === "/";
   // PR 027: Dasbor Zoonosis Lite has its own header title/subtitle (the page body carries no title).
@@ -57,7 +61,21 @@ export default function AppShell({
   }, [pathname]);
 
   // PR 017: grouped navigation from app_settings.navigation_menu (+ Form PE sub-items from the PE form registry)
-  const navGroups = useNavGroups();
+  // PR 029: /dashboard pages show only dashboard groups, tatakelola pages only tatakelola groups, Beranda shows all.
+  // Logged-in users do not see groups their role cannot open; anonymous visitors see them (they lead to /login).
+  const allGroups = useNavGroups();
+  const area = routeArea(pathname || "/");
+  const navGroups = useMemo(() => {
+    const visible = allGroups.filter((g) => {
+      if (!user) return true;
+      if (g.permission && !hasPerm(user.permissions, g.permission)) return false;
+      if (g.area === "tatakelola" && !hasPerm(user.permissions, "tatakelola")) return false;
+      return true;
+    });
+    if (!visible.some((g) => g.area)) return visible; // menu without areas (migration 051 not applied yet)
+    if (area === "dashboard" || area === "tatakelola") return visible.filter((g) => g.area === area);
+    return visible;
+  }, [allGroups, area, user]);
   const match = useNavMatch(navGroups);
 
   if (tvMode)

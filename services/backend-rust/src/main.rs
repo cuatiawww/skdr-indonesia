@@ -1,3 +1,4 @@
+mod auth;
 mod cache;
 mod case_reports;
 mod signals;
@@ -58,14 +59,28 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::build_pool()?;
     let migrations_dir = std::env::var("MIGRATIONS_DIR").unwrap_or_else(|_| "/init".into());
     db::run_migrations(&pool, &migrations_dir).await?;
+    // PR 029: first admin from env (SKDR_ADMIN_USERNAME / SKDR_ADMIN_PASSWORD), only when no admin exists yet.
+    auth::bootstrap_admin(&pool).await?;
     cache::load(&pool).await;
     let ebs_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     ebs::spawn_scheduler(pool.clone(), ebs_running.clone());
     let alert_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     alert::spawn_scheduler(pool.clone(), alert_running.clone());
 
+    let state = AppState { pool, ebs_running, alert_running };
     let app = Router::new()
         .route("/health", get(health))
+        // PR 029: login/session + user access management (users, roles, access log)
+        .route("/api/auth/login", post(auth::login))
+        .route("/api/auth/logout", post(auth::logout))
+        .route("/api/auth/session", get(auth::session))
+        .route("/api/auth/password", post(auth::change_password))
+        .route("/api/v1/users", get(auth::users_list).post(auth::user_create))
+        .route("/api/v1/users/:id", put(auth::user_update))
+        .route("/api/v1/users/:id/status", patch(auth::user_status))
+        .route("/api/v1/roles", get(auth::roles_list).post(auth::role_create))
+        .route("/api/v1/roles/:id", put(auth::role_update).delete(auth::role_delete))
+        .route("/api/v1/access-log", get(auth::access_log))
         // settings + master data
         .route("/api/v1/console/settings", get(master::console_settings))
         .route("/api/v1/master/diseases", get(master::diseases))
@@ -149,8 +164,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/integrasi/satwa-liar/sync", post(external_sync::wildlife_sync))
         // PR 016: short response cache for dashboard/analytics reads (config: app_settings 'api_cache').
         .layer(axum::middleware::from_fn(cache::layer))
+        // PR 029: auth guard runs before the response cache (public dashboard reads stay open, see auth::classify).
+        .layer(axum::middleware::from_fn_with_state(state.clone(), auth::guard))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
-        .with_state(AppState { pool, ebs_running, alert_running });
+        .with_state(state);
 
     let bind = std::env::var("BACKEND_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8091".into());
     let listener = tokio::net::TcpListener::bind(&bind).await?;

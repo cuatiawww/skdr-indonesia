@@ -68,6 +68,8 @@ export default function DashboardSidebar({ open, collapsed, menuGroups, match, o
         title={!rail ? it.description : undefined} data-nav-item className={linkCls(active)}>
         {Icon && <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-slate-400"}`} />}
         {!rail && <span className="truncate">{it.label}</span>}
+        {/* PR 029: small badge, e.g. "Segera" for Dasbor Limited placeholders */}
+        {!rail && it.badge && <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800">{it.badge}</span>}
         <Tip label={it.label} />
       </Link>
     );

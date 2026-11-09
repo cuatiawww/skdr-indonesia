@@ -2,6 +2,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
+import { notifyUnauthorized } from '@/lib/skdr-auth'
 
 export type StatusFilter = 'active' | 'inactive' | 'all'
 
@@ -28,6 +29,7 @@ export async function masterSend(method: 'POST' | 'PUT' | 'PATCH', path: string,
   const res = await fetch(`${PUBLIC_BASE_PATH}${path}`, {
     method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store',
   })
+  if (res.status === 401) notifyUnauthorized()
   const json = await res.json().catch(() => ({}))
   if (!res.ok || json.success === false) throw new Error(json.error || `HTTP ${res.status}`)
   return json
@@ -59,6 +61,7 @@ export function useMasterList<T>(path: string, extra: Record<string, string | nu
         if (v !== undefined && v !== '') qs.set(k, String(v))
       })
       const res = await fetch(`${PUBLIC_BASE_PATH}${path}?${qs}`, { cache: 'no-store' })
+      if (res.status === 401) notifyUnauthorized()
       const json = await res.json()
       if (!res.ok || json.success === false) throw new Error(json.error || `HTTP ${res.status}`)
       setData(json.data || [])

@@ -18,3 +18,8 @@ uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json"] }
+# PR 029: password hashing (Argon2id) and session tokens
+argon2 = { version = "0.5", features = ["std"] }
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"

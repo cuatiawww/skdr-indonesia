@@ -4,6 +4,7 @@ import localFont from "next/font/local"
 import "./globals.css"
 import LayoutContent from "@/components/layout/LayoutContent"
 import { LanguageProvider } from "@/lib/i18n/LanguageContext"
+import { AuthProvider } from "@/lib/skdr-auth"
 import idDict from '@/locales/id.json'
 
 // Use locally-bundled font files so Docker build works without internet access.
@@ -34,9 +35,9 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={`${roboto.variable} font-roboto antialiased`} suppressHydrationWarning>
-        <SettingsProvider><LanguageProvider>
+        <SettingsProvider><LanguageProvider><AuthProvider>
           <LayoutContent>{children}</LayoutContent>
-        </LanguageProvider></SettingsProvider>
+        </AuthProvider></LanguageProvider></SettingsProvider>
       </body>
     </html>
   )

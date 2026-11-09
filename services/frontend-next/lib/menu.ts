@@ -122,6 +122,9 @@ export type SidebarItemConfig = {
   subItems?: SidebarSubItemConfig[]
 }
 
+/** PR 029: which sidebar a group belongs to. 'home' groups show only on Beranda (full sidebar). */
+export type NavArea = 'home' | 'dashboard' | 'tatakelola'
+
 export type SidebarGroupConfig = {
   id: string
   title: string
@@ -129,6 +132,10 @@ export type SidebarGroupConfig = {
   order?: number
   enabled: boolean
   targetRoles?: string[]
+  /** PR 029: sidebar area + access hints (enforced by AuthGuard/backend, these only drive display) */
+  area?: NavArea
+  requiresAuth?: boolean
+  permission?: string
   items: SidebarItemConfig[]
 }
 
@@ -156,127 +163,48 @@ export type SidebarGroup = {
   titleKey?: string
   order?: number
   enabled?: boolean
+  area?: NavArea
+  requiresAuth?: boolean
+  permission?: string
   items: SidebarItem[]
 }
 
-// PR 017: default (pre-settings) menu = app_settings.navigation_menu from migration 028 (first paint only;
-// the DB value wins once settings load). Form PE sub-items per disease come from the PE form registry.
+// PR 017: default (pre-settings) menu = app_settings.navigation_menu (first paint only; the DB value wins once
+// settings load). PR 029: mirrors migration 051 (areas home / dashboard / tatakelola, Dasbor Limited, Manajemen Akses).
+// Form PE sub-items per disease come from the PE form registry.
+const it = (id: string, label: string, href: string, icon: string, order: number, extra: Partial<SidebarItemConfig> = {}): SidebarItemConfig =>
+  ({ id, label, href, icon, order, enabled: true, ...extra })
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
-  {
-    "id": "grp_beranda",
-    "title": "Beranda",
-    "order": 1,
-    "enabled": true,
-    "items": [
-      {
-        "id": "mod_beranda",
-        "label": "Beranda",
-        "href": "/",
-        "icon": "Home",
-        "description": "Ringkasan situasi dan rilis data surveilans terkini",
-        "order": 1,
-        "enabled": true
-      }
-    ]
-  },
-  {
-    "id": "grp_dasbor",
-    "title": "Dasbor",
-    "order": 2,
-    "enabled": true,
-    "items": [
-      {
-        "id": "mod_main_dashboard",
-        "label": "Dasbor Utama",
-        "href": "/main-dashboard",
-        "icon": "LayoutDashboard",
-        "description": "Indikator SKDR, peta sebaran, dan Kinerja 7-1-7",
-        "order": 1,
-        "enabled": true
-      },
-      {
-        "id": "mod_penyakit",
-        "label": "Penyakit",
-        "href": "/penyakit",
-        "icon": "Stethoscope",
-        "description": "Profil, tren, dan sebaran kasus per penyakit",
-        "order": 2,
-        "enabled": true
-      },
-      {
-        "id": "mod_tv",
-        "label": "Mode TV",
-        "href": "/tv",
-        "icon": "Tv",
-        "description": "Tampilan layar lebar ruang pemantauan (sedang dalam pengembangan)",
-        "order": 3,
-        "enabled": true
-      }
-    ]
-  },
-  {
-    "id": "grp_transaksi",
-    "title": "Transaksi",
-    "order": 3,
-    "enabled": true,
-    "items": [
-      {
-        "id": "mod_form_pe",
-        "label": "Form PE",
-        "href": "#",
-        "icon": "FileText",
-        "description": "Formulir Penyelidikan Epidemiologi per penyakit",
-        "source": "pe_forms",
-        "order": 1,
-        "enabled": true,
-        "subItems": [
-          {
-            "id": "sub_pe_daftar",
-            "label": "Daftar PE",
-            "href": "/pe",
-            "icon": "FileSpreadsheet",
-            "description": "Seluruh laporan PE lintas penyakit",
-            "order": 99,
-            "enabled": true
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "grp_integrasi",
-    "title": "Integrasi",
-    "order": 4,
-    "enabled": true,
-    "items": [
-      {
-        "id": "mod_ebs_sync",
-        "label": "Sinkronisasi EBS",
-        "href": "/ebs",
-        "icon": "Radio",
-        "description": "Penarikan dan pemantauan data sinyal EBS",
-        "order": 1,
-        "enabled": true
-      }
-    ]
-  },
-  {
-    "id": "grp_bantuan",
-    "title": "Lainnya",
-    "order": 5,
-    "enabled": true,
-    "items": [
-      {
-        "id": "mod_dokumentasi",
-        "label": "Dokumentasi",
-        "href": "/dokumentasi",
-        "icon": "BookText",
-        "description": "Panduan penggunaan, definisi indikator, dan sumber data",
-        "order": 1,
-        "enabled": true
-      }
-    ]
-  }
+  { id: 'grp_beranda', title: 'Beranda', order: 1, enabled: true, area: 'home', items: [it('mod_beranda', 'Beranda', '/', 'Home', 1)] },
+  { id: 'grp_dasbor', title: 'Dasbor Publik', order: 2, enabled: true, area: 'dashboard', items: [
+    it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
+    it('mod_main_dashboard', 'Dasbor Utama', '/main-dashboard', 'LayoutDashboard', 1),
+    it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),
+    it('mod_tv', 'Mode TV', '/tv', 'Tv', 3),
+  ] },
+  { id: 'grp_dasbor_limited', title: 'Dasbor Limited', order: 3, enabled: true, area: 'dashboard', requiresAuth: true, items: [
+    it('mod_spasial', 'Spasial', '/dashboard/spasial', 'MapPin', 1, { badge: 'Segera' }),
+    it('mod_matriks_analisa', 'Matriks Analisa', '/dashboard/matriks-analisa', 'Layers', 2, { badge: 'Segera' }),
+  ] },
+  { id: 'grp_tatakelola', title: 'Tata Kelola', order: 4, enabled: true, area: 'tatakelola', requiresAuth: true, permission: 'tatakelola', items: [
+    it('mod_tatakelola_home', 'Ringkasan Tata Kelola', '/tatakelola', 'Shield', 1),
+  ] },
+  { id: 'grp_transaksi', title: 'Transaksi', order: 5, enabled: true, area: 'tatakelola', items: [
+    it('mod_form_pe', 'Form PE', '#', 'FileText', 1, { source: 'pe_forms', subItems: [
+      { id: 'sub_pe_daftar', label: 'Daftar PE', href: '/pe', icon: 'FileSpreadsheet', order: 99, enabled: true },
+    ] }),
+  ] },
+  { id: 'grp_integrasi', title: 'Integrasi', order: 6, enabled: true, area: 'tatakelola', permission: 'integrasi', items: [
+    it('mod_ebs_sync', 'Sinkronisasi EBS', '/ebs', 'Radio', 1),
+  ] },
+  { id: 'grp_akses', title: 'Manajemen Akses', order: 8, enabled: true, area: 'tatakelola', requiresAuth: true, permission: 'user_management', items: [
+    it('mod_pengguna', 'Pengguna', '/tatakelola/pengguna', 'Users', 1),
+    it('mod_peran', 'Peran & Hak Akses', '/tatakelola/peran', 'ShieldCheck', 2),
+    it('mod_log_akses', 'Log Akses', '/tatakelola/log-akses', 'History', 3),
+  ] },
+  { id: 'grp_bantuan', title: 'Lainnya', order: 9, enabled: true, area: 'dashboard', items: [
+    it('mod_dokumentasi', 'Dokumentasi', '/dokumentasi', 'BookText', 1),
+  ] },
 ]
 
 export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): SidebarGroup[] {
@@ -287,6 +215,9 @@ export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): Side
       id: grp.id,
       title: grp.title,
       titleKey: grp.titleKey,
+      area: grp.area,
+      requiresAuth: grp.requiresAuth,
+      permission: grp.permission,
       items: (grp.items || [])
         .filter((item) => item.enabled)
         .sort((a, b) => (a.order || 0) - (b.order || 0))
