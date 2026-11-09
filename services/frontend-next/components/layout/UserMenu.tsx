@@ -97,13 +97,16 @@ export default function UserMenu() {
   )
 }
 
-function PasswordForm({ onDone }: { onDone: () => void }) {
+/** Change own password. Used by the user menu modal and by the forced first-login screen (AuthGuard). */
+export function PasswordForm({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
   const { t } = useTranslation()
+  const { refresh } = useAuth()
   const [f, setF] = useState({ current: '', next: '', confirm: '' })
   const [saving, setSaving] = useState(false)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (f.next !== f.confirm) return toast.error(t('skdr.auth.passwordMismatch'))
+    if (f.next === f.current) return toast.error(t('skdr.auth.passwordSame'))
     setSaving(true)
     try {
       const res = await fetch(`${PUBLIC_BASE_PATH}/api/auth/password`, {
@@ -113,6 +116,7 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.success) throw new Error(j.error || `HTTP ${res.status}`)
       toast.success(t('skdr.auth.passwordChanged'))
+      await refresh() // clears must_change_password in the auth state
       onDone()
     } catch (err) { toast.error(err instanceof Error ? err.message : String(err)) } finally { setSaving(false) }
   }
@@ -127,7 +131,7 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
       <Field label={t('skdr.auth.confirmPassword')} required>
         <input type="password" autoComplete="new-password" className={inputCls} value={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.value })} required />
       </Field>
-      <FormActions saving={saving} onCancel={onDone} />
+      <FormActions saving={saving} onCancel={onCancel || onDone} />
     </form>
   )
 }

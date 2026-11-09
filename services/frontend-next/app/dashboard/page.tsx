@@ -1,5 +1,5 @@
 'use client'
-// PR 029: /dashboard = Dasbor area landing (sidebar shows only dashboard menus: Dasbor Publik + Dasbor Limited).
+// PR 029: /dashboard = Dasbor area landing (sidebar shows only dashboard menus: Dasbor + Dasbor Limited; all need login).
 import AreaHub from '@/components/layout/AreaHub'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 

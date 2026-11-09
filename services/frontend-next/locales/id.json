@@ -2192,7 +2192,7 @@
     "auth": {
       "portal": "Portal Akses",
       "title": "Masuk ke SKDR",
-      "subtitle": "Masukkan akun Anda untuk membuka Dasbor Limited dan Tata Kelola {app}.",
+      "subtitle": "Masukkan akun Anda untuk membuka {app}.",
       "username": "Nama pengguna / Email",
       "usernamePh": "Masukkan nama pengguna atau email",
       "password": "Kata sandi",
@@ -2208,8 +2208,8 @@
       "expired": "Sesi Anda telah berakhir. Silakan masuk kembali.",
       "heroBadge": "Kementerian Kesehatan Republik Indonesia",
       "heroText": "Platform kewaspadaan dini dan respons: memantau sinyal EBS, Form Penyelidikan Epidemiologi, dan indikator 7-1-7 di seluruh Indonesia.",
-      "heroCard1Title": "Dasbor Publik",
-      "heroCard1Text": "Indikator SKDR, penyakit, dan peta sebaran terbuka untuk umum.",
+      "heroCard1Title": "Dasbor",
+      "heroCard1Text": "Indikator SKDR, penyakit, dan peta sebaran untuk pengguna terdaftar.",
       "heroCard2Title": "Dasbor Limited",
       "heroCard2Text": "Analisis spasial dan matriks analisa untuk pengguna terdaftar.",
       "heroCard3Title": "Tata Kelola",
@@ -2230,11 +2230,14 @@
       "areaTatakelola": "Tata Kelola",
       "forbiddenTitle": "Akses Dibatasi (403)",
       "forbiddenBody": "Peran Anda ({role}) tidak memiliki akses ke halaman ini. Hubungi administrator untuk mengubah peran.",
-      "toDashboard": "Ke Dasbor"
+      "toDashboard": "Ke Dasbor",
+      "mustChangeTitle": "Ganti Kata Sandi",
+      "mustChangeBody": "Demi keamanan, ganti kata sandi bawaan/sementara akun {name} sebelum melanjutkan. Halaman lain terbuka setelah kata sandi diganti.",
+      "passwordSame": "Kata sandi baru harus berbeda dari kata sandi saat ini"
     },
     "access": {
       "dashboardTitle": "Dasbor",
-      "dashboardSubtitle": "Dasbor Publik terbuka untuk umum; Dasbor Limited memerlukan login.",
+      "dashboardSubtitle": "Semua dasbor memerlukan login; Dasbor Limited memerlukan hak akses tambahan.",
       "tatakelolaTitle": "Tata Kelola",
       "tatakelolaSubtitle": "Formulir, master data, integrasi, dan manajemen akses pengguna.",
       "signedInAs": "Masuk sebagai {name} · {role}",

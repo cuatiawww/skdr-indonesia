@@ -2192,7 +2192,7 @@
     "auth": {
       "portal": "Access Portal",
       "title": "Sign in to SKDR",
-      "subtitle": "Enter your account to open the Limited Dashboard and Governance area of {app}.",
+      "subtitle": "Enter your account to open {app}.",
       "username": "Username / Email",
       "usernamePh": "Enter your username or email",
       "password": "Password",
@@ -2208,8 +2208,8 @@
       "expired": "Your session has ended. Please sign in again.",
       "heroBadge": "Ministry of Health of the Republic of Indonesia",
       "heroText": "Early warning and response platform: monitoring EBS signals, Epidemiological Investigation forms, and 7-1-7 indicators across Indonesia.",
-      "heroCard1Title": "Public Dashboard",
-      "heroCard1Text": "SKDR indicators, diseases, and distribution maps open to everyone.",
+      "heroCard1Title": "Dashboard",
+      "heroCard1Text": "SKDR indicators, diseases, and distribution maps for registered users.",
       "heroCard2Title": "Limited Dashboard",
       "heroCard2Text": "Spatial analysis and analysis matrix for registered users.",
       "heroCard3Title": "Governance",
@@ -2230,11 +2230,14 @@
       "areaTatakelola": "Governance",
       "forbiddenTitle": "Access Restricted (403)",
       "forbiddenBody": "Your role ({role}) cannot open this page. Ask an administrator to change your role.",
-      "toDashboard": "To Dashboard"
+      "toDashboard": "To Dashboard",
+      "mustChangeTitle": "Change Password",
+      "mustChangeBody": "For security, change the default/temporary password of {name} before continuing. Other pages open once the password is changed.",
+      "passwordSame": "The new password must differ from the current one"
     },
     "access": {
       "dashboardTitle": "Dashboard",
-      "dashboardSubtitle": "The Public Dashboard is open to everyone; the Limited Dashboard requires sign-in.",
+      "dashboardSubtitle": "All dashboards require sign-in; the Limited Dashboard needs an extra permission.",
       "tatakelolaTitle": "Governance",
       "tatakelolaSubtitle": "Forms, master data, integrations, and user access management.",
       "signedInAs": "Signed in as {name} · {role}",

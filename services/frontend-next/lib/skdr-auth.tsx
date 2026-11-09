@@ -13,6 +13,8 @@ export type SkdrUser = {
   role: string
   role_name: string
   permissions: string[]
+  /** true for the seeded admin / new users / admin-reset passwords until they pick their own password */
+  must_change_password?: boolean
 }
 
 type Ctx = {

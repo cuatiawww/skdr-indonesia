@@ -1,7 +1,6 @@
 -- PR 029: login + manajemen akses pengguna, dan pemisahan navigasi /dashboard vs /tatakelola.
 -- * user_roles: peran + daftar hak akses (JSONB). Peran bawaan (is_system) tidak bisa dihapus.
--- * users: password_hash = Argon2id (dibuat backend). Admin pertama dibuat backend dari env
---   SKDR_ADMIN_USERNAME / SKDR_ADMIN_PASSWORD (bukan dari migrasi; tidak ada kata sandi di git).
+-- * users: password_hash = Argon2id. Admin pertama di-seed oleh migrasi 052 (wajib ganti kata sandi).
 -- * user_sessions: hanya SHA-256 token yang disimpan; timeout idle/absolut dari app_settings.
 -- * user_activity_log: jejak login/logout dan perubahan pengguna/peran.
 -- * navigation_menu: tiap grup diberi "area" (home | dashboard | tatakelola); tambah grup Dasbor Limited

@@ -176,7 +176,7 @@ const it = (id: string, label: string, href: string, icon: string, order: number
   ({ id, label, href, icon, order, enabled: true, ...extra })
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   { id: 'grp_beranda', title: 'Beranda', order: 1, enabled: true, area: 'home', items: [it('mod_beranda', 'Beranda', '/', 'Home', 1)] },
-  { id: 'grp_dasbor', title: 'Dasbor Publik', order: 2, enabled: true, area: 'dashboard', items: [
+  { id: 'grp_dasbor', title: 'Dasbor', order: 2, enabled: true, area: 'dashboard', items: [
     it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
     it('mod_main_dashboard', 'Dasbor Utama', '/main-dashboard', 'LayoutDashboard', 1),
     it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),

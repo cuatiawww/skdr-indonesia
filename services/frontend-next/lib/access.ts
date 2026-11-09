@@ -1,10 +1,11 @@
 // PR 029: route access rules (shared by middleware.ts, AuthGuard and AppShell). Pure functions, no React.
 // Backend enforces the same split on the API (services/backend-rust/src/auth.rs `classify`).
-//   Dasbor Publik  → open without login (existing dashboard pages stay public)
+//   Every page except /login needs a session (dashboards included, any role).
+//   Dasbor         → login (any role)
 //   Dasbor Limited → login + permission `dashboard_limited`
 //   Tata Kelola    → login + permission `tatakelola` (finer: master_data, integrasi, user_management)
 export type Area = 'home' | 'dashboard' | 'tatakelola' | 'bare'
-export type Need = { kind: 'public' } | { kind: 'perm'; perm: string }
+export type Need = { kind: 'public' } | { kind: 'login' } | { kind: 'perm'; perm: string }
 
 const under = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`)
 
@@ -29,7 +30,8 @@ export function routeNeed(pathname: string): Need {
   if (under(p, '/master')) return { kind: 'perm', perm: 'master_data' }
   if (under(p, '/ebs') || under(p, '/integrasi')) return { kind: 'perm', perm: 'integrasi' }
   if (TATAKELOLA_PREFIXES.some((x) => under(p, x))) return { kind: 'perm', perm: 'tatakelola' }
-  return { kind: 'public' }
+  if (p === '/login') return { kind: 'public' }
+  return { kind: 'login' }
 }
 
 export function hasPerm(permissions: string[] | undefined | null, perm?: string): boolean {

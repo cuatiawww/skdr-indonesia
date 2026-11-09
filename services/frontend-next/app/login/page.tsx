@@ -3,7 +3,6 @@
 // that asked for login, expired-session notice); visuals use the SKDR/Kemenkes design (teal brand palette, lime
 // accent, Kemenkes logo, Beranda imagery, Roboto).
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Activity, Eye, EyeOff, LayoutDashboard, Lock, LogIn, Map as MapIcon, ShieldCheck, User } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -54,7 +53,7 @@ function LoginForm() {
       <div className="flex w-full flex-col justify-between bg-white p-6 sm:p-10 lg:w-[45%] lg:p-12 xl:w-[42%] xl:p-16 2xl:w-[38%]">
         <div className="h-[4px] -mx-6 -mt-6 mb-6 bg-primary sm:-mx-10 sm:-mt-10 lg:-mx-12 lg:-mt-12 xl:-mx-16 xl:-mt-16" />
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-xs font-semibold text-slate-500 hover:text-primary">← {t('skdr.auth.backHome')}</Link>
+          <span />
           <LanguageSwitcher />
         </div>
 
@@ -98,14 +97,6 @@ function LoginForm() {
               {busy ? <span>{t('skdr.auth.signingIn')}</span> : <><LogIn className="h-4 w-4" /><span>{t('skdr.auth.signIn')}</span></>}
             </button>
 
-            <div className="relative my-5 flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-              <span className="relative bg-white px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('skdr.auth.or')}</span>
-            </div>
-            <Link href="/dashboard"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-brand-800">
-              <LayoutDashboard className="h-4 w-4" /> {t('skdr.auth.publicDashboard')}
-            </Link>
           </form>
         </div>
 

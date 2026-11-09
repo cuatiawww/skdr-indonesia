@@ -59,8 +59,7 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::build_pool()?;
     let migrations_dir = std::env::var("MIGRATIONS_DIR").unwrap_or_else(|_| "/init".into());
     db::run_migrations(&pool, &migrations_dir).await?;
-    // PR 029: first admin from env (SKDR_ADMIN_USERNAME / SKDR_ADMIN_PASSWORD), only when no admin exists yet.
-    auth::bootstrap_admin(&pool).await?;
+    // PR 029: first admin is seeded by migration 052 (must change the default password on first login).
     cache::load(&pool).await;
     let ebs_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     ebs::spawn_scheduler(pool.clone(), ebs_running.clone());

@@ -2,9 +2,11 @@
 //! - Passwords: Argon2id (argon2 crate defaults). Session tokens: 32 random bytes, only the SHA-256 is stored.
 //! - Session = HttpOnly cookie (name/path/secure from env) or `Authorization: Bearer <token>`.
 //! - Idle/absolute timeouts from app_settings (session_idle_timeout_seconds / session_absolute_timeout_seconds).
-//! - `guard` middleware: dashboard reads stay public; tatakelola reads/writes need a role permission;
-//!   /api/v1/users and /api/v1/roles need `user_management`.
-//! - First admin: env SKDR_ADMIN_USERNAME + SKDR_ADMIN_PASSWORD, created once when no admin exists.
+//! - `guard` middleware: every API except /health and /api/auth/* needs a session (dashboards included);
+//!   tatakelola reads/writes need a role permission; /api/v1/users and /api/v1/roles need `user_management`.
+//! - First admin: seeded by migration 052 (username `admin`, default password documented in docs/PR/029) with
+//!   `must_change_password = true`; while that flag is set every API except /api/auth/* answers 403
+//!   PASSWORD_CHANGE_REQUIRED until the user picks a new password.
 use axum::{
     extract::{Path, Query, Request, State},
     http::{header, HeaderMap, HeaderValue, Method, StatusCode},
@@ -46,6 +48,7 @@ pub struct AuthUser {
     pub role: String,
     pub role_name: String,
     pub permissions: Vec<String>,
+    pub must_change_password: bool,
 }
 
 impl AuthUser {
@@ -64,7 +67,8 @@ impl AuthUser {
     }
     fn to_json(&self) -> Value {
         json!({ "id": self.id, "username": self.username, "full_name": self.full_name, "role": self.role,
-                "role_name": self.role_name, "permissions": self.permissions })
+                "role_name": self.role_name, "permissions": self.permissions,
+                "must_change_password": self.must_change_password })
     }
 }
 
@@ -251,7 +255,7 @@ pub async fn resolve(s: &AppState, token: &str) -> Result<Option<AuthUser>, ApiE
         .query_opt(
             "SELECT u.id, u.username, u.full_name, u.role, r.name, r.permissions, u.is_active,
                     (s.expires_at > now()) AND (s.last_activity_at + make_interval(secs => $2::float8) > now()) AS valid,
-                    s.last_activity_at < now() - interval '60 seconds' AS stale
+                    s.last_activity_at < now() - interval '60 seconds' AS stale, u.must_change_password
                FROM user_sessions s JOIN users u ON u.id = s.user_id JOIN user_roles r ON r.id = u.role
               WHERE s.token_hash = $1",
             &[&th, &(idle as f64)],
@@ -274,13 +278,13 @@ pub async fn resolve(s: &AppState, token: &str) -> Result<Option<AuthUser>, ApiE
         role: r.get(3),
         role_name: r.get(4),
         permissions: perms_from(&r.get::<_, Value>(5)),
+        must_change_password: r.get(9),
     }))
 }
 
 // ─── route classification ───────────────────────────────────────────────────
 
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)]
 pub enum Need {
     Public,
     Login,
@@ -291,16 +295,20 @@ fn under(path: &str, prefix: &str) -> bool {
     path == prefix || path.starts_with(&format!("{prefix}/"))
 }
 
-/// What a request needs. Dashboard (public) reads stay open; everything that edits data or shows
-/// tatakelola-only data (PE case records, admin lists, sync status) needs a permission.
+/// What a request needs. Only /health and /api/auth/* are open (CORS preflight too); every dashboard read needs
+/// a session (any role); tatakelola-only data and every write need a role permission.
 pub fn classify(method: &Method, path: &str) -> Need {
-    if path == "/health" || under(path, "/api/auth") {
+    if path == "/health" || under(path, "/api/auth") || *method == Method::OPTIONS {
+        return Need::Public;
+    }
+    // branding for the login page (anonymous callers get only the branding keys, see master::console_settings)
+    if path == "/api/v1/console/settings" && *method == Method::GET {
         return Need::Public;
     }
     if under(path, "/api/v1/users") || under(path, "/api/v1/roles") || under(path, "/api/v1/access-log") {
         return Need::Perm("user_management");
     }
-    let read = *method == Method::GET || *method == Method::HEAD || *method == Method::OPTIONS;
+    let read = *method == Method::GET || *method == Method::HEAD;
     if read {
         if under(path, "/api/v1/admin")
             || under(path, "/api/v1/integrasi")
@@ -311,7 +319,7 @@ pub fn classify(method: &Method, path: &str) -> Need {
         {
             return Need::Perm("tatakelola");
         }
-        return Need::Public;
+        return Need::Login;
     }
     // writes
     if under(path, "/api/v1/admin/master") || under(path, "/api/v1/admin/fasyankes") {
@@ -345,6 +353,9 @@ pub async fn guard(State(s): State<AppState>, mut req: Request, next: Next) -> R
     match (&need, &user) {
         (Need::Public, _) => {}
         (_, None) => return deny(StatusCode::UNAUTHORIZED, "Silakan masuk terlebih dahulu", "SESSION_REQUIRED"),
+        (_, Some(u)) if u.must_change_password => {
+            return deny(StatusCode::FORBIDDEN, "Ganti kata sandi Anda terlebih dahulu", "PASSWORD_CHANGE_REQUIRED")
+        }
         (Need::Login, Some(_)) => {}
         (Need::Perm(p), Some(u)) => {
             if !u.has(p) {
@@ -357,43 +368,6 @@ pub async fn guard(State(s): State<AppState>, mut req: Request, next: Next) -> R
         req.extensions_mut().insert(u.clone());
     }
     next.run(req).await
-}
-
-// ─── bootstrap admin ────────────────────────────────────────────────────────
-
-/// Creates the first admin from SKDR_ADMIN_USERNAME / SKDR_ADMIN_PASSWORD when no admin user exists yet.
-/// Never updates an existing user and never logs the password.
-pub async fn bootstrap_admin(pool: &deadpool_postgres::Pool) -> anyhow::Result<()> {
-    let user = std::env::var("SKDR_ADMIN_USERNAME").unwrap_or_default().trim().to_string();
-    let pass = std::env::var("SKDR_ADMIN_PASSWORD").unwrap_or_default();
-    let c = pool.get().await?;
-    let has_admin = c.query_opt("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1", &[]).await?.is_some();
-    if has_admin {
-        return Ok(());
-    }
-    if user.is_empty() || pass.is_empty() {
-        tracing::warn!("no admin user yet: set SKDR_ADMIN_USERNAME and SKDR_ADMIN_PASSWORD in .env to create the first admin");
-        return Ok(());
-    }
-    if check_password(&pass).is_err() {
-        tracing::warn!("SKDR_ADMIN_PASSWORD does not meet the password policy (min 8 chars, letters and digits); admin not created");
-        return Ok(());
-    }
-    let hash = tokio::task::spawn_blocking(move || hash_password(&pass)).await?;
-    let full = std::env::var("SKDR_ADMIN_FULL_NAME").ok().filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "Administrator".into());
-    let n = c
-        .execute(
-            "INSERT INTO users (username, full_name, password_hash, role, created_by) VALUES ($1, $2, $3, 'admin', 'bootstrap')
-             ON CONFLICT DO NOTHING",
-            &[&user, &full, &hash],
-        )
-        .await?;
-    if n > 0 {
-        tracing::info!("bootstrap admin user created: {user}");
-    } else {
-        tracing::warn!("bootstrap admin not created: username {user} already exists with another role");
-    }
-    Ok(())
 }
 
 // ─── /api/auth ──────────────────────────────────────────────────────────────
@@ -513,6 +487,9 @@ pub async fn change_password(State(s): State<AppState>, headers: HeaderMap, Json
     let cur = b.current_password.unwrap_or_default();
     let new = b.new_password.unwrap_or_default();
     check_password(&new)?;
+    if new == cur {
+        return Err(bad_request("Kata sandi baru harus berbeda dari kata sandi saat ini"));
+    }
     let c = s.pool.get().await.map_err(internal)?;
     let stored: String = c.query_one("SELECT password_hash FROM users WHERE id = $1", &[&u.id]).await.map_err(internal)?.get(0);
     let ok = tokio::task::spawn_blocking(move || verify_password(&cur, &stored)).await.map_err(internal)?;
@@ -520,7 +497,7 @@ pub async fn change_password(State(s): State<AppState>, headers: HeaderMap, Json
         return Err(bad_request("Kata sandi saat ini salah"));
     }
     let hash = tokio::task::spawn_blocking(move || hash_password(&new)).await.map_err(internal)?;
-    c.execute("UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1", &[&u.id, &hash]).await.map_err(internal)?;
+    c.execute("UPDATE users SET password_hash = $2, must_change_password = FALSE, updated_at = now() WHERE id = $1", &[&u.id, &hash]).await.map_err(internal)?;
     // end other sessions of this user, keep the current one
     c.execute("DELETE FROM user_sessions WHERE user_id = $1 AND token_hash <> $2", &[&u.id, &sha256_hex(&t)])
         .await
@@ -568,13 +545,14 @@ pub struct UserQuery {
     per_page: Option<i64>,
 }
 
-const USER_COLS: &str = "u.id, u.username, u.full_name, u.email, u.role, r.name, u.is_active, u.last_login_at::text, u.created_at::text, u.created_by";
+const USER_COLS: &str = "u.id, u.username, u.full_name, u.email, u.role, r.name, u.is_active, u.last_login_at::text, u.created_at::text, u.created_by, u.must_change_password";
 
 fn user_row(r: &tokio_postgres::Row) -> Value {
     json!({ "id": r.get::<_, Uuid>(0), "username": r.get::<_, String>(1), "full_name": r.get::<_, Option<String>>(2),
             "email": r.get::<_, Option<String>>(3), "role": r.get::<_, String>(4), "role_name": r.get::<_, String>(5),
             "is_active": r.get::<_, bool>(6), "last_login_at": r.get::<_, Option<String>>(7),
-            "created_at": r.get::<_, String>(8), "created_by": r.get::<_, Option<String>>(9) })
+            "created_at": r.get::<_, String>(8), "created_by": r.get::<_, Option<String>>(9),
+            "must_change_password": r.get::<_, bool>(10) })
 }
 
 pub async fn users_list(State(s): State<AppState>, Query(q): Query<UserQuery>) -> Result<Json<Value>, ApiError> {
@@ -673,8 +651,8 @@ pub async fn user_create(
     let c = s.pool.get().await.map_err(internal)?;
     let id: Uuid = c
         .query_one(
-            "INSERT INTO users (username, full_name, email, password_hash, role, is_active, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+            "INSERT INTO users (username, full_name, email, password_hash, role, is_active, created_by, must_change_password)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE) RETURNING id",
             &[&username, &opt(&b.full_name), &email, &hash, &role, &b.is_active.unwrap_or(true), &me.username],
         )
         .await
@@ -717,7 +695,8 @@ pub async fn user_update(
     };
     c.execute(
         "UPDATE users SET full_name = $2, email = $3, role = $4, is_active = $5,
-                password_hash = COALESCE($6, password_hash), updated_at = now() WHERE id = $1",
+                password_hash = COALESCE($6, password_hash),
+                must_change_password = must_change_password OR $6 IS NOT NULL, updated_at = now() WHERE id = $1",
         &[&id, &opt(&b.full_name), &email, &role, &active, &new_hash],
     )
     .await
@@ -942,6 +921,15 @@ mod tests {
         assert!(!verify_password("x", "not-a-hash"));
     }
 
+    /// The hash seeded by database/init/052 (made with argon2-cffi) must verify with this crate.
+    #[test]
+    fn seeded_admin_hash_verifies() {
+        let sql = include_str!("../../../database/init/052_seed_admin_must_change_password.sql");
+        let h = sql.split('\'').find(|p| p.starts_with("$argon2id$")).expect("hash in 052");
+        assert!(verify_password("Skdr@2026Admin", h));
+        assert!(!verify_password("Skdr@2026admin", h));
+    }
+
     #[test]
     fn password_policy() {
         assert!(check_password("abc12345").is_ok());
@@ -954,10 +942,16 @@ mod tests {
     fn classify_routes() {
         let g = Method::GET;
         let p = Method::POST;
-        assert_eq!(classify(&g, "/api/v1/public-dashboard"), Need::Public);
-        assert_eq!(classify(&g, "/api/v1/pe/forms"), Need::Public);
-        assert_eq!(classify(&g, "/api/v1/signals/pe-deaths"), Need::Public);
+        assert_eq!(classify(&g, "/health"), Need::Public);
         assert_eq!(classify(&p, "/api/auth/login"), Need::Public);
+        assert_eq!(classify(&g, "/api/auth/session"), Need::Public);
+        assert_eq!(classify(&Method::OPTIONS, "/api/v1/public-dashboard"), Need::Public);
+        assert_eq!(classify(&g, "/api/v1/public-dashboard"), Need::Login);
+        assert_eq!(classify(&g, "/api/v1/console/settings"), Need::Public);
+        assert_eq!(classify(&Method::PUT, "/api/v1/console/settings"), Need::Perm("tatakelola"));
+        assert_eq!(classify(&g, "/api/v1/pe/forms"), Need::Login);
+        assert_eq!(classify(&g, "/api/v1/signals/pe-deaths"), Need::Login);
+        assert_eq!(classify(&g, "/api/v1/usersx"), Need::Login);
         assert_eq!(classify(&g, "/api/v1/pe/cases"), Need::Perm("tatakelola"));
         assert_eq!(classify(&g, "/api/v1/admin/master/provinces"), Need::Perm("tatakelola"));
         assert_eq!(classify(&g, "/api/v1/integrasi/bnpb/status"), Need::Perm("tatakelola"));
@@ -968,12 +962,11 @@ mod tests {
         assert_eq!(classify(&g, "/api/v1/users"), Need::Perm("user_management"));
         assert_eq!(classify(&p, "/api/v1/roles"), Need::Perm("user_management"));
         assert_eq!(classify(&p, "/api/v1/anything-else"), Need::Perm("tatakelola"));
-        assert_eq!(classify(&g, "/api/v1/usersx"), Need::Public);
     }
 
     #[test]
     fn perms_and_pe_role() {
-        let mut u = AuthUser { id: Uuid::nil(), username: "a".into(), full_name: None, role: "x".into(), role_name: "X".into(), permissions: vec!["*".into()] };
+        let mut u = AuthUser { id: Uuid::nil(), username: "a".into(), full_name: None, role: "x".into(), role_name: "X".into(), permissions: vec!["*".into()], must_change_password: false };
         assert!(u.has("user_management"));
         assert_eq!(u.pe_role(), "admin");
         u.permissions = vec!["tatakelola".into(), "pe_verify".into()];

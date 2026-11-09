@@ -92,16 +92,21 @@ pub async fn kabkota(State(s): State<AppState>, Query(q): Query<KabQuery>) -> Re
 }
 
 /// Same shape as NLP `GET /api/v1/console/settings` (branding + navigation menu from app_settings).
-pub async fn console_settings(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+/// PR 029: open without login (the login page needs the branding); anonymous callers get only the branding keys.
+pub async fn console_settings(
+    State(s): State<AppState>,
+    me: Option<axum::Extension<crate::auth::AuthUser>>,
+) -> Result<Json<Value>, ApiError> {
+    const BRANDING: [&str; 7] = ["app_name", "app_tagline", "footer_text", "sidebar_logo_url", "login_logo_url", "favicon_url", "ticker_text"];
     let c = s.pool.get().await.map_err(internal)?;
     let rows = c.query("SELECT key, value FROM app_settings", &[]).await.map_err(internal)?;
     let mut cfg = serde_json::Map::new();
-    for k in ["app_name", "app_tagline", "footer_text", "sidebar_logo_url", "login_logo_url", "favicon_url", "ticker_text"] {
+    for k in BRANDING {
         cfg.insert(k.into(), json!(""));
     }
     for r in rows {
         let (k, v): (String, String) = (r.get(0), r.get(1));
-        if k.starts_with("session_") {
+        if k.starts_with("session_") || (me.is_none() && !BRANDING.contains(&k.as_str())) {
             continue;
         }
         let val = if k == "navigation_menu" { serde_json::from_str(&v).unwrap_or(json!([])) } else { json!(v) };
