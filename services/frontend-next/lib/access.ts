@@ -10,7 +10,7 @@ export type Need = { kind: 'public' } | { kind: 'login' } | { kind: 'perm'; perm
 const under = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`)
 
 const DASHBOARD_PREFIXES = ['/dashboard', '/main-dashboard', '/dasbor', '/penyakit', '/tv', '/dokumentasi', '/laboratorium', '/klaster']
-const TATAKELOLA_PREFIXES = ['/tatakelola', '/pe', '/ebs', '/integrasi', '/master']
+const TATAKELOLA_PREFIXES = ['/tatakelola', '/pe', '/ebs', '/ibs', '/integrasi', '/master']
 
 export const LIMITED_PREFIXES = ['/dashboard/spasial', '/dashboard/matriks-analisa']
 
@@ -28,6 +28,8 @@ export function routeNeed(pathname: string): Need {
   if (LIMITED_PREFIXES.some((x) => under(p, x))) return { kind: 'perm', perm: 'dashboard_limited' }
   if (['/tatakelola/pengguna', '/tatakelola/peran', '/tatakelola/log-akses'].some((x) => under(p, x))) return { kind: 'perm', perm: 'user_management' }
   if (under(p, '/master')) return { kind: 'perm', perm: 'master_data' }
+  // PR 030: Laporan EBS/IBS (input form) = tatakelola; the rest of /ebs (sinkronisasi) stays integrasi
+  if (under(p, '/ebs/laporan') || under(p, '/ibs')) return { kind: 'perm', perm: 'tatakelola' }
   if (under(p, '/ebs') || under(p, '/integrasi')) return { kind: 'perm', perm: 'integrasi' }
   if (TATAKELOLA_PREFIXES.some((x) => under(p, x))) return { kind: 'perm', perm: 'tatakelola' }
   if (p === '/login') return { kind: 'public' }

@@ -193,6 +193,8 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_form_pe', 'Form PE', '#', 'FileText', 1, { source: 'pe_forms', subItems: [
       { id: 'sub_pe_daftar', label: 'Daftar PE', href: '/pe', icon: 'FileSpreadsheet', order: 99, enabled: true },
     ] }),
+    it('mod_laporan_ebs', 'Laporan EBS', '/ebs/laporan', 'Radio', 2), // PR 030
+    it('mod_laporan_ibs', 'Laporan IBS (Agregat)', '/ibs/laporan', 'FileSpreadsheet', 3), // PR 030
   ] },
   { id: 'grp_integrasi', title: 'Integrasi', order: 6, enabled: true, area: 'tatakelola', permission: 'integrasi', items: [
     it('mod_ebs_sync', 'Sinkronisasi EBS', '/ebs', 'Radio', 1),
