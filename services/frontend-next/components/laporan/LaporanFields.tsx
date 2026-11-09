@@ -8,6 +8,7 @@ import SearchSelect, { type SelectOption } from '@/components/ui/SearchSelect'
 import { addDays, epiLabel, isReq, toNum, weeksOf, type Data, type FieldDef, type Jenis, type Refs } from '@/lib/laporan/engine'
 import { SEXES, USIA_BANDS, usiaTotals } from '@/lib/laporan/ebs'
 import { IBS_COLS, ibsTotals } from '@/lib/laporan/ibs'
+import { UMUR_PARTS } from '@/lib/laporan/individu'
 import { lampiranUrl, uploadLampiran, type Geo, type Lampiran } from '@/lib/laporan/api'
 import RichText from './RichText'
 
@@ -40,6 +41,8 @@ const fmtSize = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` 
 export function optionsFor(f: FieldDef, refs: Refs, current?: any): SelectOption[] {
   let list: SelectOption[] = []
   if (f.options === 'penyakit') list = refs.penyakit.map((p) => ({ value: p.value, label: p.label, hint: p.disease_name && p.disease_name !== p.label ? `Master: ${p.disease_name}` : undefined }))
+  // PR 031: 24 IBS diseases as "A — Diare Akut" (Total Kunjungan excluded)
+  else if (f.options === 'ibs_penyakit') list = refs.ibs_penyakit.filter((p) => !p.is_total).map((p) => ({ value: p.kode, label: `${p.kode_sms} — ${p.nama}`, hint: `Kode ${p.kode}${p.nama_asli !== p.nama ? ` · di form lama: ${p.nama_asli}` : ''}` }))
   else if (f.options) list = (refs.opsi[f.options] || []).map((o) => ({ value: o.value, label: o.label }))
   const cur = Array.isArray(current) ? current : current ? [String(current)] : []
   cur.forEach((v) => { if (!list.some((o) => o.value === v)) list = [...list, { value: v, label: v, hint: 'Nilai tersimpan (tidak ada di daftar)' }] })
@@ -48,13 +51,17 @@ export function optionsFor(f: FieldDef, refs: Refs, current?: any): SelectOption
 
 /** numbers: keep digits only, '' → null */
 const parseNum = (s: string) => { const t = s.replace(/[^\d]/g, ''); return t === '' ? null : Number(t) }
+/** decimals: digits + one comma/dot kept as typed (e.g. "36,5"), '' → null */
+const parseDec = (s: string) => { const t = s.replace(/[^\d.,]/g, '').replace(/([.,].*)[.,]/g, '$1'); return t === '' ? null : t }
 
 export function FieldView({ f, ctx }: { f: FieldDef; ctx: FieldCtx }) {
   const { data } = ctx
   const req = isReq(f, data)
   const shown = ctx.show(f.key)
-  const errs = shown ? ctx.errs[f.key] || [] : []
-  const warns = ctx.warns[f.key] || []
+  // umur: issues are keyed per part (umur_tahun / umur_bulan / umur_hari)
+  const keys = f.type === 'umur' ? [f.key, ...UMUR_PARTS.map((p) => p.key)] : [f.key]
+  const errs = shown ? keys.flatMap((k) => ctx.errs[k] || []) : []
+  const warns = keys.flatMap((k) => ctx.warns[k] || [])
   const invalid = errs.length > 0
   const id = `lf-${f.key}`
   const wide = f.wide || ['agegrid', 'ibsgrid', 'lampiran', 'richtext', 'textarea', 'domsama', 'check'].includes(f.type)
@@ -97,6 +104,33 @@ function Control({ f, ctx, id, invalid }: { f: FieldDef; ctx: FieldCtx; id: stri
       )
     case 'richtext':
       return <RichText id={id} value={v ?? ''} disabled={ro} placeholder={f.placeholder} invalid={invalid} onChange={(html) => ctx.set(f, html)} onBlur={blur} />
+    case 'decimal': {
+      const lock = f.locked?.(data) || null
+      return (
+        <div className="flex items-stretch">
+          <input id={id} type="text" inputMode="decimal" className={`${numCls} ${bad} ${f.unit ? 'rounded-r-none' : ''} ${lock ? 'bg-slate-50 font-semibold text-primary' : ''}`} value={v ?? ''}
+            disabled={ro || !!lock} title={lock || undefined} placeholder={f.placeholder || '—'} onChange={(e) => ctx.set(f, parseDec(e.target.value))} onBlur={blur} />
+          {f.unit && <span className="inline-flex items-center rounded-r-lg border border-l-0 border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-500">{f.unit}</span>}
+        </div>
+      )
+    }
+    case 'umur':
+      return (
+        <div className="grid grid-cols-3 gap-2">
+          {UMUR_PARTS.map((p) => {
+            const pv = data[p.key]
+            const pe = ctx.show(f.key) && (ctx.errs[p.key] || []).length > 0
+            return (
+              <div key={p.key} data-field={p.key} className="flex items-stretch">
+                <input id={p.key === 'umur_tahun' ? id : `lf-${p.key}`} type="text" inputMode="numeric" aria-label={p.label} disabled={ro} value={pv ?? ''} placeholder="—"
+                  onChange={(e) => ctx.set({ ...f, key: p.key, type: 'number' }, parseNum(e.target.value))} onBlur={blur} onFocus={(e) => e.target.select()}
+                  className={`${numCls} min-w-0 rounded-r-none text-center ${pe ? 'border-red-300 ring-1 ring-red-200' : ''}`} />
+                <span className="inline-flex items-center rounded-r-lg border border-l-0 border-slate-200 bg-slate-50 px-2 text-xs text-slate-500">{p.key === 'umur_tahun' ? 'tahun' : p.key === 'umur_bulan' ? 'bulan' : 'hari'}</span>
+              </div>
+            )
+          })}
+        </div>
+      )
     case 'number': {
       const n = toNum(v)
       const step = (d: number) => ctx.set(f, Math.max(0, (n && !Number.isNaN(n) ? n : 0) + d))
@@ -134,8 +168,8 @@ function Control({ f, ctx, id, invalid }: { f: FieldDef; ctx: FieldCtx; id: stri
         <div>
           {f.type === 'multiselect'
             ? <SearchSelect multiple id={id} options={opts} value={Array.isArray(v) ? v : []} disabled={ro} invalid={invalid} ariaLabel={f.label} onChange={(x) => ctx.set(f, x)} onBlur={blur} testId={`ss-${f.key}`} />
-            : <SearchSelect id={id} options={opts} value={v ?? null} disabled={ro} invalid={invalid} ariaLabel={f.label} recentKey={f.options === 'penyakit' ? 'penyakit' : undefined}
-                placeholder={f.placeholder || (f.options === 'penyakit' ? `Cari dari ${opts.length} penyakit…` : '- Pilih -')} onChange={(x) => ctx.set(f, x)} onBlur={blur} testId={`ss-${f.key}`} />}
+            : <SearchSelect id={id} options={opts} value={v ?? null} disabled={ro} invalid={invalid} ariaLabel={f.label} recentKey={f.options === 'penyakit' || f.options === 'ibs_penyakit' ? f.options : undefined}
+                placeholder={f.placeholder || (f.options === 'penyakit' || f.options === 'ibs_penyakit' ? `Cari dari ${opts.length} penyakit (nama atau kode)…` : '- Pilih -')} onChange={(x) => ctx.set(f, x)} onBlur={blur} testId={`ss-${f.key}`} />}
           {extra}
         </div>
       )
@@ -323,7 +357,9 @@ function IbsGrid({ ctx }: { ctx: FieldCtx }) {
   const tot = ibsTotals(data, rows)
   const filledCount = rows.filter((x) => IBS_COLS.some((c) => Number(r[x.kode]?.[c.key]) > 0)).length
   const nq = q.trim().toLowerCase()
-  const visible = rows.filter((x) => (!nq || `${x.kode} ${x.nama} ${x.nama_asli} ${x.kode_sms}`.toLowerCase().includes(nq)) && (!onlyFilled || IBS_COLS.some((c) => Number(r[x.kode]?.[c.key]) > 0)))
+  // exact Kode SMS ("a", "aa") wins over substring search
+  const exactSms = !!nq && rows.some((x) => x.kode_sms.toLowerCase() === nq)
+  const visible = rows.filter((x) => (!nq || (exactSms ? x.kode_sms.toLowerCase() === nq : `${x.kode} ${x.nama} ${x.nama_asli} ${x.kode_sms}`.toLowerCase().includes(nq))) && (!onlyFilled || IBS_COLS.some((c) => Number(r[x.kode]?.[c.key]) > 0)))
   const tableRef = useRef<HTMLDivElement>(null)
   const setCell = (kode: string, col: string, val: number | null) => {
     const row = { ...(r[kode] || {}), [col]: val }
@@ -360,30 +396,42 @@ function IbsGrid({ ctx }: { ctx: FieldCtx }) {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari penyakit / kode…" className={`${inputCls} py-1.5 pl-8 text-xs`} aria-label="Cari penyakit" />
         </div>
         <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" className="accent-primary" checked={onlyFilled} onChange={(e) => setOnlyFilled(e.target.checked)} /> Hanya yang terisi ({filledCount})</label>
-        <span className="text-[11px] text-slate-400">Enter / ↑ ↓ untuk pindah baris · kosong = 0</span>
+        <span className="text-[11px] text-slate-400">Enter / ↑ ↓ pindah baris · Tab pindah kolom · kosong = 0 · cari juga dengan Kode SMS (mis. "A")</span>
       </div>
+      {/* PR 031: kolom mengikuti tabel resmi (No · Kode SMS · Kode Penyakit · Nama Penyakit · Jumlah Kasus/Kematian/Lab);
+          kolom identitas menempel di kiri saat tabel digulir ke samping, header & total menempel atas/bawah. */}
       <div ref={tableRef} className="hidden max-h-[60vh] overflow-auto md:block">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 shadow-[0_1px_0_#e2e8f0]"><tr>
-            <th className="w-8 px-2 py-2 text-left font-semibold">No</th>
-            <th className="px-2 py-2 text-left font-semibold">Penyakit</th>
-            {IBS_COLS.map((c) => <th key={c.key} className="w-24 px-1 py-2 text-center font-semibold" title={c.hint}>{c.label}</th>)}
+        <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-0 text-xs">
+          <thead className="sticky top-0 z-20 text-slate-500"><tr className="[&>th]:border-b [&>th]:border-slate-200 [&>th]:bg-slate-50">
+            <th className="sticky left-0 z-10 w-10 px-2 py-2 text-left font-semibold">No</th>
+            <th className="sticky left-10 z-10 w-16 px-1 py-2 text-center font-semibold" title="Kode SMS (huruf pelaporan SMS)">Kode SMS</th>
+            <th className="sticky left-[6.5rem] z-10 w-20 px-2 py-2 text-left font-semibold">Kode Penyakit</th>
+            <th className="sticky left-[11.5rem] z-10 px-2 py-2 text-left font-semibold shadow-[1px_0_0_#e2e8f0]">Nama Penyakit</th>
+            {IBS_COLS.map((c) => <th key={c.key} className="w-28 px-1 py-2 text-center font-semibold" title={c.hint}>{c.label}</th>)}
           </tr></thead>
           <tbody>
-            {visible.map((x) => (
-              <tr key={x.kode} className={`border-t border-slate-100 ${IBS_COLS.some((c) => Number(r[x.kode]?.[c.key]) > 0) ? 'bg-primary/[0.03]' : ''}`}>
-                <td className="px-2 py-1 tabular-nums text-slate-400">{x.urutan}</td>
-                <td className="px-2 py-1">
-                  <div className="font-medium text-slate-700">{x.nama}</div>
-                  <div className="text-[10px] text-slate-400">{x.kode}{x.nama_asli && x.nama_asli !== x.nama ? ` · di form lama: ${x.nama_asli}` : ''}</div>
-                </td>
-                {IBS_COLS.map((c) => <td key={c.key} className="px-1 py-1">{cell(x.kode, c.key, x.nama, c.label)}</td>)}
-              </tr>
-            ))}
-            {!visible.length && <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Tidak ada penyakit yang cocok.</td></tr>}
+            {visible.map((x) => {
+              const filled = IBS_COLS.some((c) => Number(r[x.kode]?.[c.key]) > 0)
+              const bg = filled ? 'bg-sky-50' : 'bg-white'
+              return (
+                <tr key={x.kode} className={`[&>td]:border-t [&>td]:border-slate-100 ${filled ? '[&>td]:bg-sky-50' : ''}`} data-filled={filled || undefined}>
+                  <td className={`sticky left-0 z-[1] px-2 py-1 tabular-nums text-slate-400 ${bg}`}>{x.urutan}</td>
+                  <td className={`sticky left-10 z-[1] px-1 py-1 text-center ${bg}`}>
+                    <span className={`inline-flex min-w-[1.75rem] justify-center rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold ${filled ? 'bg-primary text-white' : 'bg-primary/10 text-primary'}`}>{x.kode_sms}</span>
+                  </td>
+                  <td className={`sticky left-[6.5rem] z-[1] px-2 py-1 font-mono text-[11px] text-slate-500 ${bg}`}>{x.kode}</td>
+                  <td className={`sticky left-[11.5rem] z-[1] px-2 py-1 shadow-[1px_0_0_#f1f5f9] ${bg}`}>
+                    <div className={`font-medium ${filled ? 'text-slate-900' : 'text-slate-700'}`}>{x.nama}</div>
+                    {x.nama_asli && x.nama_asli !== x.nama && <div className="text-[10px] text-slate-400">di form lama: {x.nama_asli}</div>}
+                  </td>
+                  {IBS_COLS.map((c) => <td key={c.key} className="px-1 py-1">{cell(x.kode, c.key, x.nama, c.label)}</td>)}
+                </tr>
+              )
+            })}
+            {!visible.length && <tr><td colSpan={4 + IBS_COLS.length} className="px-3 py-6 text-center text-slate-400">Tidak ada penyakit yang cocok.</td></tr>}
           </tbody>
-          <tfoot className="sticky bottom-0 bg-slate-100/95 font-semibold text-slate-700"><tr>
-            <td className="px-2 py-2" colSpan={2}>Total semua penyakit (otomatis)</td>
+          <tfoot className="sticky bottom-0 z-20 font-semibold text-slate-700"><tr className="[&>td]:border-t [&>td]:border-slate-200 [&>td]:bg-slate-100">
+            <td className="sticky left-0 z-10 px-2 py-2" colSpan={4}>Total {rows.length} penyakit (otomatis · tidak termasuk Total Kunjungan)</td>
             {IBS_COLS.map((c) => <td key={c.key} className="px-1 py-2 text-center tabular-nums">{tot[c.key]}</td>)}
           </tr></tfoot>
         </table>
@@ -391,14 +439,17 @@ function IbsGrid({ ctx }: { ctx: FieldCtx }) {
       <div className="divide-y divide-slate-100 md:hidden">
         {visible.map((x) => (
           <div key={x.kode} className="px-3 py-2">
-            <div className="mb-1.5 text-sm font-medium text-slate-700">{x.urutan}. {x.nama} <span className="text-[10px] font-normal text-slate-400">{x.kode}</span></div>
+            <div className="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="inline-flex min-w-[1.75rem] justify-center rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-bold text-primary">{x.kode_sms}</span>
+              <span className="min-w-0 flex-1">{x.nama}</span><span className="font-mono text-[10px] font-normal text-slate-400">{x.kode}</span>
+            </div>
             <div className="grid grid-cols-3 gap-2">
-              {IBS_COLS.map((c) => <label key={c.key} className="text-[10px] font-semibold text-slate-500">{c.label}{cell(x.kode, c.key, x.nama, c.label, true)}</label>)}
+              {IBS_COLS.map((c) => <label key={c.key} className="text-[10px] font-semibold text-slate-500">{c.short}{cell(x.kode, c.key, x.nama, c.label, true)}</label>)}
             </div>
           </div>
         ))}
         <div className="grid grid-cols-3 gap-2 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-          {IBS_COLS.map((c) => <span key={c.key}>Total {c.label}: {tot[c.key]}</span>)}
+          {IBS_COLS.map((c) => <span key={c.key}>Total {c.short}: {tot[c.key]}</span>)}
         </div>
       </div>
     </div>

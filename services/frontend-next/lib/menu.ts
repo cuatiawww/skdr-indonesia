@@ -194,7 +194,8 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
       { id: 'sub_pe_daftar', label: 'Daftar PE', href: '/pe', icon: 'FileSpreadsheet', order: 99, enabled: true },
     ] }),
     it('mod_laporan_ebs', 'Laporan EBS', '/ebs/laporan', 'Radio', 2), // PR 030
-    it('mod_laporan_ibs', 'Laporan IBS (Agregat)', '/ibs/laporan', 'FileSpreadsheet', 3), // PR 030
+    it('mod_laporan_ibs', 'Entri Data Agregat', '/ibs/laporan', 'FileSpreadsheet', 3, { description: 'Entri data agregat mingguan per Puskesmas/unit (SKDR-IBS) — tabel 24 penyakit + Total Kunjungan' }), // PR 030, label PR 031
+    it('mod_laporan_individu', 'Form Individu', '/ibs/individu', 'Stethoscope', 4, { description: 'Form Individu IBS — data per pasien (penyakit agregat, pemeriksaan, SOAP)' }), // PR 031
   ] },
   { id: 'grp_integrasi', title: 'Integrasi', order: 6, enabled: true, area: 'tatakelola', permission: 'integrasi', items: [
     it('mod_ebs_sync', 'Sinkronisasi EBS', '/ebs', 'Radio', 1),

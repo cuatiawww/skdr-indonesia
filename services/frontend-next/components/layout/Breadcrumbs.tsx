@@ -17,7 +17,9 @@ export default function Breadcrumbs({ match }: { match: Match }) {
   const base = (match.sub?.href || match.item.href || '').replace(/\/$/, '')
   const rest = pathname.slice(base.length).split('/').filter(Boolean)
   // PR 030: also used by Laporan EBS/IBS
-  if (rest.length) crumbs.push({ label: rest[rest.length - 1] === 'baru' ? (pathname.startsWith('/pe') ? 'Tambah PE' : 'Tambah Laporan') : 'Detail' })
+  // PR 031: Form Individu → "Tambah Pasien"
+  const addLabel = pathname.startsWith('/pe') ? 'Tambah PE' : pathname.startsWith('/ibs/individu') ? 'Tambah Pasien' : 'Tambah Laporan'
+  if (rest.length) crumbs.push({ label: rest[rest.length - 1] === 'baru' ? addLabel : 'Detail' })
   const last = crumbs.length - 1
   return (
     <nav aria-label="Breadcrumb" data-testid="breadcrumbs" className="px-4 pt-3 text-xs sm:px-6 lg:px-8">

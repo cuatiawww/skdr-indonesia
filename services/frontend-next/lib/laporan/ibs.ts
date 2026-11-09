@@ -3,10 +3,11 @@
 // Data Entry Date → Tanggal Entri, Form Date → Tanggal Formulir).
 import { Collector, epiLabel, toNum, weekStart, weeksInYear, type Data, type FormDef, type Refs } from './engine'
 
-export const IBS_COLS: { key: 'kasus' | 'kematian' | 'lab'; label: string; hint: string }[] = [
-  { key: 'kasus', label: 'Kasus', hint: 'Jumlah kasus' },
-  { key: 'kematian', label: 'Kematian', hint: 'Jumlah kematian (≤ kasus)' },
-  { key: 'lab', label: 'Lab', hint: 'Jumlah Lab: kasus dengan pemeriksaan laboratorium (definisi perlu konfirmasi Kemkes)' },
+// PR 031: label kolom = nama resmi (Jumlah Kasus / Jumlah Kematian / Jumlah Lab); `short` untuk kartu ponsel & ringkasan.
+export const IBS_COLS: { key: 'kasus' | 'kematian' | 'lab'; label: string; short: string; hint: string }[] = [
+  { key: 'kasus', label: 'Jumlah Kasus', short: 'Kasus', hint: 'Jumlah kasus' },
+  { key: 'kematian', label: 'Jumlah Kematian', short: 'Kematian', hint: 'Jumlah kematian (≤ kasus)' },
+  { key: 'lab', label: 'Jumlah Lab', short: 'Lab', hint: 'Jumlah Lab: kasus dengan pemeriksaan laboratorium (definisi perlu konfirmasi Kemkes)' },
 ]
 
 export function ibsTotals(d: Data, rows: { kode: string }[]) {
@@ -21,8 +22,14 @@ export const IBS_FORM: FormDef = {
   jenis: 'ibs',
   title: 'Entri Data Agregat Mingguan (IBS)',
   short: 'IBS',
-  eyebrow: 'SKDR-IBS · Laporan Agregat',
+  eyebrow: 'SKDR-IBS · Entri Data Agregat',
   listHref: '/ibs/laporan',
+  listTitle: 'Entri Data Agregat',
+  addLabel: 'Entri Data Mingguan',
+  searchPlaceholder: 'Cari nomor, unit, petugas…',
+  prefillKeys: ['jenis_unit', 'kelompok', 'provinsi_id', 'kabkota_id', 'kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode', 'petugas'],
+  nameKey: 'petugas',
+  defaultWeek: true,
   steps: [
     { id: 's1', title: 'Unit & Wilayah', desc: 'Umumnya terisi otomatis dari laporan terakhir Anda.', sections: [
       { id: 's1-unit', title: 'Unit pelapor', fields: [
@@ -45,7 +52,7 @@ export const IBS_FORM: FormDef = {
     ] },
     { id: 's3', title: 'Data Kasus', desc: 'Isi angka per penyakit; kosong dihitung 0.', sections: [
       { id: 's3-grid', title: 'Kasus per penyakit', fields: [{ key: 'rows', label: 'Tabel kasus mingguan', type: 'ibsgrid', wide: true }] },
-      { id: 's3-total', title: 'Total kunjungan & konfirmasi', fields: [
+      { id: 's3-total', title: 'Total Kunjungan (baris X · TOTA)', tone: 'accent', desc: 'Bukan penyakit — diisi terpisah dari tabel di atas dan tidak ikut dijumlahkan.', fields: [
         { key: 'total_kunjungan', label: 'Total Kunjungan', type: 'number', required: true, hint: 'Seluruh kunjungan pasien di unit pada minggu ini (penyebut proporsi).' },
         { key: 'konfirmasi_nihil', label: 'Saya konfirmasi tidak ada kasus untuk semua penyakit pada minggu ini (laporan nihil)', type: 'check', wide: true,
           visible: (d) => !Object.values(d.rows || {}).some((r: any) => Number(r?.kasus) > 0), required: true },
@@ -56,6 +63,18 @@ export const IBS_FORM: FormDef = {
   validate: (d, refs) => validateIbs(d, refs.today, diseaseRows(refs).map((r) => r.kode)),
 }
 
+/** Tahun + Minggu Epid (shared with Form Individu) — mirrors laporan.rs periode */
+export function periode(c: Collector, d: Data, step: string, today: string) {
+  c.req(step, 'tahun', 'Tahun')
+  if (c.req(step, 'minggu', 'Minggu Epid')) {
+    const t = Number(d.tahun), m = Number(d.minggu)
+    if (t && m) {
+      if (m < 1 || m > weeksInYear(t)) c.e(step, 'minggu', 'Minggu Epid tidak valid untuk tahun ini')
+      else if (weekStart(t, m) > today) c.e(step, 'minggu', 'Minggu Epid belum dimulai')
+    }
+  }
+}
+
 /** mirrors laporan.rs validate_ibs */
 export function validateIbs(d: Data, today: string, rows: string[]) {
   const c = new Collector(d)
@@ -64,14 +83,7 @@ export function validateIbs(d: Data, today: string, rows: string[]) {
   c.req('s1', 'kabkota_id', 'Kab/Kota')
   c.req('s1', 'unit_pelapor', 'Puskesmas/Unit')
   c.req('s1', 'petugas', 'Petugas')
-  c.req('s2', 'tahun', 'Tahun')
-  if (c.req('s2', 'minggu', 'Minggu Epid')) {
-    const t = Number(d.tahun), m = Number(d.minggu)
-    if (t && m) {
-      if (m < 1 || m > weeksInYear(t)) c.e('s2', 'minggu', 'Minggu Epid tidak valid untuk tahun ini')
-      else if (weekStart(t, m) > today) c.e('s2', 'minggu', 'Minggu Epid belum dimulai')
-    }
-  }
+  periode(c, d, 's2', today)
   let tk = 0
   const data = d.rows || {}
   for (const kode of rows) {

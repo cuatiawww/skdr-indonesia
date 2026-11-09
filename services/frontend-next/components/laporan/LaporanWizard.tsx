@@ -13,6 +13,7 @@ import { SkeletonDetail } from '@/components/ui/Skeleton'
 import { epiLabel, isFilled, isVisible, overall, reportingWeek, stepStats, UNIT_KEY, visibleFields, weeksOf, type Data, type FieldDef, type FormDef, type Issue, type Refs, type StepDef } from '@/lib/laporan/engine'
 import { SEXES, usiaTotals } from '@/lib/laporan/ebs'
 import { IBS_COLS, ibsTotals } from '@/lib/laporan/ibs'
+import { imtKategori, umurText, UMUR_PARTS } from '@/lib/laporan/individu'
 import { lapFetch, STATUS_CLS, STATUS_LABEL, useGeo, type Lampiran, type LapRecord } from '@/lib/laporan/api'
 import { FieldView, optionsFor, type FieldCtx } from './LaporanFields'
 
@@ -22,6 +23,7 @@ const SERVER_KEYS = ['tgl_laporan', 'tgl_entri', 'tgl_formulir']
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
 interface DupEbs { lokal: { id: number; no: string; status: string; tgl: string | null; unit: string | null; kasus: number | null }[]; ebs: { no: string | null; tgl: string | null; unit: string | null; kasus: number; status: string | null }[] }
 type Reported = FieldCtx['reported']
+interface DupIndividu { sama: { id: number; no: string; status: string; tgl: string | null }[]; periode: number }
 
 const localKey = (jenis: string, id: number | null) => `skdr-lap-local:${jenis}:${id ?? 'baru'}`
 const EVENT_LABEL: Record<string, string> = { dibuat: 'Draf dibuat', dikirim: 'Laporan dikirim', dihapus: 'Draf dihapus' }
@@ -90,14 +92,11 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
           const last = p?.data.last || {}
           const src = p?.data.last_no ? `Dari laporan terakhir Anda (${p.data.last_no})` : ''
           const a: Record<string, string> = {}
-          const keys = jenis === 'ebs'
-            ? ['jenis_unit', 'provinsi_id', 'kabkota_id', 'kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode', 'nama_pelapor', 'hp_pelapor']
-            : ['jenis_unit', 'kelompok', 'provinsi_id', 'kabkota_id', 'kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode', 'petugas']
-          keys.forEach((k) => { if (isFilled(last[k])) { d[k] = last[k]; a[k] = src } })
-          const nameKey = jenis === 'ebs' ? 'nama_pelapor' : 'petugas'
+          def.prefillKeys.forEach((k) => { if (isFilled(last[k])) { d[k] = last[k]; a[k] = src } })
+          const nameKey = def.nameKey
           if (!isFilled(d[nameKey]) && p?.data.nama) { d[nameKey] = p.data.nama; a[nameKey] = 'Dari akun yang sedang login' }
           if (jenis === 'ebs') d.dom_sama = true
-          if (jenis === 'ibs') {
+          if (def.defaultWeek) {
             const w = reportingWeek(r.data.today)
             d.tahun = w.year; d.minggu = w.week
             a.minggu = 'Minggu laporan berjalan (minggu epid terakhir yang sudah selesai)'
@@ -167,6 +166,7 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
     const next: Data = { ...cur, [f.key]: v, ...extra }
     if (cur[f.key] !== v) (f.resets || []).forEach((k) => { if (!(k in extra)) next[k] = null })
     if (next.dom_sama) { next.dom_provinsi_id = next.provinsi_id ?? null; next.dom_kabkota_id = next.kabkota_id ?? null }
+    if (def.derive) Object.assign(next, def.derive(next))
     if (auto[f.key]) setAuto((a) => { const b = { ...a }; delete b[f.key]; return b })
     commit(next)
   }
@@ -210,6 +210,21 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
     }, 500)
     return () => clearTimeout(t)
   }, [jenis, ukey, data.tahun])
+
+  // PR 031: Form Individu — same unit + nama pasien + tanggal periksa (soft warning); IBS agregat — count of individu records
+  // for the same unit + minggu (info only, no auto-fill: the official sync rules are unknown)
+  const [dupInd, setDupInd] = useState<DupIndividu | null>(null)
+  useEffect(() => {
+    if (jenis !== 'individu' && jenis !== 'ibs') return
+    const nama = jenis === 'individu' ? String(data.nama_pasien || '').trim() : ''
+    if (!ukey || (jenis === 'individu' ? !nama || !data.tgl_periksa : !data.tahun || !data.minggu)) { setDupInd(null); return }
+    const t = setTimeout(() => {
+      const qs = new URLSearchParams({ unit_key: ukey, exclude: String(jenis === 'individu' ? recId.current || 0 : 0) })
+      if (jenis === 'individu') { qs.set('nama', nama); qs.set('tgl', data.tgl_periksa) } else { qs.set('tahun', String(data.tahun)); qs.set('minggu', String(data.minggu)) }
+      lapFetch<{ data: DupIndividu }>(`/api/v1/laporan-ref/duplikat/individu?${qs}`).then((j) => setDupInd(j.data)).catch(() => {})
+    }, 700)
+    return () => clearTimeout(t)
+  }, [jenis, ukey, data.nama_pasien, data.tgl_periksa, data.tahun, data.minggu])
 
   // ── validation / progress ────────────────────────────────────────────────
   const result = useMemo(() => (refs ? def.validate(data, refs) : { errors: [], warnings: [] }), [def, data, refs])
@@ -309,6 +324,19 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
       </ul>
     </div>
   )
+  const indPanel = jenis === 'individu' && dupInd && dupInd.sama.length > 0 && (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800" data-testid="lap-duplikat">
+      <div className="mb-1.5 flex items-center gap-2 font-bold uppercase tracking-wider text-amber-700"><Copy className="h-4 w-4" /> Kemungkinan data ganda ({dupInd.sama.length})</div>
+      <p className="mb-2">Sudah ada data pasien <b>{data.nama_pasien}</b> di unit yang sama dengan Tanggal Pemeriksaan {data.tgl_periksa}. Periksa dulu sebelum mengirim (tetap boleh dikirim).</p>
+      <ul className="space-y-1">{dupInd.sama.map((x) => <li key={x.id}>• <Link className="font-semibold underline" href={`${def.listHref}/${x.id}?mode=lihat`} target="_blank">{x.no}</Link> · {STATUS_LABEL[x.status] || x.status}</li>)}</ul>
+    </div>
+  )
+  const indInfo = jenis === 'ibs' && dupInd && dupInd.periode > 0 && (
+    <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800" data-testid="lap-info-individu">
+      <Info className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>Terdapat <b>{dupInd.periode}</b> data Form Individu untuk unit ini pada Minggu {data.minggu}/{data.tahun}. Angka agregat tetap diisi manual (aturan sinkronisasi Individu → Agregat belum dipastikan). <Link href="/ibs/individu" className="font-semibold underline">Lihat Form Individu</Link></span>
+    </div>
+  )
   const weekPanel = weekDup && (
     <div className={`rounded-2xl border p-4 text-xs ${weekDup.status === 'dikirim' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`} data-testid="lap-duplikat">
       <div className="flex items-center gap-2 font-bold"><Copy className="h-4 w-4" />
@@ -381,10 +409,11 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
         <div className="space-y-5 xl:col-span-9">
           {step.desc && <p className="text-xs text-slate-500">{step.desc}</p>}
           {jenis === 'ibs' && (step.id === 's2' || step.id === 's1') && weekPanel}
+          {jenis === 'ibs' && step.id === 's3' && indInfo}
           {step.review ? (
-            <Review def={def} data={data} ctx={ctx} stats={stats} errors={errors} warnings={warnings} goto={goto} focusIssue={focusIssue} extra={<>{dupPanel}{weekPanel}</>} />
+            <Review def={def} data={data} ctx={ctx} stats={stats} errors={errors} warnings={warnings} goto={goto} focusIssue={focusIssue} extra={<>{dupPanel}{weekPanel}{indPanel}{indInfo}</>} />
           ) : sections.map((se) => (
-            <section key={se.id} className={`${card} p-4 sm:p-5`}>
+            <section key={se.id} className={`${se.tone === 'accent' ? 'rounded-2xl border border-primary/30 bg-primary/[0.03] shadow-xs' : card} p-4 sm:p-5`} data-section={se.id}>
               <div className="skdr-section-head"><h2 className="skdr-section-title">{se.title}</h2>{se.desc && <p className="skdr-section-desc">{se.desc}</p>}</div>
               <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
                 {se.fields.filter((f) => isVisible(f, data)).map((f) => <FieldView key={f.key} f={f} ctx={ctx} />)}
@@ -392,6 +421,7 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
             </section>
           ))}
           {!step.review && (step.id === 's2' || step.id === 's3') && dupPanel}
+          {!step.review && (step.id === 's2' || step.id === 's3') && indPanel}
 
           <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-slate-200 bg-white/95 px-3 py-2.5 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
             <button disabled={stepIdx === 0} onClick={() => goto(stepIdx - 1)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
@@ -417,7 +447,7 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
               <div className="flex justify-between gap-2"><dt>Nomor</dt><dd className="font-mono font-semibold text-slate-800">{rec?.no_laporan || '—'}</dd></div>
               <div className="flex justify-between gap-2"><dt>Status</dt><dd>{rec ? <span className={badge(STATUS_CLS[rec.status] || '')}>{STATUS_LABEL[rec.status]}</span> : 'Belum tersimpan'}</dd></div>
               <div className="flex justify-between gap-2"><dt>Dibuat oleh</dt><dd className="text-right">{rec?.created_by_name || user?.full_name || user?.username || '—'}</dd></div>
-              {jenis === 'ibs' && data.tahun && data.minggu && <div className="flex justify-between gap-2"><dt>Periode</dt><dd className="text-right">Minggu {data.minggu}/{data.tahun}<br /><span className="text-slate-400">{weeksOf(Number(data.tahun))[Number(data.minggu) - 1]?.label}</span></dd></div>}
+              {def.defaultWeek && data.tahun && data.minggu && <div className="flex justify-between gap-2"><dt>Periode</dt><dd className="text-right">Minggu {data.minggu}/{data.tahun}<br /><span className="text-slate-400">{weeksOf(Number(data.tahun))[Number(data.minggu) - 1]?.label}</span></dd></div>}
               <div className="flex justify-between gap-2"><dt>Kelengkapan</dt><dd className="font-semibold">{tot.done}/{tot.total} wajib</dd></div>
             </dl>
             {errors.length > 0 && editable && (
@@ -553,6 +583,7 @@ function display(f: FieldDef, ctx: FieldCtx): string | null {
   const v = ctx.data[f.key]
   const g = ctx.geo
   if (f.type === 'info') return f.info ? f.info(ctx.data, { no: ctx.no }) : null
+  if (f.type === 'umur') return umurText(ctx.data)
   if (!isFilled(v) && f.type !== 'agegrid') return null
   switch (f.type) {
     case 'province': return g.provinces?.find((o) => o.value === String(v))?.label || `ID ${v}`
@@ -567,6 +598,10 @@ function display(f: FieldDef, ctx: FieldCtx): string | null {
       return (Array.isArray(v) ? v : [v]).map((x) => opts.find((o) => o.value === String(x))?.label || String(x)).join(', ')
     }
     case 'date': return `${v}${f.epi ? ` · ${epiLabel(v)}` : ''}`
+    case 'decimal': {
+      const extra = f.key === 'imt' && Number(String(v).replace(',', '.')) > 0 ? ` · ${imtKategori(Number(String(v).replace(',', '.')))}` : ''
+      return `${v}${f.unit ? ` ${f.unit}` : ''}${extra}`
+    }
     case 'richtext': return stripHtml(String(v))
     case 'check': case 'domsama': return v ? 'Ya' : null
     case 'epiweek': { const w = weeksOf(Number(ctx.data.tahun))[Number(v) - 1]; return `Minggu ${v}${w ? ` · ${w.label}` : ''}` }
@@ -622,7 +657,8 @@ function Review({ def, data, ctx, stats, errors, warnings, goto, focusIssue, ext
             <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
               {fields.map((f) => {
                 const val = display(f, ctx)
-                const missing = !val && stats[i].errs.some((e) => e.key.split('.')[0] === f.key)
+                const own = f.type === 'umur' ? [f.key, ...UMUR_PARTS.map((p) => p.key)] : [f.key]
+                const missing = !val && stats[i].errs.some((e) => own.includes(e.key.split('.')[0]))
                 if (!val && !missing) return null
                 return (
                   <div key={f.key} className={f.type === 'richtext' || f.type === 'textarea' || f.type === 'agegrid' ? 'sm:col-span-2' : ''}>
@@ -639,8 +675,8 @@ function Review({ def, data, ctx, stats, errors, warnings, goto, focusIssue, ext
                 <div className="mt-3 overflow-x-auto">
                   {filled.length ? (
                     <table className="w-full text-xs">
-                      <thead className="text-slate-400"><tr><th className="py-1 text-left font-semibold">Penyakit</th>{IBS_COLS.map((c) => <th key={c.key} className="w-20 text-center font-semibold">{c.label}</th>)}</tr></thead>
-                      <tbody>{filled.map((x) => <tr key={x.kode} className="border-t border-slate-100"><td className="py-1">{x.nama}</td>{IBS_COLS.map((c) => <td key={c.key} className="text-center tabular-nums">{r[x.kode]?.[c.key] ?? 0}</td>)}</tr>)}</tbody>
+                      <thead className="text-slate-400"><tr><th className="py-1 text-left font-semibold">Penyakit</th>{IBS_COLS.map((c) => <th key={c.key} className="w-20 text-center font-semibold">{c.short}</th>)}</tr></thead>
+                      <tbody>{filled.map((x) => <tr key={x.kode} className="border-t border-slate-100"><td className="py-1"><span className="mr-1.5 font-mono text-[10px] font-bold text-primary">{x.kode_sms}</span>{x.nama}</td>{IBS_COLS.map((c) => <td key={c.key} className="text-center tabular-nums">{r[x.kode]?.[c.key] ?? 0}</td>)}</tr>)}</tbody>
                       <tfoot><tr className="border-t border-slate-200 font-semibold"><td className="py-1">Total</td>{IBS_COLS.map((c) => <td key={c.key} className="text-center tabular-nums">{t[c.key]}</td>)}</tr></tfoot>
                     </table>
                   ) : <p className="flex items-center gap-1 text-xs text-slate-500"><Info className="h-3.5 w-3.5" /> Semua penyakit 0 kasus (laporan nihil).</p>}

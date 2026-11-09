@@ -4,11 +4,13 @@ import { getEpiWeekDateRange, getMmwrEpiWeek, getWeeksInYear } from '@/lib/epi-w
 
 export type Data = Record<string, any>
 export interface Issue { step: string; key: string; msg: string }
-export type Jenis = 'ebs' | 'ibs'
+export type Jenis = 'ebs' | 'ibs' | 'individu'
 
 export type FieldType =
   | 'info' | 'text' | 'tel' | 'textarea' | 'richtext' | 'number' | 'date' | 'select' | 'multiselect' | 'yatidak'
   | 'province' | 'kabkota' | 'kecamatan' | 'unit' | 'agegrid' | 'ibsgrid' | 'lampiran' | 'epiweek' | 'tahun' | 'check' | 'domsama'
+  // PR 031: decimal measurement ("36,5"), age in tahun/bulan/hari (three inputs, empty = not filled)
+  | 'decimal' | 'umur'
 
 export interface FieldDef {
   key: string
@@ -16,7 +18,7 @@ export interface FieldDef {
   type: FieldType
   required?: boolean | ((d: Data) => boolean)
   visible?: (d: Data) => boolean
-  /** laporan_opsi kelompok, or 'penyakit' */
+  /** laporan_opsi kelompok, 'penyakit' (EBS diagnosa) or 'ibs_penyakit' (24 IBS diseases, without Total Kunjungan) */
   options?: string
   hint?: string
   placeholder?: string
@@ -36,11 +38,17 @@ export interface FieldDef {
   child?: boolean
   wide?: boolean
   maxLen?: number
+  /** unit suffix shown next to decimal inputs (cm, kg, °C…) */
+  unit?: string
+  /** custom "filled" test for progress (e.g. umur = any of three parts) */
+  filled?: (d: Data) => boolean
+  /** read-only while the function returns a reason (e.g. IMT auto-calculated) */
+  locked?: (d: Data) => string | null
   /** info chip renderer */
   info?: (d: Data, ctx: { no: string | null }) => string
 }
 
-export interface SectionDef { id: string; title: string; desc?: string; fields: FieldDef[]; visible?: (d: Data) => boolean }
+export interface SectionDef { id: string; title: string; desc?: string; fields: FieldDef[]; visible?: (d: Data) => boolean; tone?: 'accent' }
 export interface StepDef { id: string; title: string; desc?: string; sections: SectionDef[]; review?: boolean }
 
 export interface Refs {
@@ -57,6 +65,17 @@ export interface FormDef {
   short: string
   eyebrow: string
   listHref: string
+  /** list page title / "new" button / search placeholder */
+  listTitle: string
+  addLabel: string
+  searchPlaceholder: string
+  /** keys copied from the user's last report of this jenis when starting a new one; nameKey = default from the account */
+  prefillKeys: string[]
+  nameKey: string
+  /** new report starts at the current reporting epi week (tahun + minggu) */
+  defaultWeek?: boolean
+  /** derived values recomputed after every change (e.g. IMT from tinggi + berat) */
+  derive?: (d: Data) => Data
   steps: StepDef[]
   validate: (d: Data, refs: Refs) => { errors: Issue[]; warnings: Issue[] }
 }
@@ -148,7 +167,7 @@ export function stepStats(def: FormDef, d: Data, errors: Issue[]) {
     visibleFields(st, d).forEach((f) => {
       if (!isReq(f, d) || ['info', 'lampiran', 'agegrid', 'ibsgrid'].includes(f.type)) return
       total++
-      if (isFilled(d[f.key]) && !errKeys.has(f.key)) done++
+      if ((f.filled ? f.filled(d) : isFilled(d[f.key])) && !errKeys.has(f.key)) done++
     })
     const errs = errors.filter((e) => e.step === st.id)
     return { total, done, errs, pct: st.review ? (errors.length ? 0 : 1) : total ? done / total : errs.length ? 0 : 1 }

@@ -26,6 +26,11 @@ export const EBS_FORM: FormDef = {
   short: 'EBS',
   eyebrow: 'SKDR-EBS · Laporan',
   listHref: '/ebs/laporan',
+  listTitle: 'Laporan EBS',
+  addLabel: 'Laporan EBS Baru',
+  searchPlaceholder: 'Cari nomor, penyakit, unit…',
+  prefillKeys: ['jenis_unit', 'provinsi_id', 'kabkota_id', 'kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode', 'nama_pelapor', 'hp_pelapor'],
+  nameKey: 'nama_pelapor',
   steps: [
     { id: 's1', title: 'Pelapor & Wilayah', desc: 'Umumnya terisi otomatis dari akun atau laporan terakhir Anda.', sections: [
       { id: 's1-id', title: 'Identitas laporan', fields: [
@@ -117,8 +122,14 @@ export const EBS_FORM: FormDef = {
         { key: 'koordinasi_tgl', label: 'Tanggal Koordinasi Rapat LS/LP', type: 'date', child: true, visible: (d) => ya(d, 'koordinasi'), required: true },
       ] },
     ] },
-    { id: 's6', title: 'Lampiran', desc: 'Opsional. Unggah tidak memicu validasi langkah lain.', sections: [
+    { id: 's6', title: 'Lampiran & Respon SIZE', desc: 'Lampiran opsional. Unggah tidak memicu validasi langkah lain.', sections: [
       { id: 's6-file', title: 'Lampiran', fields: [{ key: 'lampiran', label: 'File lampiran', type: 'lampiran', wide: true }] },
+      // PR 031: padanan tab "Respon SIZE" form resmi — hanya baca; integrasi SIZE belum ada sehingga selalu kosong.
+      { id: 's6-size', title: 'Respon SIZE', desc: 'Hanya baca — diisi oleh SIZE setelah laporan ditindaklanjuti. Integrasi SIZE belum tersedia di SKDR Indonesia.', fields: [
+        { key: 'size_ref', label: 'ID Referensi SIZE', type: 'info', info: (d) => d.size_ref || 'Belum ada respon dari SIZE' },
+        { key: 'size_oleh', label: 'Diupdate oleh SIZE', type: 'info', info: (d) => d.size_oleh || '—' },
+        { key: 'size_tgl', label: 'Tanggal Update SIZE', type: 'info', info: (d) => d.size_tgl || '—' },
+      ] },
     ] },
     { id: 's7', title: 'Tinjau & Kirim', review: true, sections: [] },
   ],
