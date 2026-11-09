@@ -316,6 +316,8 @@ pub fn classify(method: &Method, path: &str) -> Need {
             || under(path, "/api/v1/pe/clusters")
             || under(path, "/api/v1/pe/ebs-search")
             || under(path, "/api/v1/case-reports")
+            || under(path, "/api/v1/laporan")
+            || under(path, "/api/v1/laporan-ref")
         {
             return Need::Perm("tatakelola");
         }
@@ -328,7 +330,8 @@ pub fn classify(method: &Method, path: &str) -> Need {
     if under(path, "/api/v1/admin/ebs") || under(path, "/api/v1/integrasi") {
         return Need::Perm("integrasi");
     }
-    if under(path, "/api/v1/pe") || under(path, "/api/v1/case-reports") {
+    // PR 030: Laporan EBS/IBS drafts, kirim, lampiran
+    if under(path, "/api/v1/pe") || under(path, "/api/v1/case-reports") || under(path, "/api/v1/laporan") {
         return Need::Perm("pe_input");
     }
     Need::Perm("tatakelola")
@@ -962,6 +965,13 @@ mod tests {
         assert_eq!(classify(&g, "/api/v1/users"), Need::Perm("user_management"));
         assert_eq!(classify(&p, "/api/v1/roles"), Need::Perm("user_management"));
         assert_eq!(classify(&p, "/api/v1/anything-else"), Need::Perm("tatakelola"));
+        // PR 030
+        assert_eq!(classify(&g, "/api/v1/laporan/ebs"), Need::Perm("tatakelola"));
+        assert_eq!(classify(&g, "/api/v1/laporan-ref/opsi"), Need::Perm("tatakelola"));
+        assert_eq!(classify(&p, "/api/v1/laporan/ibs"), Need::Perm("pe_input"));
+        assert_eq!(classify(&Method::PUT, "/api/v1/laporan/ebs/1"), Need::Perm("pe_input"));
+        assert_eq!(classify(&p, "/api/v1/laporan/ebs/1/lampiran"), Need::Perm("pe_input"));
+        assert_eq!(classify(&Method::DELETE, "/api/v1/laporan/ebs/1"), Need::Perm("pe_input"));
     }
 
     #[test]

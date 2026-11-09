@@ -14,6 +14,7 @@ mod master;
 mod master_admin;
 mod pe;
 mod pe_engine;
+mod laporan;
 mod external_sync;
 mod alert;
 mod kategori;
@@ -122,6 +123,17 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/pe/clusters", get(pe::clusters).post(pe::cluster_create))
         .route("/api/v1/pe/clusters/:id", put(pe::cluster_update))
         .route("/api/v1/pe/ebs-search", get(pe::ebs_search))
+        // PR 030: Laporan EBS / IBS (wizard input, draf, kirim, lampiran)
+        .route("/api/v1/laporan-ref/opsi", get(laporan::opsi))
+        .route("/api/v1/laporan-ref/kecamatan", get(laporan::kecamatan))
+        .route("/api/v1/laporan-ref/unit", get(laporan::unit))
+        .route("/api/v1/laporan-ref/prefill", get(laporan::prefill))
+        .route("/api/v1/laporan-ref/duplikat/:jenis", get(laporan::duplikat))
+        .route("/api/v1/laporan/:jenis", get(laporan::list).post(laporan::create))
+        .route("/api/v1/laporan/:jenis/:id", get(laporan::get_one).put(laporan::update).delete(laporan::remove))
+        .route("/api/v1/laporan/:jenis/:id/kirim", post(laporan::kirim))
+        .route("/api/v1/laporan/:jenis/:id/lampiran", post(laporan::lampiran_upload).layer(axum::extract::DefaultBodyLimit::max(laporan::MAX_LAMPIRAN + 64 * 1024)))
+        .route("/api/v1/laporan/:jenis/:id/lampiran/:lid", get(laporan::lampiran_get).delete(laporan::lampiran_delete))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
         // main dashboard (NLP shapes, form data only)
