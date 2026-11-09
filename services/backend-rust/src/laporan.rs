@@ -5,6 +5,8 @@
 //! * Pilihan form: laporan_opsi + ebs_diagnosa_alias (penyakit EBS resmi) + ibs_penyakit; wilayah dari master_*,
 //!   kecamatan & unit dari master_fasyankes (fallback: nilai tersinkron di ebs_reports).
 //! Akses (auth::classify): baca = `tatakelola`, tulis = `pe_input`.
+//! PR 031: jenis ketiga `individu` = Form Individu IBS (per pasien, tabel laporan_ibs_individu, nomor IND-YYYY-######);
+//! tanpa lampiran, tanpa batas satu-per-minggu (duplikat hanya peringatan: unit + nama pasien + tanggal periksa).
 use axum::{
     body::{Body, Bytes},
     extract::{Path, Query, State},
@@ -43,6 +45,7 @@ fn me(u: &Me) -> Result<AuthUser, ApiError> {
 pub enum Jenis {
     Ebs,
     Ibs,
+    Individu,
 }
 
 impl Jenis {
@@ -50,17 +53,18 @@ impl Jenis {
         match s {
             "ebs" => Ok(Jenis::Ebs),
             "ibs" => Ok(Jenis::Ibs),
+            "individu" => Ok(Jenis::Individu),
             _ => Err(err(StatusCode::NOT_FOUND, "Jenis laporan tidak dikenal")),
         }
     }
     fn table(self) -> &'static str {
-        match self { Jenis::Ebs => "laporan_ebs", Jenis::Ibs => "laporan_ibs" }
+        match self { Jenis::Ebs => "laporan_ebs", Jenis::Ibs => "laporan_ibs", Jenis::Individu => "laporan_ibs_individu" }
     }
     fn key(self) -> &'static str {
-        match self { Jenis::Ebs => "ebs", Jenis::Ibs => "ibs" }
+        match self { Jenis::Ebs => "ebs", Jenis::Ibs => "ibs", Jenis::Individu => "individu" }
     }
     fn prefix(self) -> &'static str {
-        match self { Jenis::Ebs => "EBS", Jenis::Ibs => "IBS" }
+        match self { Jenis::Ebs => "EBS", Jenis::Ibs => "IBS", Jenis::Individu => "IND" }
     }
 }
 
@@ -87,6 +91,13 @@ fn n(d: &Obj, k: &str) -> Option<f64> {
 }
 fn int(d: &Obj, k: &str) -> Option<i32> {
     n(d, k).map(|f| f as i32)
+}
+/// decimal measurement typed with comma or dot ("36,5" / "36.5")
+fn dec(d: &Obj, k: &str) -> Option<f64> {
+    match d.get(k) {
+        Some(Value::String(x)) if !x.trim().is_empty() => x.trim().replace(',', ".").parse().ok(),
+        v => num(v),
+    }
 }
 fn date(d: &Obj, k: &str) -> Option<NaiveDate> {
     d.get(k).and_then(|v| v.as_str()).and_then(|x| NaiveDate::parse_from_str(x.trim(), "%Y-%m-%d").ok())
@@ -312,18 +323,7 @@ fn validate_ibs(d: &Obj, today: NaiveDate, rows: &[String]) -> Issues {
     i.req(d, "s1", "kabkota_id", "Kab/Kota");
     i.req(d, "s1", "unit_pelapor", "Puskesmas/Unit");
     i.req(d, "s1", "petugas", "Petugas");
-    let th = int(d, "tahun");
-    let mg = int(d, "minggu");
-    i.req(d, "s2", "tahun", "Tahun");
-    if i.req(d, "s2", "minggu", "Minggu Epid") {
-        if let (Some(t), Some(m)) = (th, mg) {
-            if m < 1 || m > weeks_in_year(t) {
-                i.e("s2", "minggu", "Minggu Epid tidak valid untuk tahun ini");
-            } else if mmwr_week_one(t) + Duration::days(((m - 1) * 7) as i64) > today {
-                i.e("s2", "minggu", "Minggu Epid belum dimulai");
-            }
-        }
-    }
+    periode(&mut i, d, "s2", today);
     let mut tk = 0.0;
     let empty = Map::new();
     let data = d.get("rows").and_then(|v| v.as_object()).unwrap_or(&empty);
@@ -365,6 +365,158 @@ fn validate_ibs(d: &Obj, today: NaiveDate, rows: &[String]) -> Issues {
     i
 }
 
+/// Shared by IBS agregat & Individu: Tahun + Minggu Epid (valid for the year, already started).
+fn periode(i: &mut Issues, d: &Obj, step: &str, today: NaiveDate) {
+    let th = int(d, "tahun");
+    let mg = int(d, "minggu");
+    i.req(d, step, "tahun", "Tahun");
+    if i.req(d, step, "minggu", "Minggu Epid") {
+        if let (Some(t), Some(m)) = (th, mg) {
+            if m < 1 || m > weeks_in_year(t) {
+                i.e(step, "minggu", "Minggu Epid tidak valid untuk tahun ini");
+            } else if mmwr_week_one(t) + Duration::days(((m - 1) * 7) as i64) > today {
+                i.e(step, "minggu", "Minggu Epid belum dimulai");
+            }
+        }
+    }
+}
+
+fn max_len(i: &mut Issues, d: &Obj, step: &str, key: &str, label: &str, max: usize) {
+    if let Some(Value::String(v)) = d.get(key) {
+        if v.chars().count() > max {
+            i.e(step, key, &format!("{label} maksimal {max} karakter"));
+        }
+    }
+}
+
+/// Age parts (tahun 0–150, bulan 0–11, hari 0–30). Empty = not filled (official form defaulted to 0).
+pub const UMUR_PARTS: [(&str, &str, f64); 3] = [("umur_tahun", "Umur (tahun)", 150.0), ("umur_bulan", "Umur (bulan)", 11.0), ("umur_hari", "Umur (hari)", 30.0)];
+
+pub fn umur_text(d: &Obj) -> Option<String> {
+    let parts: Vec<String> = UMUR_PARTS
+        .iter()
+        .zip(["th", "bl", "hr"])
+        .filter_map(|((k, _, _), u)| n(d, k).filter(|x| *x > 0.0).map(|x| format!("{} {u}", x as i64)))
+        .collect();
+    if !parts.is_empty() {
+        return Some(parts.join(" "));
+    }
+    // all filled parts are 0 → "0 hr" style is meaningless; keep None
+    None
+}
+
+/// Measurement fields on step s4: (key, label, warn_min, warn_max).
+pub const PERIKSA: [(&str, &str, f64, f64); 6] = [
+    ("tinggi", "Tinggi badan (cm)", 30.0, 250.0),
+    ("berat", "Berat badan (kg)", 0.5, 300.0),
+    ("imt", "IMT", 5.0, 80.0),
+    ("sistole", "Sistole (mmHg)", 50.0, 250.0),
+    ("diastole", "Diastole (mmHg)", 30.0, 150.0),
+    ("suhu", "Suhu (°C)", 30.0, 45.0),
+];
+
+/// Individu (5 langkah: s1 Unit & Periode, s2 Info Pasien, s3 Penyakit, s4 Pemeriksaan, s5 Tinjau & Kirim).
+fn validate_individu(d: &Obj, today: NaiveDate, rows: &[String]) -> Issues {
+    let mut i = Issues::new();
+    // s1
+    i.req(d, "s1", "jenis_unit", "Jenis Unit");
+    i.req(d, "s1", "provinsi_id", "Provinsi");
+    i.req(d, "s1", "kabkota_id", "Kab/Kota");
+    i.req(d, "s1", "unit_pelapor", "Puskesmas/Unit");
+    i.req(d, "s1", "petugas", "Nama Petugas");
+    if let Some(hp) = s(d, "hp_petugas") {
+        if !valid_hp(&hp) {
+            i.e("s1", "hp_petugas", "Format No. Telp tidak valid (contoh: 0812xxxxxxx atau +62812xxxxxxx)");
+        }
+    }
+    periode(&mut i, d, "s1", today);
+    // s2
+    i.req(d, "s2", "nama_pasien", "Nama Pasien");
+    i.req(d, "s2", "kelamin", "Jenis Kelamin");
+    let mut any = false;
+    let mut nonzero = false;
+    for (k, l, max) in UMUR_PARTS {
+        if let Some(v) = d.get(k) {
+            if v.is_null() || v.as_str().map(|t| t.trim().is_empty()).unwrap_or(false) {
+                continue;
+            }
+            match num(Some(v)) {
+                Some(x) if x >= 0.0 && x.fract() == 0.0 && x <= max => {
+                    any = true;
+                    nonzero |= x > 0.0;
+                }
+                _ => i.e("s2", k, &format!("{l} harus bilangan bulat 0–{}", max as i64)),
+            }
+        }
+    }
+    if !any {
+        i.e("s2", "umur_tahun", "Umur wajib diisi (tahun, bulan, atau hari)");
+    } else if !nonzero {
+        i.e("s2", "umur_tahun", "Umur tidak boleh 0 semua — isi bulan/hari untuk bayi");
+    }
+    max_len(&mut i, d, "s2", "alamat", "Alamat", 500);
+    // s3
+    if i.req(d, "s3", "penyakit", "Penyakit Agregat") {
+        if !rows.is_empty() && !rows.iter().any(|r| Some(r.as_str()) == s(d, "penyakit").as_deref()) {
+            i.e("s3", "penyakit", "Penyakit Agregat tidak ada di daftar penyakit IBS");
+        }
+    }
+    if i.req(d, "s3", "tgl_periksa", "Tanggal Pemeriksaan") {
+        if let Some(t) = date(d, "tgl_periksa") {
+            if t > today {
+                i.e("s3", "tgl_periksa", "Tanggal Pemeriksaan tidak boleh di masa depan");
+            } else if let (Some(th), Some(m)) = (int(d, "tahun"), int(d, "minggu")) {
+                if m >= 1 && m <= weeks_in_year(th) {
+                    let a = mmwr_week_one(th) + Duration::days(((m - 1) * 7) as i64);
+                    if t < a || t > a + Duration::days(6) {
+                        i.w("s3", "tgl_periksa", "Tanggal Pemeriksaan di luar Minggu Epid yang dipilih");
+                    }
+                }
+            }
+        }
+    }
+    if s(d, "status_akhir").as_deref() == Some("Meninggal") && i.req(d, "s3", "tgl_meninggal", "Tanggal Meninggal") {
+        if let Some(m) = date(d, "tgl_meninggal") {
+            if m > today {
+                i.e("s3", "tgl_meninggal", "Tanggal Meninggal tidak boleh di masa depan");
+            }
+            if let Some(p) = date(d, "tgl_periksa") {
+                if m < p {
+                    i.w("s3", "tgl_meninggal", "Tanggal Meninggal lebih awal dari Tanggal Pemeriksaan");
+                }
+            }
+        }
+    }
+    for (k, l, m) in [("keluhan", "Keluhan Utama", 500), ("lama_sakit", "Lama Sakit", 100), ("icdx", "ICD-X", 20), ("diagnosa", "Diagnosa", 500)] {
+        max_len(&mut i, d, "s3", k, l, m);
+    }
+    // s4
+    for (k, l, lo, hi) in PERIKSA {
+        if let Some(v) = d.get(k) {
+            if v.is_null() || v.as_str().map(|t| t.trim().is_empty()).unwrap_or(false) {
+                continue;
+            }
+            match dec(d, k) {
+                Some(x) if x > 0.0 => {
+                    if x < lo || x > hi {
+                        i.w("s4", k, &format!("{l} {x} di luar rentang wajar ({lo}–{hi}) — periksa kembali"));
+                    }
+                }
+                _ => i.e("s4", k, &format!("{l} harus angka lebih dari 0")),
+            }
+        }
+    }
+    if let (Some(sy), Some(di)) = (dec(d, "sistole"), dec(d, "diastole")) {
+        if di >= sy {
+            i.w("s4", "diastole", "Diastole sama atau lebih tinggi dari Sistole — periksa kembali");
+        }
+    }
+    for (k, l) in [("soap_s", "SOAP Subjective"), ("soap_o", "SOAP Objective"), ("soap_a", "SOAP Assessment"), ("soap_p", "SOAP Planning")] {
+        max_len(&mut i, d, "s4", k, l, 500);
+    }
+    i
+}
+
 fn ibs_totals(d: &Obj, rows: &[String]) -> (i32, i32) {
     let empty = Map::new();
     let data = d.get("rows").and_then(|v| v.as_object()).unwrap_or(&empty);
@@ -402,6 +554,7 @@ async fn evaluate(c: &deadpool_postgres::Object, j: Jenis, d: &Obj) -> Result<Is
     let mut iss = match j {
         Jenis::Ebs => validate_ebs(d, t),
         Jenis::Ibs => validate_ibs(d, t, &ibs_rows(c).await?),
+        Jenis::Individu => validate_individu(d, t, &ibs_rows(c).await?),
     };
     db_checks(c, d, &mut iss).await?;
     Ok(iss)
@@ -452,6 +605,19 @@ async fn persist(c: &deadpool_postgres::Object, j: Jenis, id: i64, d: &Obj, iss:
                  WHERE id = $1",
                 &[&id, &data, &errors, &warnings, &int(d, "tahun"), &int(d, "minggu").filter(|m| (1..=53).contains(m)), &unit_key(d), &s(d, "unit_pelapor"),
                   &int(d, "provinsi_id"), &int(d, "kabkota_id"), &tk, &tm, &int(d, "total_kunjungan")],
+            )
+            .await
+            .map_err(internal)?;
+        }
+        Jenis::Individu => {
+            c.execute(
+                "UPDATE laporan_ibs_individu SET data = $2, errors = $3, warnings = $4, tahun = $5, minggu = $6, unit_key = $7, unit_nama = $8,
+                    province_id = $9, kabkota_id = $10, nama_pasien = $11, kelamin = $12, umur = $13, penyakit = $14, tgl_periksa = $15,
+                    keluhan = $16, diagnosa = $17, status_akhir = $18, updated_at = now()
+                 WHERE id = $1",
+                &[&id, &data, &errors, &warnings, &int(d, "tahun"), &int(d, "minggu").filter(|m| (1..=53).contains(m)), &unit_key(d), &s(d, "unit_pelapor"),
+                  &int(d, "provinsi_id"), &int(d, "kabkota_id"), &s(d, "nama_pasien"), &s(d, "kelamin"), &umur_text(d), &s(d, "penyakit"),
+                  &date(d, "tgl_periksa"), &s(d, "keluhan"), &s(d, "diagnosa"), &s(d, "status_akhir")],
             )
             .await
             .map_err(internal)?;
@@ -649,7 +815,7 @@ pub async fn prefill(State(st): State<AppState>, u: Me, Query(q): Query<PrefillQ
     if let Some(r) = last {
         let d: Value = r.get(0);
         from = Some(r.get(1));
-        for k in ["jenis_unit", "kelompok", "provinsi_id", "kabkota_id", "kecamatan", "kecamatan_nama", "unit_pelapor", "unit_kode", "nama_pelapor", "hp_pelapor", "petugas"] {
+        for k in ["jenis_unit", "kelompok", "provinsi_id", "kabkota_id", "kecamatan", "kecamatan_nama", "unit_pelapor", "unit_kode", "nama_pelapor", "hp_pelapor", "petugas", "hp_petugas"] {
             if let Some(v) = d.get(k).filter(|v| !v.is_null()) {
                 keep.insert(k.into(), v.clone());
             }
@@ -665,11 +831,15 @@ pub struct DupQuery {
     tgl: Option<String>,
     unit_key: Option<String>,
     tahun: Option<i32>,
+    minggu: Option<i32>,
+    nama: Option<String>,
     exclude: Option<i64>,
 }
 
 /// EBS: same Penyakit Rumor + kab/kota (domisili, else pelapor) within ±7 days (local drafts/reports + synced EBS Kemkes).
 /// IBS: all reports of the unit in the year (frontend marks reported weeks; same week = duplicate).
+/// Individu: `sama` = same unit + nama pasien + tanggal periksa (soft warning); `periode` = number of individu records for
+/// unit + tahun + minggu (info line on the IBS agregat Data Kasus step — no auto-fill, sync rules unknown).
 pub async fn duplikat(State(st): State<AppState>, Path(jenis): Path<String>, Query(q): Query<DupQuery>) -> Result<Json<Value>, ApiError> {
     let j = Jenis::parse(&jenis)?;
     let c = st.pool.get().await.map_err(internal)?;
@@ -719,6 +889,31 @@ pub async fn duplikat(State(st): State<AppState>, Path(jenis): Path<String>, Que
                 .map_err(internal)?;
             Ok(Json(json!({ "success": true, "data": rows.iter().map(|r| json!({ "id": r.get::<_, i64>(0), "no": r.get::<_, String>(1), "status": r.get::<_, String>(2), "minggu": r.get::<_, i32>(3) })).collect::<Vec<_>>() })))
         }
+        Jenis::Individu => {
+            let uk = q.unit_key.clone().filter(|x| !x.trim().is_empty());
+            let mut sama: Vec<Value> = vec![];
+            let tgl = q.tgl.as_deref().and_then(|x| NaiveDate::parse_from_str(x, "%Y-%m-%d").ok());
+            if let (Some(uk), Some(nm), Some(t)) = (uk.clone(), q.nama.clone().map(|x| x.trim().to_string()).filter(|x| !x.is_empty()), tgl) {
+                let rows = c
+                    .query(
+                        "SELECT id, no_laporan, status, tgl_periksa::text FROM laporan_ibs_individu
+                         WHERE deleted_at IS NULL AND id <> $1 AND unit_key = $2 AND lower(trim(nama_pasien)) = lower($3) AND tgl_periksa = $4 ORDER BY id DESC LIMIT 10",
+                        &[&ex, &uk, &nm, &t],
+                    )
+                    .await
+                    .map_err(internal)?;
+                sama = rows.iter().map(|r| json!({ "id": r.get::<_, i64>(0), "no": r.get::<_, String>(1), "status": r.get::<_, String>(2), "tgl": r.get::<_, Option<String>>(3) })).collect();
+            }
+            let mut periode = 0i64;
+            if let (Some(uk), Some(th), Some(mg)) = (uk, q.tahun, q.minggu) {
+                periode = c
+                    .query_one("SELECT count(*) FROM laporan_ibs_individu WHERE deleted_at IS NULL AND unit_key = $1 AND tahun = $2 AND minggu = $3", &[&uk, &th, &mg])
+                    .await
+                    .map_err(internal)?
+                    .get(0);
+            }
+            Ok(Json(json!({ "success": true, "data": { "sama": sama, "periode": periode } })))
+        }
     }
 }
 
@@ -740,11 +935,25 @@ pub async fn list(State(st): State<AppState>, Path(jenis): Path<String>, Query(q
     let off = (page - 1) * per_page;
     let status = q.status.clone().filter(|x| !x.is_empty() && x != "all");
     let search = q.search.as_ref().map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).map(|x| format!("%{x}%"));
+    // per-jenis list columns as one JSON object (merged into each row)
     let (extra, srch) = match j {
-        Jenis::Ebs => ("l.tgl_laporan::text, l.tgl_rumor::text, l.penyakit_rumor, l.jml_kasus, l.jml_kematian, NULL::int, NULL::int, NULL::int",
-                       "(l.no_laporan ILIKE $2 OR l.penyakit_rumor ILIKE $2 OR l.unit_nama ILIKE $2 OR k.name ILIKE $2)"),
-        Jenis::Ibs => ("NULL::text, NULL::text, NULL::text, l.total_kasus, l.total_kematian, l.tahun, l.minggu, l.total_kunjungan",
-                       "(l.no_laporan ILIKE $2 OR l.unit_nama ILIKE $2 OR k.name ILIKE $2)"),
+        Jenis::Ebs => (
+            "jsonb_build_object('tgl_laporan', l.tgl_laporan::text, 'tgl_rumor', l.tgl_rumor::text, 'penyakit', l.penyakit_rumor, 'kasus', l.jml_kasus,
+               'kematian', l.jml_kematian, 'penyakit_terverifikasi', l.data->>'penyakit_terverifikasi', 'status_kejadian', l.data->>'status_kejadian',
+               'klb', l.data->>'klb', 'klb_status', l.data->>'klb_status', 'jenis_unit', l.data->>'jenis_unit')",
+            "(l.no_laporan ILIKE $2 OR l.penyakit_rumor ILIKE $2 OR l.data->>'penyakit_terverifikasi' ILIKE $2 OR l.unit_nama ILIKE $2 OR k.name ILIKE $2)",
+        ),
+        Jenis::Ibs => (
+            "jsonb_build_object('kasus', l.total_kasus, 'kematian', l.total_kematian, 'tahun', l.tahun, 'minggu', l.minggu, 'kunjungan', l.total_kunjungan,
+               'petugas', l.data->>'petugas')",
+            "(l.no_laporan ILIKE $2 OR l.unit_nama ILIKE $2 OR k.name ILIKE $2 OR l.data->>'petugas' ILIKE $2)",
+        ),
+        Jenis::Individu => (
+            "jsonb_build_object('tahun', l.tahun, 'minggu', l.minggu, 'nama_pasien', l.nama_pasien, 'kelamin', l.kelamin, 'umur', l.umur,
+               'penyakit', l.penyakit, 'penyakit_label', (SELECT p.kode_sms || ' — ' || p.nama FROM ibs_penyakit p WHERE p.kode = l.penyakit),
+               'tgl_periksa', l.tgl_periksa::text, 'status_akhir', l.status_akhir, 'diagnosa', l.diagnosa, 'petugas', l.data->>'petugas')",
+            "(l.no_laporan ILIKE $2 OR l.unit_nama ILIKE $2 OR k.name ILIKE $2 OR l.nama_pasien ILIKE $2 OR l.diagnosa ILIKE $2 OR l.data->>'no_epid' ILIKE $2)",
+        ),
     };
     let rows = c
         .query(
@@ -763,13 +972,17 @@ pub async fn list(State(st): State<AppState>, Path(jenis): Path<String>, Query(q
     let total = rows.first().map(|r| r.get::<_, i64>(8)).unwrap_or(0);
     let data: Vec<Value> = rows
         .iter()
-        .map(|r| json!({
-            "id": r.get::<_, i64>(0), "no_laporan": r.get::<_, String>(1), "status": r.get::<_, String>(2), "unit": r.get::<_, Option<String>>(3),
-            "kabkota": r.get::<_, Option<String>>(4), "error_count": r.get::<_, i32>(5), "created_by_name": r.get::<_, Option<String>>(6),
-            "updated_at": r.get::<_, Option<String>>(7), "tgl_laporan": r.get::<_, Option<String>>(9), "tgl_rumor": r.get::<_, Option<String>>(10),
-            "penyakit": r.get::<_, Option<String>>(11), "kasus": r.get::<_, Option<i32>>(12), "kematian": r.get::<_, Option<i32>>(13),
-            "tahun": r.get::<_, Option<i32>>(14), "minggu": r.get::<_, Option<i32>>(15), "kunjungan": r.get::<_, Option<i32>>(16),
-        }))
+        .map(|r| {
+            let mut o = json!({
+                "id": r.get::<_, i64>(0), "no_laporan": r.get::<_, String>(1), "status": r.get::<_, String>(2), "unit": r.get::<_, Option<String>>(3),
+                "kabkota": r.get::<_, Option<String>>(4), "error_count": r.get::<_, i32>(5), "created_by_name": r.get::<_, Option<String>>(6),
+                "updated_at": r.get::<_, Option<String>>(7),
+            });
+            if let (Some(m), Value::Object(x)) = (o.as_object_mut(), r.get::<_, Value>(9)) {
+                m.extend(x);
+            }
+            o
+        })
         .collect();
     let counts = c
         .query(&format!("SELECT status, count(*) FROM {} WHERE deleted_at IS NULL GROUP BY 1", j.table()), &[])
@@ -798,6 +1011,7 @@ pub async fn create(State(st): State<AppState>, u: Me, Path(jenis): Path<String>
     match j {
         Jenis::Ebs => { d.insert("tgl_laporan".into(), json!(t)); }
         Jenis::Ibs => { d.insert("tgl_entri".into(), json!(t)); d.entry("tgl_formulir").or_insert(json!(t)); }
+        Jenis::Individu => { d.insert("tgl_entri".into(), json!(t)); }
     }
     let no = next_no(&c, j).await?;
     let r = c
@@ -822,7 +1036,7 @@ async fn status_of(c: &deadpool_postgres::Object, j: Jenis, id: i64) -> Result<(
 
 /// Keep server-assigned keys from the stored record (client cannot change them).
 fn keep_server_keys(j: Jenis, stored: &Value, d: &mut Obj) {
-    let keys: &[&str] = match j { Jenis::Ebs => &["tgl_laporan"], Jenis::Ibs => &["tgl_entri"] };
+    let keys: &[&str] = match j { Jenis::Ebs => &["tgl_laporan"], Jenis::Ibs | Jenis::Individu => &["tgl_entri"] };
     for k in keys {
         if let Some(v) = stored.get(*k) {
             d.insert((*k).into(), v.clone());
@@ -1082,6 +1296,60 @@ mod tests {
         z.insert("konfirmasi_nihil".into(), json!(true));
         assert!(validate_ibs(&z, d("2026-11-09"), &rows).errors.is_empty());
         assert_eq!(ibs_totals(&obj(json!({ "rows": { "01AWD": { "kasus": 2, "kematian": 1 }, "12MAL": { "kasus": "3" } } })), &rows), (5, 1));
+    }
+
+    #[test]
+    fn individu_rules() {
+        let rows = vec!["01AWD".to_string(), "12MAL".to_string()];
+        let base = json!({ "jenis_unit": "Puskesmas", "provinsi_id": 1, "kabkota_id": 2, "unit_pelapor": "PKM A", "petugas": "Budi", "tahun": 2026, "minggu": 44,
+            "nama_pasien": "Siti", "kelamin": "Wanita", "umur_tahun": 34, "penyakit": "01AWD", "tgl_periksa": "2026-11-02" });
+        let i = validate_individu(&obj(base.clone()), d("2026-11-09"), &rows);
+        assert!(i.errors.is_empty(), "{:?}", i.errors);
+        assert!(i.warnings.is_empty(), "{:?}", i.warnings);
+        // empty form: required keys
+        let k = keys(&validate_individu(&obj(json!({})), d("2026-11-09"), &rows).errors);
+        for want in ["jenis_unit", "unit_pelapor", "petugas", "tahun", "minggu", "nama_pasien", "kelamin", "umur_tahun", "penyakit", "tgl_periksa"] {
+            assert!(k.contains(&want.to_string()), "missing {want}");
+        }
+        assert!(!k.contains(&"tgl_meninggal".to_string()));
+        // bad values
+        let mut b = obj(base.clone());
+        b.insert("umur_tahun".into(), json!(0));
+        b.insert("umur_bulan".into(), json!(12));
+        b.insert("penyakit".into(), json!("TOTA"));
+        b.insert("tgl_periksa".into(), json!("2026-11-10"));
+        b.insert("status_akhir".into(), json!("Meninggal"));
+        b.insert("hp_petugas".into(), json!("123"));
+        b.insert("suhu".into(), json!("abc"));
+        b.insert("alamat".into(), json!("x".repeat(501)));
+        let k = keys(&validate_individu(&b, d("2026-11-09"), &rows).errors);
+        for want in ["umur_bulan", "penyakit", "tgl_periksa", "tgl_meninggal", "hp_petugas", "suhu", "alamat"] {
+            assert!(k.contains(&want.to_string()), "missing {want}: {k:?}");
+        }
+        // age: 0 tahun alone is not enough, 0 tahun + 3 bulan is fine
+        let mut z = obj(base.clone());
+        z.insert("umur_tahun".into(), json!(0));
+        assert!(keys(&validate_individu(&z, d("2026-11-09"), &rows).errors).contains(&"umur_tahun".to_string()));
+        z.insert("umur_bulan".into(), json!(3));
+        assert!(validate_individu(&z, d("2026-11-09"), &rows).errors.is_empty());
+        assert_eq!(umur_text(&z), Some("3 bl".into()));
+        assert_eq!(umur_text(&obj(json!({ "umur_tahun": 2, "umur_hari": "5" }))), Some("2 th 5 hr".into()));
+        // warnings: date outside the week, out-of-range measurements (decimal comma accepted)
+        let mut w = obj(base);
+        w.insert("tgl_periksa".into(), json!("2026-10-20"));
+        w.insert("suhu".into(), json!("46,5"));
+        w.insert("tinggi".into(), json!("165"));
+        w.insert("sistole".into(), json!(80));
+        w.insert("diastole".into(), json!(90));
+        let i = validate_individu(&w, d("2026-11-09"), &rows);
+        assert!(i.errors.is_empty(), "{:?}", i.errors);
+        let wk = keys(&i.warnings);
+        for want in ["tgl_periksa", "suhu", "diastole"] {
+            assert!(wk.contains(&want.to_string()), "missing warning {want}: {wk:?}");
+        }
+        assert!(!wk.contains(&"tinggi".to_string()));
+        assert!(matches!(Jenis::parse("individu"), Ok(Jenis::Individu)));
+        assert_eq!(Jenis::Individu.table(), "laporan_ibs_individu");
     }
 
     #[test]
