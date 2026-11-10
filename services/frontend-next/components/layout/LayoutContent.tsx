@@ -6,12 +6,11 @@ import { tr } from '@/lib/i18n/LanguageContext'
 import AppShell from '@/components/layout/AppShell'
 import AuthGuard from '@/components/AuthGuard'
 
-// SKDR: copied from NLP-PENYAKIT LayoutContent. PR 029: /login renders without the app shell; every other page is
-// wrapped in AuthGuard (public pages pass straight through, see lib/access.ts).
+// PR 029/037: / (Landing Page) dan /login tampil penuh tanpa AppShell sidebar; halaman lainnya dilindungi AuthGuard.
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const toaster = <Toaster position="top-right" richColors containerAriaLabel={tr("skdr.notifications")} />
-  if (pathname === '/login') {
+  if (pathname === '/' || pathname === '/login') {
     return (
       <>
         {children}

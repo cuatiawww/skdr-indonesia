@@ -1,8 +1,21 @@
 FROM rust:1-slim-bookworm AS builder
 WORKDIR /app
+# PR 038: disable -g3 DWARF bloat in C dependencies (cuts ring temp assembly in /tmp from ~13MB to <600KB)
+# and cap build parallelism so CI runners do not exhaust RAM or /tmp during full builds.
+ENV CFLAGS="-g0" \
+    CARGO_BUILD_JOBS="2"
+
+# Cache compiled dependencies separately from application sources.
 COPY Cargo.toml Cargo.lock* ./
+RUN mkdir -p src && printf 'fn main() {}\n' > src/main.rs \
+    && cargo build --release --locked \
+    && rm -rf src /usr/local/cargo/registry/cache
+
 COPY src ./src
-RUN cargo build --release
+RUN rm -rf target/release/.fingerprint/backend-rust-* target/release/backend-rust* target/release/deps/backend_rust* \
+    && touch src/main.rs \
+    && cargo build --release --locked \
+    && strip target/release/backend-rust
 
 FROM debian:bookworm-slim
 WORKDIR /app

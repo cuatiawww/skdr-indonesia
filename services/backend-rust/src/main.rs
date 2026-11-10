@@ -24,6 +24,8 @@ mod lab_klaster;
 mod dash_alert;
 mod ebs_dash;
 mod impor_lama;
+mod dasbor_ebs_ibs;
+mod dasbor_mbg;
 
 use axum::{http::StatusCode, routing::{delete, get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -97,6 +99,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/dashboard/sections", get(dash_alert::sections))
         .route("/api/v1/ebs-analitik", get(ebs_dash::analitik))
         .route("/api/v1/ebs-wilayah", get(ebs_dash::wilayah))
+        // PR 035: Dasbor SKDR EBS & IBS (dari transaksi Form Laporan EBS, Entri Data Agregat & Form Individu IBS)
+        .route("/api/v1/dasbor/ebs-ibs/ebs", get(dasbor_ebs_ibs::ebs))
+        .route("/api/v1/dasbor/ebs-ibs/ibs", get(dasbor_ebs_ibs::ibs))
+        // PR 036: Dasbor MBG (dari transaksi Pengawasan Gizi MBG & Keracunan Pangan MBG)
+        .route("/api/v1/dasbor/mbg/pengawasan-gizi", get(dasbor_mbg::pengawasan_gizi))
+        .route("/api/v1/dasbor/mbg/keracunan", get(dasbor_mbg::keracunan))
         .route("/api/v1/integrasi/alert-skdr/status", get(alert::status))
         .route("/api/v1/integrasi/alert-skdr/sync", post(alert::sync_now))
         .route("/api/v1/master/provinces", get(master::provinces))

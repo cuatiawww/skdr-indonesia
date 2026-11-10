@@ -1,10 +1,10 @@
--- PR 035: penamaan menu laporan dirapikan (hanya teks yang terlihat; id, URL, dan data tidak berubah):
+-- PR 035 (dinomori ulang dari 057_label karena bentrok dengan 057_dasbor_ebs_ibs): penamaan menu laporan dirapikan (hanya teks yang terlihat; id, URL, dan data tidak berubah):
 --   mod_laporan_ebs      "Laporan EBS"        (label tetap; deskripsi menu diperbarui)
 --   mod_laporan_ibs      "Entri Data Agregat" → "Laporan Agregat IBS"
 --   mod_laporan_individu "Form Individu"      → "Laporan Individu IBS"
--- UPDATE satu baris app_settings (ringan, idempoten). Rollback: rollback/057_rollback.sql
+-- UPDATE satu baris app_settings (ringan, idempoten). Rollback: rollback/061_rollback.sql
 BEGIN;
-CREATE TABLE IF NOT EXISTS app_settings_bak_057 AS SELECT key, value FROM app_settings WHERE key = 'navigation_menu';
+CREATE TABLE IF NOT EXISTS app_settings_bak_061 AS SELECT key, value FROM app_settings WHERE key = 'navigation_menu';
 UPDATE app_settings SET value = (
   SELECT jsonb_agg(CASE WHEN e.g->>'id' = 'grp_transaksi' THEN jsonb_set(e.g, '{items}', (
       SELECT COALESCE(jsonb_agg(CASE

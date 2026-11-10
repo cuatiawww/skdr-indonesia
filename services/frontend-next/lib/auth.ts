@@ -77,7 +77,7 @@ export function hasModuleAccess(
   const cleanPath = moduleKeyOrPath.split('?')[0];
 
   // Public / launchpad home portal is always accessible to authenticated users
-  if (cleanPath === '/') return true;
+  if (cleanPath === '/' || cleanPath === '/beranda') return true;
 
   // 1. Dynamic active modules check from active navigation configuration
   const activeMenu = navigationMenu || getNavigationCache();

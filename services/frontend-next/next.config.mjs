@@ -30,8 +30,11 @@ const nextConfig = {
     return [{ source: '/:path*', headers: [{ key: 'Content-Security-Policy', value: cspDirectives }] }];
   },
   async redirects() {
+    const bp = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    if (!bp) return [];
     return [
-      // PR 016: '/' is now the Beranda (app/page.tsx) and '/tv' the MODE TV placeholder (app/tv/page.tsx).
+      // PR 037: redirect bare root '/' (e.g. localhost:3200/) to basePath landing page (/skdr)
+      { source: '/', destination: bp, basePath: false, permanent: false },
     ];
   },
   async rewrites() {
