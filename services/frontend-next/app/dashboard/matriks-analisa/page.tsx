@@ -1,9 +1,11 @@
-'use client'
-// PR 029: Dasbor Limited placeholder (menu only for now; real feature postponed). Login required.
-import UnderDevelopment from '@/components/UnderDevelopment'
-import { useTranslation } from '@/lib/i18n/LanguageContext'
+// PR 042: Matriks Analisa (Dasbor Limited) - replaces the PR 029 placeholder. Login required (LIMITED_PREFIXES).
+import { Suspense } from 'react'
+import MatriksAnalisaClient from '@/components/analisa/MatriksAnalisaClient'
 
 export default function MatriksAnalisaPage() {
-  const { t } = useTranslation()
-  return <div data-testid="limited-matriks-analisa"><UnderDevelopment description={t('skdr.access.matriksDesc')} /></div>
+  return (
+    <div data-testid="limited-matriks-analisa">
+      <Suspense fallback={null}><MatriksAnalisaClient /></Suspense>
+    </div>
+  )
 }
