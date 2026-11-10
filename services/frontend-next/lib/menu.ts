@@ -21,6 +21,7 @@ import {
   History,
   Stethoscope,
   ClipboardCheck,
+  Utensils,
   Globe2,
   Tv,
   LayoutDashboard,
@@ -69,6 +70,7 @@ export const MENU_ICON_MAP: Record<string, any> = {
   History,
   Stethoscope,
   ClipboardCheck,
+  Utensils, // PR 034
   Globe2,
   Tv,
   LayoutDashboard,
@@ -198,7 +200,11 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_laporan_ebs', 'Laporan EBS', '/ebs/laporan', 'Radio', 2), // PR 030
     it('mod_laporan_ibs', 'Entri Data Agregat', '/ibs/laporan', 'FileSpreadsheet', 3, { description: 'Entri data agregat mingguan per Puskesmas/unit (SKDR-IBS) — tabel 24 penyakit + Total Kunjungan' }), // PR 030, label PR 031
     it('mod_laporan_individu', 'Form Individu', '/ibs/individu', 'Stethoscope', 4, { description: 'Form Individu IBS — data per pasien (penyakit agregat, pemeriksaan, SOAP)' }), // PR 031
-    it('mod_pengawasan_gizi', 'Pengawasan Gizi MBG', '/pengawasan-gizi', 'ClipboardCheck', 5, { description: 'Kunjungan pengawasan standar gizi MBG ke SPPG — Formulir 1–13 (ketenagaan, SOP, daya terima, rekap)' }), // PR 033
+    // PR 034: satu menu "Program MBG" — Pengawasan Gizi (PR 033) + Keracunan Pangan
+    it('mod_program_mbg', 'Program MBG', '#', 'Utensils', 5, { description: 'Program Makan Bergizi Gratis — pengawasan standar gizi SPPG dan laporan keracunan pangan', subItems: [
+      { id: 'mod_pengawasan_gizi', label: 'Pengawasan Gizi MBG', href: '/pengawasan-gizi', icon: 'ClipboardCheck', order: 1, enabled: true, description: 'Kunjungan pengawasan standar gizi MBG ke SPPG — Formulir 1–13 (ketenagaan, SOP, daya terima, rekap)' },
+      { id: 'mod_keracunan_mbg', label: 'Keracunan Pangan MBG', href: '/keracunan-mbg', icon: 'AlertTriangle', order: 2, enabled: true, description: 'Laporan cepat & penyelidikan kejadian keracunan pangan MBG — kasus harian, lingkungan, laboratorium' },
+    ] }),
   ] },
   { id: 'grp_integrasi', title: 'Integrasi', order: 6, enabled: true, area: 'tatakelola', permission: 'integrasi', items: [
     it('mod_ebs_sync', 'Sinkronisasi EBS', '/ebs', 'Radio', 1),

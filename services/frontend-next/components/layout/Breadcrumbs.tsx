@@ -18,7 +18,7 @@ export default function Breadcrumbs({ match }: { match: Match }) {
   const rest = pathname.slice(base.length).split('/').filter(Boolean)
   // PR 030: also used by Laporan EBS/IBS
   // PR 031: Form Individu → "Tambah Pasien"
-  const addLabel = pathname.startsWith('/pengawasan-gizi') ? 'Tambah Kunjungan' : pathname.startsWith('/pe') ? 'Tambah PE' : pathname.startsWith('/ibs/individu') ? 'Tambah Pasien' : 'Tambah Laporan'
+  const addLabel = pathname.startsWith('/pengawasan-gizi') ? 'Tambah Kunjungan' : pathname.startsWith('/keracunan-mbg') ? 'Lapor Kejadian' : pathname.startsWith('/pe') ? 'Tambah PE' : pathname.startsWith('/ibs/individu') ? 'Tambah Pasien' : 'Tambah Laporan'
   if (rest.length) crumbs.push({ label: rest[rest.length - 1] === 'baru' ? addLabel : 'Detail' })
   const last = crumbs.length - 1
   return (

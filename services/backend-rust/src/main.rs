@@ -16,6 +16,7 @@ mod pe;
 mod pe_engine;
 mod laporan;
 mod pengawasan_gizi;
+mod keracunan_mbg;
 mod external_sync;
 mod alert;
 mod kategori;
@@ -23,7 +24,7 @@ mod lab_klaster;
 mod dash_alert;
 mod ebs_dash;
 
-use axum::{http::StatusCode, routing::{get, patch, post, put}, Json, Router};
+use axum::{http::StatusCode, routing::{delete, get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
 use tower_http::cors::{Any, CorsLayer};
@@ -145,6 +146,19 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/pengawasan-gizi/:id/form/:no/buka", post(pengawasan_gizi::form_buka))
         .route("/api/v1/pengawasan-gizi/:id/lampiran", post(pengawasan_gizi::lampiran_upload).layer(axum::extract::DefaultBodyLimit::max(laporan::MAX_LAMPIRAN + 64 * 1024)))
         .route("/api/v1/pengawasan-gizi/:id/lampiran/:lid", get(pengawasan_gizi::lampiran_get).delete(pengawasan_gizi::lampiran_delete))
+        // PR 034: Keracunan Pangan MBG
+        .route("/api/v1/keracunan-mbg-ref/prefill", get(keracunan_mbg::prefill))
+        .route("/api/v1/keracunan-mbg-ref/sppg", get(keracunan_mbg::sppg))
+        .route("/api/v1/keracunan-mbg", get(keracunan_mbg::list).post(keracunan_mbg::create))
+        .route("/api/v1/keracunan-mbg/export", get(keracunan_mbg::export))
+        .route("/api/v1/keracunan-mbg/:id", get(keracunan_mbg::get_one).put(keracunan_mbg::update).delete(keracunan_mbg::remove))
+        .route("/api/v1/keracunan-mbg/:id/kirim", post(keracunan_mbg::kirim))
+        .route("/api/v1/keracunan-mbg/:id/tutup", post(keracunan_mbg::tutup))
+        .route("/api/v1/keracunan-mbg/:id/buka", post(keracunan_mbg::buka))
+        .route("/api/v1/keracunan-mbg/:id/harian", post(keracunan_mbg::harian))
+        .route("/api/v1/keracunan-mbg/:id/harian/:uid", delete(keracunan_mbg::harian_delete))
+        .route("/api/v1/keracunan-mbg/:id/lampiran", post(keracunan_mbg::lampiran_upload).layer(axum::extract::DefaultBodyLimit::max(laporan::MAX_LAMPIRAN + 64 * 1024)))
+        .route("/api/v1/keracunan-mbg/:id/lampiran/:lid", get(keracunan_mbg::lampiran_get).delete(keracunan_mbg::lampiran_delete))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
         // main dashboard (NLP shapes, form data only)
