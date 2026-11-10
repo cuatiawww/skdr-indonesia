@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/ui/Skeleton'
 import { tableHeadCls, thCls } from '@/components/master/MasterUi'
 import { useEffect, useState } from 'react'
 import { fetchFrom } from '@/lib/api'
+import type { Sumber } from '@/lib/use-sumber'
 
 type T = {
   kpis: { alerts: number; klb_alerts: number; klb_cases: number; klb_deaths: number; clusters: number; respon24: number; ebs_klb: number; ebs_klb_cases: number; ebs_klb_deaths: number }
@@ -44,7 +45,9 @@ function Pager({ n, p, set }: { n: number; p: number; set: (v: number) => void }
 }
 
 /** PR 021: seksi Klaster & KLB - dipakai di Dasbor Utama / dasbor kategori (query = filter dasbor) dan halaman /klaster. */
-export default function KlasterSection({ query, showHeader = true }: { query: Record<string, unknown>; showHeader?: boolean }) {
+/** PR 041: `sumber` (main dashboard) - ebs = only Laporan EBS bertanda KLB, pe (IBS) = only IBS alert clusters, all = both. */
+export default function KlasterSection({ query, showHeader = true, sumber = 'all' }: { query: Record<string, unknown>; showHeader?: boolean; sumber?: Sumber }) {
+  const ibs = sumber !== 'ebs', ebs = sumber !== 'pe'
   const [d, setD] = useState<T | null>(null)
   const [error, setError] = useState(false)
   const [pg, setPg] = useState(0)
@@ -60,15 +63,18 @@ export default function KlasterSection({ query, showHeader = true }: { query: Re
   const trend = (d?.trend || []).map((r) => ({ ...r, label: `M${r.week}` }))
   return (
     <section id="section-klaster" data-testid="section-klaster" className="skdr-section w-full space-y-4 scroll-mt-24">
-      {showHeader ? <div><div className="skdr-eyebrow">Klaster</div><h2 className="skdr-section-title">Klaster & KLB</h2><p className="skdr-section-desc">Klaster KLB dari Alert SKDR (per kab/kota dan penyakit) dan laporan EBS bertanda KLB.</p></div> : null}
+      {showHeader ? <div><div className="skdr-eyebrow">Klaster</div><h2 className="skdr-section-title">Klaster & KLB</h2><p className="skdr-section-desc">Klaster KLB dari alert Laporan Agregat IBS (per kab/kota dan penyakit) dan Laporan EBS bertanda KLB.</p></div> : null}
       {error ? <ErrorState onRetry={load} /> : null}
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <section className={`grid grid-cols-2 gap-4 ${ibs && ebs ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        {ibs ? <>
         <Kpi label="Klaster KLB" value={k ? nf(k.clusters) : '...'} sub="kab/kota x penyakit" />
         <Kpi label="Alert KLB" value={k ? nf(k.klb_alerts) : '...'} sub={k ? `${pct(k.klb_alerts, k.alerts)} dari ${nf(k.alerts)} alert` : undefined} />
         <Kpi label="Kasus KLB" value={k ? nf(k.klb_cases) : '...'} sub={k ? `${nf(k.klb_deaths)} kematian` : undefined} />
         <Kpi label="Respons 24 jam" value={k ? pct(k.respon24, k.alerts) : '...'} sub={k ? `${nf(k.respon24)} alert direspons` : undefined} />
-        <Kpi label="EBS KLB / klaster" value={k ? nf(k.ebs_klb) : '...'} sub={k ? `${nf(k.ebs_klb_cases)} kasus, ${nf(k.ebs_klb_deaths)} kematian` : undefined} />
+        </> : null}
+        {ebs ? <Kpi label="Laporan EBS KLB / klaster" value={k ? nf(k.ebs_klb) : '...'} sub={k ? `${nf(k.ebs_klb_cases)} kasus, ${nf(k.ebs_klb_deaths)} kematian` : undefined} /> : null}
       </section>
+      {ibs ? <>
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <article className="skdr-card p-4">
           <div className="skdr-eyebrow">Tren mingguan</div>
@@ -99,7 +105,8 @@ export default function KlasterSection({ query, showHeader = true }: { query: Re
           {d && !d.clusters.length ? <div className="p-6 text-center text-sm text-slate-500">Tidak ada alert KLB pada periode dan filter ini.</div> : null}</div>
         <Pager n={filt(d?.clusters || []).length} p={pg} set={setPg} />
       </section>
-      <section className="skdr-card p-4">
+      </> : null}
+      {ebs ? <section className="skdr-card p-4">
         <h2 className="skdr-section-title">Laporan EBS bertanda KLB atau klaster tidak lazim</h2>
         <div className="mt-3 max-h-[560px] overflow-auto"><table className="skdr-table text-left text-xs"><thead><tr className={tableHeadCls}>
           <th className={thCls}>No. EBS</th><th className={thCls}>Tanggal</th><th className={thCls}>Penyakit</th><th className={thCls}>Wilayah</th><th className={`${thCls} text-right`}>Kasus</th><th className={`${thCls} text-right`}>Kematian</th><th className={thCls}>Status</th></tr></thead>
@@ -109,7 +116,7 @@ export default function KlasterSection({ query, showHeader = true }: { query: Re
             <td className="px-4 py-2">{r.status || '-'}</td></tr>)}</tbody></table>
           {d && !d.ebs.length ? <div className="p-6 text-center text-sm text-slate-500">Tidak ada laporan EBS bertanda KLB pada periode dan filter ini.</div> : null}</div>
         <Pager n={(d?.ebs || []).length} p={pgE} set={setPgE} />
-      </section>
+      </section> : null}
     </section>
   )
 }

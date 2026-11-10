@@ -457,12 +457,13 @@ export default function DashboardPage() {
         sumber={sumber}
         ukuran={ukuran}
         slots={{
-          laboratorium: <LabSection query={dashboardApiFilters(applied)} />,
+          laboratorium: <LabSection query={dashboardApiFilters(applied)} sumber={sumber} />,
           klaster: (
             <section className="skdr-section w-full space-y-4">
-              <SectionHeader title="Klaster dan epi curve" description="Kurva epidemi mingguan dan klaster KLB." />
-              <EpiCurve query={dashboardApiFilters(applied)} />
-              <KlasterSection query={dashboardApiFilters(applied)} showHeader={false} />
+              {/* PR 041: epi curve + klaster IBS only for IBS/Semua; EBS shows only Laporan EBS bertanda KLB */}
+              <SectionHeader title={sumber === "ebs" ? "Klaster dan KLB" : "Klaster dan epi curve"} description={sumber === "ebs" ? "Laporan EBS bertanda KLB atau klaster tidak lazim." : sumber === "pe" ? "Kurva epidemi mingguan dan klaster KLB dari alert Laporan Agregat IBS." : "Kurva epidemi mingguan dan klaster KLB (Laporan Agregat IBS) serta Laporan EBS bertanda KLB."} />
+              {sumber !== "ebs" ? <EpiCurve query={dashboardApiFilters(applied)} /> : null}
+              <KlasterSection query={dashboardApiFilters(applied)} showHeader={false} sumber={sumber} />
             </section>
           ),
         }}
@@ -490,7 +491,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="skdr-card mt-4 min-h-[460px] w-full flex-1 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05)]" data-testid="map-card">
-              <PetaMultiMode query={dashboardApiFilters(applied) as Record<string, unknown>} sinyal={!data ? (error ? null : <SkeletonMap height={520} />) : <SpatialOutbreakMap
+              <PetaMultiMode query={dashboardApiFilters(applied) as Record<string, unknown>} sumber={sumber} sinyal={!data ? (error ? null : <SkeletonMap height={520} />) : <SpatialOutbreakMap
                 countries={countryData}
                 locations={mapLocations}
                 highlightCountry="Indonesia"

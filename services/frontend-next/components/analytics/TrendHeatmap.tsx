@@ -81,7 +81,7 @@ function Combined({ ov, ukuran }: { ov: Overview; ukuran: UkuranEbs }) {
             <YAxis yAxisId="pe" orientation="right" tick={{ fontSize: 12, fill: SOURCE_COLOR.pe }} allowDecimals={false} width={36} />
             <Tooltip formatter={(v: any) => fmt(Number(v))} />
             <Line yAxisId="ebs" type="monotone" dataKey="ebs" name={`EBS · ${ebsLabel}`} stroke={SOURCE_COLOR.ebs} strokeWidth={2.5} dot={false} isAnimationActive={false} />
-            <Line yAxisId="pe" type="monotone" dataKey="pe" name={`${t('skdr.source.pe')}`} stroke={SOURCE_COLOR.pe} strokeWidth={2.5} strokeDasharray="6 3" dot={false} isAnimationActive={false} />
+            <Line yAxisId="pe" type="monotone" dataKey="pe" name={t('skdr.charts.metricPeCases')} stroke={SOURCE_COLOR.pe} strokeWidth={2.5} strokeDasharray="6 3" dot={false} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer></div>
       </div>
@@ -116,14 +116,14 @@ function Heatmap({ ov, sumber, ukuran }: { ov: Overview; sumber: Sumber; ukuran:
             <thead><tr><th className="sticky left-0 z-10 min-w-[140px] bg-card text-left font-semibold text-slate-500">{t('skdr.charts.province')}</th>
               {ov.weeks.map((w) => <th key={w.start} className="min-w-[22px] whitespace-nowrap font-normal text-slate-400" title={w.start}>{w.week}</th>)}
               {showEbs ? <th className="pl-2 text-right font-semibold text-ebs">EBS</th> : null}
-              {showPe ? <th className="pl-2 text-right font-semibold text-pe">PE</th> : null}</tr></thead>
+              {showPe ? <th className="pl-2 text-right font-semibold text-pe">IBS</th> : null}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td className="sticky left-0 z-10 truncate bg-card pr-2 font-semibold text-slate-700">{r.name}</td>
                   {ov.weeks.map((w, i) => {
                     const e = r.e?.values[i] || 0, p = r.p?.values[i] || 0
-                    const title = `${r.name} · ${w.label}: ${showEbs ? `EBS ${fmt(e)}` : ''}${both ? ' · ' : ''}${showPe ? `PE ${fmt(p)}` : ''}`
+                    const title = `${r.name} · ${w.label}: ${showEbs ? `EBS ${fmt(e)}` : ''}${both ? ' · ' : ''}${showPe ? `IBS ${fmt(p)}` : ''}`
                     return both ? (
                       <td key={i} title={title} className="h-6 overflow-hidden rounded-sm p-0">
                         <div className="h-3" style={{ background: shade(e, maxE, 'ebs') }} />

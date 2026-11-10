@@ -43,10 +43,10 @@ export function AlertCfr({ query }: { query: Record<string, unknown> }) {
     <div className="space-y-3" data-testid="alert-cfr">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Kpi label="CFR keseluruhan" value={pf(o.pct)} sub={`IK 95% ${pf(o.ci_low)}–${pf(o.ci_high)}`} tone="text-red-600" />
-        <Kpi label="Kematian" value={nf(o.num)} tone="text-red-600" sub="dilaporkan di Alert SKDR" />
-        <Kpi label="Kasus" value={nf(o.den)} sub="dilaporkan di Alert SKDR" />
+        <Kpi label="Kematian" value={nf(o.num)} tone="text-red-600" sub="dilaporkan di Laporan Agregat IBS" />
+        <Kpi label="Kasus" value={nf(o.den)} sub="dilaporkan di Laporan Agregat IBS" />
       </div>
-      {!rows.length ? <Empty>Belum ada kasus Alert SKDR untuk filter ini, jadi CFR tidak bisa dihitung.</Empty> : (
+      {!rows.length ? <Empty>Belum ada kasus Laporan Agregat IBS untuk filter ini, jadi CFR tidak bisa dihitung.</Empty> : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <div className="skdr-card p-3" style={{ height: Math.max(320, rows.length * 30 + 60) }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -83,7 +83,7 @@ export function AlertSection({ query }: { query: Record<string, unknown> }) {
   if (err) return <ErrorState onRetry={retry} />
   if (!d) return <SkeletonChart />
   const k = d.kpis
-  if (!k.alerts) return <Empty>Belum ada Alert SKDR untuk filter ini.</Empty>
+  if (!k.alerts) return <Empty>Belum ada alert IBS untuk filter ini.</Empty>
   const trend = d.trend.map((r) => ({ ...r, label: `M${r.week}`, belum: r.alerts - r.verified }))
   const top = d.by_disease.slice(0, 12).map((r) => ({ name: r.disease, Terverifikasi: r.verified, 'Belum diverifikasi': r.alerts - r.verified }))
   return (
@@ -129,7 +129,7 @@ export function AlertSection({ query }: { query: Record<string, unknown> }) {
           ))}</tbody>
         </table>
       </div>
-      <p className="text-[11px] text-slate-500">Sumber: SKDR – Alert mingguan.</p>
+      <p className="text-[11px] text-slate-500">Sumber: Laporan Agregat IBS (alert mingguan).</p>
     </div>
   )
 }
@@ -163,7 +163,7 @@ export function AlertT717({ query }: { query: Record<string, unknown> }) {
   const rows = d.by_disease.filter((r) => r.notify.den > 0).slice(0, 15)
   return (
     <div className="space-y-3" data-testid="t717-alert">
-      <div className="text-sm font-bold text-slate-800">Alert SKDR</div>
+      <div className="text-sm font-bold text-slate-800">Alert IBS</div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <StageCard title="Deteksi" target="≤ 7 hari" s={t.detection} basis="" reason={t.detection_reason} />
         <StageCard title="Notifikasi / verifikasi" target="≤ 1 hari" s={t.notification} basis={t.notification_basis} />

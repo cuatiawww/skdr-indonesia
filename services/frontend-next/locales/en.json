@@ -1094,7 +1094,7 @@
     "amap": {
       "hoverCases": "Cases",
       "hoverDeaths": "Deaths",
-      "hoverSplit": "EBS {ebs} signals · PE {pe} cases",
+      "hoverSplit": "EBS {ebs} signals · IBS {pe} cases",
       "hoverClickProvince": "Click to zoom in & filter this province",
       "hoverClickRegion": "Click to zoom in to this region",
       "unknown_region": "Unknown region",
@@ -1189,9 +1189,9 @@
       "openSource": "Open source",
       "ebsSignals": "EBS signals",
       "ebsCasesLine": "{cases} reported cases · {deaths} deaths",
-      "peCases": "PE cases",
+      "peCases": "IBS cases",
       "peDeathsLine": "{deaths} deaths",
-      "regionSplitNote": "EBS (signals) and PE cases (individual cases) are shown separately and never summed."
+      "regionSplitNote": "EBS (signals) and IBS (aggregate report cases) are shown separately and never summed."
     },
     "layout": {
       "settings": "Settings",
@@ -1715,6 +1715,8 @@
       "showing": "Menampilkan",
       "and": "dan",
       "scopePe": "{n} individual reports (IBS individual)",
+      "scopeIbs": "{n} cases in IBS aggregate reports",
+      "scopeEbsAll": "{n} EBS reports",
       "scopeEbs": "{n} alert EBS zoonosis",
       "allDiseases": "Semua penyakit",
       "allEbs": "total seluruh alert EBS: {n}",
@@ -1754,7 +1756,7 @@
     },
     "charts": {
       "trendEbs": "Tren mingguan alert EBS per penyakit",
-      "trendPe": "Tren mingguan Kasus PE per penyakit",
+      "trendPe": "Weekly IBS cases per disease",
       "pickDisease": "Pilih penyakit",
       "emptyEbs": "Belum ada alert EBS pada periode dan filter ini.",
       "emptyPe": "Belum ada Kasus PE pada periode dan filter ini.",
@@ -1899,7 +1901,7 @@
       "deaths": "Deaths",
       "regions": "Provinces",
       "peForm": "PE form",
-      "noPeForm": "No PE form yet",
+      "noPeForm": "No IBS data for this disease yet",
       "provN": "{n} prov.",
       "openForm": "Open",
       "deltaHint": "Last 4 weeks: {a} · previous 4 weeks: {b}",
@@ -1916,11 +1918,11 @@
       "otherAlerts": "{n} alerts",
       "otherCases": "{n} reported cases",
       "peTitle": "IBS cases",
-      "peCases": "Individual reports",
-      "peSub": "{v} verified/final",
+      "peCases": "Cases (IBS aggregate reports)",
+      "peSub": "{v} cases from verified alerts",
       "deathsTitle": "Deaths",
       "deathsEbs": "Reported in EBS",
-      "deathsPe": "IBS deaths",
+      "deathsPe": "Deaths (IBS aggregate reports)",
       "regionsTitle": "Affected provinces",
       "regionsEbs": "Provinces with EBS signals",
       "regionsPe": "Provinces with IBS cases",
@@ -1935,7 +1937,7 @@
       "sparkDaily": "Daily trend over the filter period",
       "sparkWeekly": "Weekly trend over the filter period",
       "dataUntil": "data up to {date}",
-      "verifiedPe": "IBS cases submitted"
+      "verifiedPe": "Verified IBS cases"
     },
     "state": {
       "loading": "Loading data…",
@@ -2045,10 +2047,10 @@
       "deaths": "Deaths",
       "cfrHint": "IBS CFR = deaths / cases (IBS aggregate report)",
       "provinces": "Provinces affected",
-      "statusSplit": "PE case status",
+      "statusSplit": "IBS case classification",
       "unclassified": "Unclassified",
       "noCases": "No IBS cases for this filter",
-      "noPeForm": "No PE form yet",
+      "noPeForm": "No IBS data for this disease yet",
       "lastData": "Last data",
       "noData": "No data yet",
       "d24None": "24-hour change not available",
@@ -2066,7 +2068,7 @@
     "signal": {
       "view": "View",
       "ebs": "EBS alert",
-      "pe": "PE case",
+      "pe": "IBS",
       "loading": "Loading signal detail…",
       "unknownDisease": "Unmapped disease",
       "status": "Status",

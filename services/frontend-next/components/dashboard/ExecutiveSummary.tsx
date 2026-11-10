@@ -244,18 +244,19 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
   if (err) return <ErrorState message={err} onRetry={() => setTick((x) => x + 1)} />
   if (!d) return <div className="space-y-4"><SkeletonKpiRow /><SkeletonChart /><SkeletonTable /></div>
 
-  const src = d.filters.source
   const te = sm?.kpi_trend?.ebs ?? null
   const tp = sm?.kpi_trend?.pe ?? null
   const days = sm?.kpi_trend?.days ?? []
   const until = sm?.kpi_trend?.until ?? null
   const bucket = sm?.kpi_trend?.bucket ?? 'day'
-  const showEbs = src !== 'pe' && src !== 'form'
-  const showPe = src !== 'ebs'
+  // PR 041: visibility follows the page Sumber filter (ebs | pe=IBS | all), not d.filters.source (backend returns 'ibs').
+  const showEbs = sumber !== 'pe'
+  const showPe = sumber !== 'ebs'
   const h = d.header
   const parts = [
-    showPe && h.individual_reports !== null ? t('skdr.exec.scopePe', { n: n(h.individual_reports) }) : null,
-    showEbs && h.ebs_alerts_zoonosis !== null ? t('skdr.exec.scopeEbs', { n: n(h.ebs_alerts_zoonosis) }) : null,
+    showPe ? t('skdr.exec.scopeIbs', { n: n(sm?.kpi.pe?.cases ?? 0) }) : null,
+    showPe && h.individual_reports ? t('skdr.exec.scopePe', { n: n(h.individual_reports) }) : null,
+    showEbs ? t('skdr.exec.scopeEbsAll', { n: n(sm?.kpi.ebs?.alerts ?? h.ebs_alerts_all ?? 0) }) + (h.ebs_alerts_zoonosis !== null ? ` (${t('skdr.exec.scopeEbs', { n: n(h.ebs_alerts_zoonosis) })})` : '') : null,
   ].filter(Boolean)
   const tx = d.config.texts || {}
   const star = d.cfr.star_deaths.reduce((s, x) => s + x.deaths, 0)
@@ -281,7 +282,7 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
         <SectionHeader title="Ringkasan" />
       <p className="border-l-2 border-brand-300 pl-3 text-sm text-slate-600">
         {t('skdr.exec.showing')} {parts.join(` ${t('skdr.exec.and')} `)} · {dmy(d.filters.start_date)} – {dmy(d.filters.end_date)} {epiLabel ? `(${epiLabel})` : ''} · {d.filters.scope} · {d.filters.disease || t('skdr.exec.allDiseases')}
-        {showEbs && h.ebs_alerts_all !== null ? <span className="text-slate-500"> ({t('skdr.exec.allEbs', { n: n(h.ebs_alerts_all) })})</span> : null}
+        {showEbs && h.ebs_alerts_all !== null && sm?.kpi.ebs && h.ebs_alerts_all !== sm.kpi.ebs.alerts ? <span className="text-slate-500"> ({t('skdr.exec.allEbs', { n: n(h.ebs_alerts_all) })})</span> : null}
       </p>
       {d.no_group_for_disease ? <div className="text-xs italic text-slate-500">{t('skdr.exec.notZoonosis')}</div> : null}
 
@@ -303,7 +304,7 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
           ? <Kpi testId="kpi-extra" title={t('skdr.kpi.verifiedEbs')} rows={[{ src: 'ebs', label: t('skdr.kpi.verifiedRate'), value: sm?.kpi.ebs?.alerts ? `${pct1(((sm.kpi.ebs.verified) / sm.kpi.ebs.alerts) * 100)}%` : '—', sub: sm?.kpi.ebs ? `${n(sm.kpi.ebs.verified)} / ${n(sm.kpi.ebs.alerts)}` : undefined }]} />
           : <Kpi testId="kpi-extra" title={t('skdr.kpi.verifiedPe')} rows={[{ src: 'pe', label: t('skdr.kpi.verifiedRate'), value: sm?.kpi.pe?.cases ? `${pct1((sm.kpi.pe.verified / sm.kpi.pe.cases) * 100)}%` : '—', sub: sm?.kpi.pe ? `${n(sm.kpi.pe.verified)} / ${n(sm.kpi.pe.cases)}` : undefined }]} />) : null}
       </div>
-      <p className="text-[11px] leading-relaxed text-slate-500">{tx.footnote} {tx.individual_def} {tx.alert_def}</p>
+      <p className="text-[11px] leading-relaxed text-slate-500">{[showEbs ? tx.footnote : null, showEbs ? tx.alert_def : null, showPe ? tx.footnote_ibs : null, showPe && h.individual_reports ? tx.individual_def : null].filter(Boolean).join(' ')}</p>
 
 
       {/* PR 018: carousel of compact disease cards directly below the map (replaces the PR 016 disease table panel) */}
@@ -313,7 +314,7 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
         {showEbs ? <EbsUnitPanel query={query as Record<string, unknown>} /> : null}
       </section>
     ),
-    cfr: (
+    cfr: showPe ? (
       <section className="skdr-section w-full space-y-4">
         <SectionHeader title="Case fatality rate (CFR)" description="Kematian per kasus Laporan Agregat IBS per penyakit dengan IK 95%; CFR Laporan Individu IBS tampil bila datanya ada." />
         <AlertCfr query={query as Record<string, unknown>} />
@@ -375,19 +376,19 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
         </Panel>
       ) : null}
       </section>
-    ),
+    ) : null,
     alert: (
       <section className="skdr-section w-full space-y-4">
         <SectionHeader title="Alert dan status tindak lanjut" />
-        <AlertSection query={query as Record<string, unknown>} />
+        {showPe ? <AlertSection query={query as Record<string, unknown>} /> : null}
         {showEbs ? <EbsAlertPanel query={query as Record<string, unknown>} /> : null}
       </section>
     ),
     t717: (
       <section className="skdr-section w-full space-y-4">
         <SectionHeader title="Ketepatan respons (7-1-7)" description="Deteksi ≤ 7 hari, notifikasi ≤ 1 hari, respons ≤ 7 hari. Dihitung hanya dari tanggal yang tersedia; tahap tanpa tanggal ditandai belum tersedia." />
-        <T717 data={sm?.t717} sumber={sumber} />
-        <AlertT717 query={query as Record<string, unknown>} />
+        {showEbs ? <T717 data={sm?.t717} sumber={sumber} /> : null}
+        {showPe ? <AlertT717 query={query as Record<string, unknown>} /> : null}
         {showEbs ? <EbsResponsCard query={query as Record<string, unknown>} /> : null}
       </section>
     ),
@@ -395,7 +396,7 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
     wilayah: afterCards, // PR 023: peta EBS rinci digabung ke Peta Sinyal Surveilans (PetaMultiMode)
     tren: <><TrendHeatmap query={query as Record<string, unknown>} sumber={sumber} ukuran={ukuran} hideHeatmap={hidden.has('heatmap')} />{showEbs ? <div className="mt-4"><EbsPrevYear query={query as Record<string, unknown>} /></div> : null}</>,
     klaster: slots.klaster,
-    nar: <NarSkdr qs={qs} sumber={sumber} />,
+    nar: showPe ? <NarSkdr qs={qs} sumber={sumber} /> : null,
   }
   const order = [...sections.order, ...Object.keys(blocks).filter((k) => !sections.order.includes(k))]
   return (

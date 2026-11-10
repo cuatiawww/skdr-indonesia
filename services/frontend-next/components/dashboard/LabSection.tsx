@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/ui/Skeleton'
 import { tableHeadCls, thCls } from '@/components/master/MasterUi'
 import { useEffect, useState } from 'react'
 import { fetchFrom } from '@/lib/api'
+import type { Sumber } from '@/lib/use-sumber'
 
 type T = {
   kpis: { alerts: number; with_specimen: number; with_result: number; positive: number; negative: number; other: number; cases: number; units_with_specimen: number; in_process: number }
@@ -36,7 +37,8 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 
 /** PR 021: seksi Laboratorium - dipakai di Dasbor Utama / dasbor kategori (query = filter dasbor) dan halaman /laboratorium. */
 /** PR 028: `data` = already-loaded /laboratorium response (Zoonosis Lite modal); then this section does not fetch again. */
-export default function LabSection({ query, showHeader = true, data }: { query: Record<string, unknown>; showHeader?: boolean; data?: T | null }) {
+/** PR 041: `sumber` (main dashboard) - ebs = only Laporan EBS with lab results, pe (IBS) = only the IBS alert part, all = both. */
+export default function LabSection({ query, showHeader = true, data, sumber = 'all' }: { query: Record<string, unknown>; showHeader?: boolean; data?: T | null; sumber?: Sumber }) {
   const [own, setD] = useState<T | null>(null)
   const d = data !== undefined ? data : own
   const [error, setError] = useState(false)
@@ -46,12 +48,24 @@ export default function LabSection({ query, showHeader = true, data }: { query: 
   useEffect(load, [qs])
   const k = d?.kpis
   const trend = (d?.trend || []).map((r) => ({ ...r, label: `M${r.week}` }))
+  if (sumber === 'ebs') return (
+    <section id="section-laboratorium" data-testid="section-laboratorium" className="skdr-section w-full space-y-4 scroll-mt-24">
+      {showHeader ? <div><div className="skdr-eyebrow">Laboratorium</div><h2 className="skdr-section-title">Laboratorium</h2><p className="skdr-section-desc">Laporan EBS yang diagnosanya menyebut hasil laboratorium.</p></div> : null}
+      {error ? <ErrorState onRetry={load} /> : null}
+      <article className="skdr-card p-4" data-testid="lab-ebs">
+        <div className="skdr-eyebrow">Laporan EBS</div>
+        <h2 className="skdr-section-title">Laporan EBS dengan hasil laboratorium</h2>
+        {!d ? <p className="mt-2 text-xs text-slate-500">Memuat...</p> : d.ebs_lab.length ? <ul className="mt-2 space-y-1 text-xs">{d.ebs_lab.map((r) => <li key={r.diagnosa} className="flex justify-between gap-2 border-b border-slate-100 pb-1"><span>{r.diagnosa}</span><span className="font-mono">{nf(r.reports)} laporan</span></li>)}</ul>
+          : <p className="mt-2 text-xs text-slate-500">Tidak ada Laporan EBS dengan hasil laboratorium pada periode dan filter ini.</p>}
+      </article>
+    </section>
+  )
   return (
     <section id="section-laboratorium" data-testid="section-laboratorium" className="skdr-section w-full space-y-4 scroll-mt-24">
-      {showHeader ? <div><div className="skdr-eyebrow">Laboratorium</div><h2 className="skdr-section-title">Laboratorium</h2><p className="skdr-section-desc">Spesimen diperiksa dan hasil laboratorium dari Alert SKDR mingguan.</p></div> : null}
+      {showHeader ? <div><div className="skdr-eyebrow">Laboratorium</div><h2 className="skdr-section-title">Laboratorium</h2><p className="skdr-section-desc">Spesimen diperiksa dan hasil laboratorium dari alert Laporan Agregat IBS (mingguan).</p></div> : null}
       {error ? <ErrorState onRetry={load} /> : null}
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Kpi label="Alert SKDR" value={k ? nf(k.alerts) : '...'} sub={k ? `${nf(k.cases)} kasus` : undefined} />
+        <Kpi label={sumber === 'pe' ? 'Alert IBS' : 'Alert SKDR'} value={k ? nf(k.alerts) : '...'} sub={k ? `${nf(k.cases)} kasus` : undefined} />
         <Kpi label="Spesimen diperiksa" value={k ? nf(k.with_specimen) : '...'} sub={k ? `${pct(k.with_specimen, k.alerts)} dari alert, ${nf(k.units_with_specimen)} unit` : undefined} />
         <Kpi label="Ada hasil" value={k ? nf(k.with_result) : '...'} sub={k ? pct(k.with_result, k.with_specimen) + ' dari spesimen' : undefined} />
         <Kpi label="Positif" value={k ? nf(k.positive) : '...'} sub={k ? pct(k.positive, k.with_result) + ' dari hasil' : undefined} />
@@ -85,7 +99,7 @@ export default function LabSection({ query, showHeader = true, data }: { query: 
           <h2 className="skdr-section-title">Nilai &quot;spesimen diperiksa&quot; pada alert</h2>
           <p className="mt-1 text-[11px] text-slate-500">Status pemeriksaan spesimen pada alert yang memiliki spesimen.</p>
           <ul className="mt-3 space-y-1.5 text-xs">{(d?.specimens || []).map((r, i) => <li key={i} className="flex justify-between gap-2 border-b border-slate-100 pb-1"><span className="truncate" title={r.specimen || ''}>{r.specimen || '-'}</span><span className="font-mono font-bold">{nf(r.count)}</span></li>)}</ul>
-          {(d?.ebs_lab || []).length ? <div className="mt-4">
+          {sumber !== 'pe' && (d?.ebs_lab || []).length ? <div className="mt-4">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Laporan EBS dengan hasil laboratorium</div>
             <ul className="mt-2 space-y-1 text-xs">{d!.ebs_lab.map((r) => <li key={r.diagnosa} className="flex justify-between gap-2"><span>{r.diagnosa}</span><span className="font-mono">{nf(r.reports)} laporan</span></li>)}</ul></div> : null}
         </article>

@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import type { EbsMetric, EbsOptions } from '@/components/dashboard/PetaEbs'
 import { nf, pf } from '@/lib/alert-skdr'
+import type { Sumber } from '@/lib/use-sumber'
 const PetaEbs = dynamic(() => import('@/components/dashboard/PetaEbs'), { ssr: false })
 
 const GROUPS: { id: string; label: string; test: (v: string) => boolean }[] = [
@@ -23,7 +24,8 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   return <div className="space-y-1.5"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{title}</div><div className="flex flex-wrap gap-1.5">{children}</div></div>
 }
 
-export default function PetaMultiMode({ query, sinyal }: { query: Record<string, unknown>; sinyal: ReactNode }) {
+/** PR 041: `sumber` = main dashboard Sumber; IBS (pe) hides the Laporan EBS rinci mode. */
+export default function PetaMultiMode({ query, sinyal, sumber = 'all' }: { query: Record<string, unknown>; sinyal: ReactNode; sumber?: Sumber }) {
   const [mode, setMode] = useState<'sinyal' | 'ebs'>(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('peta') === 'ebs' ? 'ebs' : 'sinyal'))
   const [open, setOpen] = useState(true)
   const [metric, setMetric] = useState<EbsMetric>('reports')
@@ -36,6 +38,8 @@ export default function PetaMultiMode({ query, sinyal }: { query: Record<string,
   // nilai sts_rumor yang dikirim: rincian bila dipilih, kalau tidak semua nilai dalam kelompok terpilih
   const sr = raw.length ? raw : grp.length ? sts.filter((s) => grp.includes(groupOf(s.value))).map((s) => s.value) : []
   const active = ku.length + grp.length + raw.length + klb.length
+  const ebsOk = sumber !== 'pe'
+  const view = ebsOk ? mode : 'sinyal'
   return (
     <div className="flex h-full min-h-[460px] w-full" data-testid="peta-multi">
       <aside className={`shrink-0 border-r border-slate-200 bg-slate-50/70 transition-all ${open ? 'w-[270px]' : 'w-10'}`} data-testid="peta-panel">
@@ -43,11 +47,11 @@ export default function PetaMultiMode({ query, sinyal }: { query: Record<string,
           <SlidersHorizontal className="h-4 w-4 shrink-0" />{open ? <><span>Pengaturan peta</span>{active ? <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{active}</span> : null}<ChevronLeft className="ml-auto h-4 w-4" /></> : <ChevronRight className="h-3 w-3" />}
         </button>
         {open ? <div className="max-h-[680px] space-y-4 overflow-y-auto px-3 pb-4">
-          <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-white p-0.5 text-[11px] font-bold">
+          {ebsOk ? <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-white p-0.5 text-[11px] font-bold">
             {([['sinyal', 'Sinyal surveilans'], ['ebs', 'Laporan EBS rinci']] as const).map(([v, l]) => (
               <button key={v} type="button" data-testid={`mode-${v}`} onClick={() => setMode(v)} className={`rounded-md px-2 py-1.5 ${mode === v ? 'bg-primary text-white' : 'text-slate-600'}`}>{l}</button>))}
-          </div>
-          {mode === 'sinyal' ? <p className="text-[11px] text-slate-500">Sinyal Alert SKDR dan EBS per lokasi, mengikuti filter dasbor. Pilih “Laporan EBS rinci” untuk peta wilayah sampai kecamatan dengan filter unit, status laporan, dan status KLB.</p> : <>
+          </div> : null}
+          {view === 'sinyal' ? <p className="text-[11px] text-slate-500">{sumber === 'pe' ? 'Sinyal alert Laporan Agregat IBS per lokasi, mengikuti filter dasbor.' : sumber === 'ebs' ? 'Sinyal Laporan EBS per lokasi, mengikuti filter dasbor.' : 'Sinyal alert Laporan Agregat IBS dan Laporan EBS per lokasi, mengikuti filter dasbor.'}{ebsOk ? ' '+'Pilih “Laporan EBS rinci” untuk peta wilayah sampai kecamatan dengan filter unit, status laporan, dan status KLB.' : ''}</p> : <>
             {tot ? <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] text-slate-500" data-testid="peta-kpi">
               <div className="rounded-lg bg-white p-1.5 shadow-sm"><b className="block text-sm text-slate-800">{nf(tot.rep)}</b>laporan</div>
               <div className="rounded-lg bg-white p-1.5 shadow-sm"><b className="block text-sm text-slate-800">{tot.pv === null ? '—' : nf(tot.pv)}</b>tahun lalu</div>
@@ -69,7 +73,7 @@ export default function PetaMultiMode({ query, sinyal }: { query: Record<string,
         </div> : null}
       </aside>
       <div className="min-w-0 flex-1">
-        {mode === 'sinyal' ? sinyal : <PetaEbs embedded query={query} ku={ku} sr={sr} klb={klb} metric={metric} showMatrix={matrix} onOptions={setOpt} onTotals={setTot} />}
+        {view === 'sinyal' ? sinyal : <PetaEbs embedded query={query} ku={ku} sr={sr} klb={klb} metric={metric} showMatrix={matrix} onOptions={setOpt} onTotals={setTot} />}
       </div>
     </div>
   )

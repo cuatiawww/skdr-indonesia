@@ -76,8 +76,8 @@ export default function DiseaseCard({ r, sumber, ukuran = 'alert', compact = fal
       <dl className={`mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] ${compact ? '' : 'sm:grid-cols-2'}`}>
         <div className="flex justify-between gap-1"><dt className="text-slate-500">{t('skdr.dcard.deaths')}</dt>
           <dd className="font-bold tabular-nums text-slate-800">{fmt((showEbs ? r.ebs?.deaths ?? 0 : 0) + (showPe ? r.pe?.deaths ?? 0 : 0))}</dd></div>
-        <div className="flex justify-between gap-1" title={t('skdr.dcard.cfrHint')}><dt className="text-slate-500">CFR PE</dt>
-          <dd className="font-bold tabular-nums text-slate-800">{showPe && cfr !== null ? `${cfr.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '—'}</dd></div>
+        {showPe ? <div className="flex justify-between gap-1" title={t('skdr.dcard.cfrHint')}><dt className="text-slate-500">CFR IBS</dt>
+          <dd className="font-bold tabular-nums text-slate-800">{cfr !== null ? `${cfr.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '—'}</dd></div> : null}
         <div className="col-span-2 flex justify-between gap-1"><dt className="text-slate-500">{t('skdr.dcard.provinces')}</dt>
           <dd className="font-bold tabular-nums text-slate-800">
             {showEbs ? <span style={{ color: SOURCE_COLOR.ebs }}>● {fmt(r.ebs?.provinces ?? 0)}</span> : null}

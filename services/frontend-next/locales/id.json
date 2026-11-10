@@ -1094,7 +1094,7 @@
     "amap": {
       "hoverCases": "Kasus",
       "hoverDeaths": "Kematian",
-      "hoverSplit": "EBS {ebs} sinyal · PE {pe} kasus",
+      "hoverSplit": "EBS {ebs} sinyal · IBS {pe} kasus",
       "hoverClickProvince": "Klik untuk memperbesar & memfilter provinsi ini",
       "hoverClickRegion": "Klik untuk memperbesar wilayah ini",
       "unknown_region": "Wilayah tidak diketahui",
@@ -1189,9 +1189,9 @@
       "openSource": "Buka sumber",
       "ebsSignals": "Sinyal EBS",
       "ebsCasesLine": "{cases} kasus dilaporkan · {deaths} kematian",
-      "peCases": "Kasus PE",
+      "peCases": "Kasus IBS",
       "peDeathsLine": "{deaths} kematian",
-      "regionSplitNote": "EBS (sinyal) dan Kasus PE (kasus individu) ditampilkan terpisah dan tidak dijumlahkan."
+      "regionSplitNote": "EBS (sinyal) dan IBS (kasus Laporan Agregat IBS) ditampilkan terpisah dan tidak dijumlahkan."
     },
     "layout": {
       "settings": "Pengaturan",
@@ -1715,6 +1715,8 @@
       "showing": "Menampilkan",
       "and": "dan",
       "scopePe": "{n} laporan individu (Laporan Individu IBS)",
+      "scopeIbs": "{n} kasus Laporan Agregat IBS",
+      "scopeEbsAll": "{n} Laporan EBS",
       "scopeEbs": "{n} alert EBS zoonosis",
       "allDiseases": "Semua penyakit",
       "allEbs": "total seluruh alert EBS: {n}",
@@ -1754,16 +1756,16 @@
     },
     "charts": {
       "trendEbs": "Tren mingguan alert EBS per penyakit",
-      "trendPe": "Tren mingguan Kasus PE per penyakit",
+      "trendPe": "Tren mingguan kasus IBS per penyakit",
       "pickDisease": "Pilih penyakit",
       "emptyEbs": "Belum ada alert EBS pada periode dan filter ini.",
-      "emptyPe": "Belum ada Kasus PE pada periode dan filter ini.",
+      "emptyPe": "Belum ada kasus IBS pada periode dan filter ini.",
       "emptyHeat": "Belum ada data untuk heatmap pada filter ini.",
       "heatmap": "Heatmap minggu epidemiologi × provinsi",
       "metric": "Metrik",
       "metricAlerts": "Alert EBS",
       "metricEbsCases": "Kasus dilaporkan EBS",
-      "metricPeCases": "Kasus PE",
+      "metricPeCases": "Kasus IBS",
       "province": "Provinsi",
       "total": "Total",
       "low": "Rendah",
@@ -1774,8 +1776,8 @@
       "loadFailed": "Gagal memuat grafik",
       "diseaseNotFound": "Penyakit tidak ditemukan.",
       "trendTitle": "Tren mingguan",
-      "combinedNote": "EBS dan Kasus PE memakai sumbu masing-masing (kiri EBS, kanan Kasus PE) dan tidak dijumlahkan.",
-      "heatBothNote": "Tiap sel: atas = EBS, bawah = Kasus PE"
+      "combinedNote": "EBS dan IBS memakai sumbu masing-masing (kiri EBS, kanan IBS) dan tidak dijumlahkan.",
+      "heatBothNote": "Tiap sel: atas = EBS, bawah = IBS"
     },
     "penyakit": {
       "title": "Penyakit",
@@ -1916,11 +1918,11 @@
       "otherAlerts": "{n} alert",
       "otherCases": "{n} kasus dilaporkan",
       "peTitle": "Kasus IBS",
-      "peCases": "Laporan individu",
-      "peSub": "{v} terverifikasi/final",
+      "peCases": "Kasus (Laporan Agregat IBS)",
+      "peSub": "{v} kasus dari alert terverifikasi",
       "deathsTitle": "Kematian",
       "deathsEbs": "Dilaporkan di EBS",
-      "deathsPe": "Kematian IBS",
+      "deathsPe": "Kematian (Laporan Agregat IBS)",
       "regionsTitle": "Provinsi terdampak",
       "regionsEbs": "Provinsi dengan sinyal EBS",
       "regionsPe": "Provinsi dengan kasus IBS",
@@ -1935,7 +1937,7 @@
       "sparkDaily": "Tren harian sepanjang periode filter",
       "sparkWeekly": "Tren mingguan sepanjang periode filter",
       "dataUntil": "data s.d. {date}",
-      "verifiedPe": "Kasus IBS terkirim"
+      "verifiedPe": "Kasus IBS terverifikasi"
     },
     "state": {
       "loading": "Memuat data…",
@@ -2045,10 +2047,10 @@
       "deaths": "Kematian",
       "cfrHint": "CFR IBS = kematian / kasus (Laporan Agregat IBS)",
       "provinces": "Provinsi terdampak",
-      "statusSplit": "Status kasus PE",
+      "statusSplit": "Klasifikasi kasus IBS",
       "unclassified": "Belum terklasifikasi",
       "noCases": "Belum ada kasus IBS pada filter ini",
-      "noPeForm": "Belum ada formulir PE",
+      "noPeForm": "Belum ada data IBS untuk penyakit ini",
       "lastData": "Data terakhir",
       "noData": "Data belum tersedia",
       "d24None": "Perubahan 24 jam belum dapat dihitung (riwayat data < 24 jam)",
@@ -2066,7 +2068,7 @@
     "signal": {
       "view": "Lihat",
       "ebs": "Alert EBS",
-      "pe": "Kasus PE",
+      "pe": "IBS",
       "loading": "Memuat detail sinyal…",
       "unknownDisease": "Penyakit belum dipetakan",
       "status": "Status",

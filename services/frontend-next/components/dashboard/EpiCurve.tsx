@@ -70,7 +70,7 @@ export default function EpiCurve({ query }: { query: Record<string, unknown> }) 
         <Toggle on={showDeaths} set={setShowDeaths}>Kematian</Toggle>
         <button type="button" onClick={csv} className="ml-auto inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Download className="h-3.5 w-3.5" />CSV</button>
       </div>
-      {!d.weeks.length ? <p className="py-10 text-center text-sm text-slate-500">Belum ada data Alert SKDR untuk filter ini.</p> : (
+      {!d.weeks.length ? <p className="py-10 text-center text-sm text-slate-500">Belum ada data Laporan Agregat IBS untuk filter ini.</p> : (
         <>
           <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-4">
             <div><b className="text-lg text-slate-900">{nf(d.totals.cases)}</b> kasus</div>
@@ -112,7 +112,7 @@ export default function EpiCurve({ query }: { query: Record<string, unknown> }) 
             </div>
           ) : null}
           <p className="mt-2 text-[11px] text-slate-500">
-            Sumber: SKDR – Alert mingguan. Garis ambang menandai minggu dengan kasus lebih tinggi dari biasanya.
+            Sumber: Laporan Agregat IBS (alert mingguan). Garis ambang menandai minggu dengan kasus lebih tinggi dari biasanya.
             {!d.prev_available ? ` Data tahun ${d.prev_year ?? 'sebelumnya'} belum tersinkron, jadi garis pembanding tidak ditampilkan.` : ''}
           </p>
           {d.outliers.length || d.outliers_prev.length ? (
