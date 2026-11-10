@@ -2,7 +2,7 @@
 // PR 042: one filter bar for every Matriks Analisa tab. Only filters relevant to the active tab + Sumber are shown
 // (and sent); uncommon ones live under "Filter lanjutan".
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react'
+import { CalendarDays, ChevronDown, RotateCcw, SlidersHorizontal, X } from 'lucide-react'
 import SearchSelect, { type SelectOption } from '@/components/ui/SearchSelect'
 import { fetchKabkota, fetchProvinces, type MasterKabkota, type MasterProvince } from '@/lib/skdr-api'
 import { getEpiWeekDateRange, getWeeksInYear } from '@/lib/epi-week'
@@ -42,13 +42,13 @@ export function scopeFilter(f: AFilter, tab: TabKey): AFilter {
   return g
 }
 
-const box = 'h-10 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none hover:border-brand-300 focus:border-primary'
+const box = 'h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none hover:border-brand-300 focus:border-primary'
 const lbl = 'mb-1 flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600'
 
-export default function FilterBar({ f, set, tab, opsi, opsiLoading }: { f: AFilter; set: (p: Partial<AFilter>) => void; tab: TabKey; opsi: any; opsiLoading: boolean }) {
+export default function FilterBar({ f, set, tab, opsi, opsiLoading, onClose }: { f: AFilter; set: (p: Partial<AFilter>) => void; tab: TabKey; opsi: any; opsiLoading: boolean; onClose?: () => void }) {
   const [provs, setProvs] = useState<MasterProvince[]>([])
   const [kabs, setKabs] = useState<MasterKabkota[]>([])
-  const [adv, setAdv] = useState(false)
+  const [adv, setAdv] = useState(() => relevantAdv(tab, f.sumber).some((k) => f[k].length > 0))
   useEffect(() => { fetchProvinces().then(setProvs).catch(() => setProvs([])) }, [])
   useEffect(() => { if (f.prov) fetchKabkota(Number(f.prov)).then(setKabs).catch(() => setKabs([])); else setKabs([]) }, [f.prov])
   const years = useMemo(() => { const y = new Date().getFullYear(); return Array.from({ length: y - 2019 }, (_, i) => y - i) }, [])
@@ -70,23 +70,35 @@ export default function FilterBar({ f, set, tab, opsi, opsiLoading }: { f: AFilt
     { value: 'semua', label: 'Semua', title: 'Laporan EBS + Laporan Agregat IBS (penyakit disatukan menurut master penyakit)' },
   ]
   const showPeriode = tab === 'ringkasan' || tab === 'matriks'
+  const total = activeFilterCount(f, tab)
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs" data-testid="analisa-filter">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[auto_minmax(20rem,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.2fr)]">
+    <div className="flex max-h-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xs" data-testid="analisa-filter">
+      <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-3">
+        <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-800">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> Filter analisa
+          {total ? <span className="rounded-full bg-primary px-1.5 text-[10px] text-white" data-testid="filter-count">{total}</span> : null}
+        </div>
+        {onClose ? <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Sembunyikan filter" data-testid="filter-close"><X className="h-4 w-4" /></button> : null}
+      </div>
+      <div className="flex-1 space-y-3.5 overflow-y-auto px-3.5 py-3">
         <div>
           <div className={lbl}>Sumber <InfoTip text="EBS = Laporan EBS (sinyal/rumor, minggu epid dihitung dari tanggal laporan). IBS = Laporan Agregat IBS (rekap mingguan unit) + Laporan Individu IBS. Semua = keduanya." /></div>
           <Seg value={f.sumber} onChange={(v) => set({ sumber: v })} options={sumberOpts} testId="filter-sumber" />
         </div>
         <div>
-          <div className={lbl}><CalendarDays className="h-3 w-3" /> Rentang minggu epid <span className="font-semibold normal-case tracking-normal text-slate-400">({range})</span></div>
-          <div className="flex flex-wrap items-center gap-1">
+          <div className={lbl}><CalendarDays className="h-3 w-3" /> Rentang minggu epid</div>
+          <div className="mb-1 text-[10.5px] text-slate-500">{range}</div>
+          <div className="flex items-center gap-1">
+            <span className="w-8 text-[10.5px] font-bold text-slate-500">Dari</span>
             <select className={box} value={f.sy} onChange={(e) => { const y = Number(e.target.value); set({ sy: y, sw: Math.min(f.sw, getWeeksInYear(y)) }) }} aria-label="Tahun awal">{years.map((y) => <option key={y} value={y}>{y}</option>)}</select>
             <select className={box} value={f.sw} onChange={(e) => set({ sw: Number(e.target.value) })} aria-label="Minggu awal">{weeks(f.sy).map((w) => <option key={w} value={w}>M{w}</option>)}</select>
-            <span className="px-0.5 text-xs font-bold text-slate-400">s.d.</span>
+          </div>
+          <div className="mt-1 flex items-center gap-1">
+            <span className="w-8 text-[10.5px] font-bold text-slate-500">s.d.</span>
             <select className={box} value={f.ey} onChange={(e) => { const y = Number(e.target.value); set({ ey: y, ew: Math.min(f.ew, getWeeksInYear(y)) }) }} aria-label="Tahun akhir">{years.map((y) => <option key={y} value={y}>{y}</option>)}</select>
             <select className={box} value={f.ew} onChange={(e) => set({ ew: Number(e.target.value) })} aria-label="Minggu akhir">{weeks(f.ey).map((w) => <option key={w} value={w}>M{w}</option>)}</select>
           </div>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap gap-1">
             {([['4minggu', '4 minggu terakhir'], ['12minggu', '12 minggu terakhir'], ['tahun', 'Tahun berjalan']] as const).map(([k, l]) => (
               <button key={k} type="button" onClick={() => set(preset(k))} data-testid={`preset-${k}`} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-600 hover:border-primary hover:text-primary">{l}</button>
             ))}
@@ -112,38 +124,50 @@ export default function FilterBar({ f, set, tab, opsi, opsiLoading }: { f: AFilt
           <SearchSelect multiple options={(opsi?.penyakit || []).map((p: any) => ({ value: p.value, label: p.label || p.value, hint: `${Number(p.kasus).toLocaleString('id-ID')} kasus` }))}
             value={f.penyakit} loading={opsiLoading} placeholder="Semua penyakit" onChange={(v) => set({ penyakit: v })} testId="filter-penyakit" />
         </div>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
         {showPeriode ? (
-          <div className="flex items-center gap-1.5"><span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600">Agregasi</span>
+          <div><div className={lbl}>Agregasi waktu</div>
             <Seg value={f.periode} onChange={(v) => set({ periode: v })} options={[{ value: 'minggu', label: 'Mingguan' }, { value: 'bulan', label: 'Bulanan' }, { value: 'tahun', label: 'Tahunan' }]} testId="filter-periode" />
           </div>
         ) : null}
         {f.sumber === 'ebs' && tab !== 'kinerja' ? (
-          <div className="flex items-center gap-1.5"><span className="flex items-center gap-1 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600">Penyakit menurut <InfoTip text="Terverifikasi = penyakit hasil verifikasi (jika ada, selain itu rumor). Rumor = penyakit seperti dilaporkan pertama kali." /></span>
+          <div><div className={lbl}>Penyakit menurut <InfoTip text="Terverifikasi = penyakit hasil verifikasi (jika ada, selain itu rumor). Rumor = penyakit seperti dilaporkan pertama kali." /></div>
             <Seg value={f.basis} onChange={(v) => set({ basis: v })} options={[{ value: 'verif', label: 'Terverifikasi' }, { value: 'rumor', label: 'Rumor' }]} testId="filter-basis" />
           </div>
         ) : null}
-        <button type="button" onClick={() => setAdv((x) => !x)} aria-expanded={adv} data-testid="toggle-lanjutan"
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50">
-          <SlidersHorizontal className="h-3.5 w-3.5" /> Filter lanjutan {advActive ? <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{advActive}</span> : null}
-          <ChevronDown className={`h-3.5 w-3.5 transition ${adv ? 'rotate-180' : ''}`} />
-        </button>
-        <button type="button" onClick={() => { const d = defaultFilter(); set({ ...d, sumber: f.sumber }) }} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-500 hover:text-primary" data-testid="reset-filter">
-          <RotateCcw className="h-3.5 w-3.5" /> Atur ulang
+        <div className="rounded-xl border border-slate-200">
+          <button type="button" onClick={() => setAdv((x) => !x)} aria-expanded={adv} data-testid="toggle-lanjutan"
+            className="flex w-full items-center justify-between px-2.5 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50">
+            <span className="inline-flex items-center gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5" /> Filter lanjutan {advActive ? <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{advActive}</span> : null}</span>
+            <ChevronDown className={`h-3.5 w-3.5 transition ${adv ? 'rotate-180' : ''}`} />
+          </button>
+          {adv ? (
+            <div className="space-y-2.5 border-t border-slate-100 bg-slate-50 p-2.5" data-testid="filter-lanjutan">
+              {advKeys.map((k) => (
+                <div key={k}>
+                  <div className={lbl}>{ADV_LABEL[k].label}<InfoTip text={ADV_LABEL[k].tip} /></div>
+                  <SearchSelect multiple options={optsFor(k)} value={f[k]} placeholder="Semua" onChange={(v) => set({ [k]: v } as Partial<AFilter>)} testId={`filter-${k}`} />
+                </div>
+              ))}
+              <div className="text-[10.5px] text-slate-500">Hanya filter yang berlaku untuk tab dan sumber terpilih yang ditampilkan. "(Belum diisi)" = laporan yang tidak mengisi field tersebut.</div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="border-t border-slate-100 p-3">
+        <button type="button" onClick={() => { const d = defaultFilter(); set({ ...d, sumber: f.sumber }) }} disabled={!total && f.sy === defaultFilter().sy && f.sw === defaultFilter().sw && f.ew === defaultFilter().ew}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600 hover:border-red-300 hover:text-red-600 disabled:opacity-40" data-testid="reset-filter">
+          <RotateCcw className="h-3.5 w-3.5" /> Atur ulang filter
         </button>
       </div>
-      {adv ? (
-        <div className="mt-2 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5" data-testid="filter-lanjutan">
-          {advKeys.map((k) => (
-            <div key={k}>
-              <div className={lbl}>{ADV_LABEL[k].label}<InfoTip text={ADV_LABEL[k].tip} /></div>
-              <SearchSelect multiple options={optsFor(k)} value={f[k]} placeholder="Semua" onChange={(v) => set({ [k]: v } as Partial<AFilter>)} testId={`filter-${k}`} />
-            </div>
-          ))}
-          <div className="col-span-full text-[10.5px] text-slate-500">Hanya filter yang berlaku untuk tab dan sumber terpilih yang ditampilkan. "(Belum diisi)" = laporan yang tidak mengisi field tersebut.</div>
-        </div>
-      ) : null}
     </div>
   )
+}
+
+/** Number of active (non-default) filters relevant to the tab; the week range is not counted. */
+export function activeFilterCount(f: AFilter, tab: TabKey) {
+  let n = (f.prov ? 1 : 0) + (f.kab ? 1 : 0) + (f.kec ? 1 : 0) + (f.penyakit.length ? 1 : 0)
+  if ((tab === 'ringkasan' || tab === 'matriks') && f.periode !== 'minggu') n++
+  if (f.sumber === 'ebs' && f.basis === 'rumor') n++
+  for (const k of relevantAdv(tab, f.sumber)) if (f[k].length) n++
+  return n
 }
