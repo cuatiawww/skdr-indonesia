@@ -20,6 +20,11 @@ if (!backend) console.warn('[skdr] BACKEND_INTERNAL_URL is not set; API proxy di
 const nextConfig = {
   output: 'standalone',
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  // PR 040: hide bottom-left Next.js DevTools "Static route" & build indicators in dev-mode containers
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: false,
+  },
   experimental: {
     proxyTimeout: 90_000,
   },

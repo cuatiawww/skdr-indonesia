@@ -1,13 +1,29 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Mail, MapPin, Phone, Shield } from 'lucide-react'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
 import { useAuth } from '@/lib/skdr-auth'
 
+// Split local/domain across elements so upstream email obfuscators (e.g. Cloudflare)
+// do not rewrite SSR HTML and cause a React hydration mismatch.
+function SafeEmail({ local, domain }: { local: string; domain: string }) {
+  return (
+    <span className="inline-flex">
+      <span>{local}</span>
+      <span>@</span>
+      <span>{domain}</span>
+    </span>
+  )
+}
+
 export default function LandingFooter() {
   const { user } = useAuth()
+  const [mailHref, setMailHref] = useState('#kontak')
+  useEffect(() => {
+    setMailHref(`mailto:${['info', 'kemkes.go.id'].join('@')}`)
+  }, [])
   const authOrLogin = (dest: string) => (user ? dest : `/login?redirect=${encodeURIComponent(dest)}`)
 
   return (
@@ -66,7 +82,7 @@ export default function LandingFooter() {
                 </svg>
               </a>
               <a
-                href="mailto:info@kemkes.go.id"
+                href={mailHref}
                 aria-label="Email Kementerian Kesehatan"
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
               >
@@ -151,7 +167,9 @@ export default function LandingFooter() {
               <div className="flex items-center gap-2.5">
                 <Mail className="h-4 w-4 flex-shrink-0 text-[#b6d31e]" />
                 <span>
-                  <strong className="text-white">Email:</strong> info@kemkes.go.id / skdr@kemkes.go.id
+                  <strong className="text-white">Email:</strong>{' '}
+                  <SafeEmail local="info" domain="kemkes.go.id" />{' / '}
+                  <SafeEmail local="skdr" domain="kemkes.go.id" />
                 </span>
               </div>
             </div>
