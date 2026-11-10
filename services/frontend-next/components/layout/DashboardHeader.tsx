@@ -79,7 +79,7 @@ export default function DashboardHeader({
               <Menu className="h-5 w-5" />
             </button>
             <Link
-              href={consoleMode ? "/console/settings" : "/"}
+              href={consoleMode ? "/console/settings" : authenticated ? "/beranda" : "/"}
               className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-5"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -17,7 +17,7 @@ export const LIMITED_PREFIXES = ['/dashboard/spasial', '/dashboard/matriks-anali
 export function routeArea(pathname: string): Area {
   const p = pathname || '/'
   if (p === '/login') return 'bare'
-  if (p === '/') return 'home'
+  if (p === '/' || p === '/beranda') return 'home'
   if (TATAKELOLA_PREFIXES.some((x) => under(p, x))) return 'tatakelola'
   if (DASHBOARD_PREFIXES.some((x) => under(p, x))) return 'dashboard'
   return 'home'
@@ -25,6 +25,7 @@ export function routeArea(pathname: string): Area {
 
 export function routeNeed(pathname: string): Need {
   const p = pathname || '/'
+  if (p === '/' || p === '/login') return { kind: 'public' }
   if (LIMITED_PREFIXES.some((x) => under(p, x))) return { kind: 'perm', perm: 'dashboard_limited' }
   if (['/tatakelola/pengguna', '/tatakelola/peran', '/tatakelola/log-akses'].some((x) => under(p, x))) return { kind: 'perm', perm: 'user_management' }
   if (under(p, '/master')) return { kind: 'perm', perm: 'master_data' }
@@ -32,7 +33,6 @@ export function routeNeed(pathname: string): Need {
   if (under(p, '/ebs/laporan') || under(p, '/ibs')) return { kind: 'perm', perm: 'tatakelola' }
   if (under(p, '/ebs') || under(p, '/integrasi')) return { kind: 'perm', perm: 'integrasi' }
   if (TATAKELOLA_PREFIXES.some((x) => under(p, x))) return { kind: 'perm', perm: 'tatakelola' }
-  if (p === '/login') return { kind: 'public' }
   return { kind: 'login' }
 }
 

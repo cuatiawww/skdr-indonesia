@@ -34,7 +34,7 @@ export default function AppShell({
   const { user } = useAuth();
   const authenticated = !!user;
   const isDirectoryPage = false;
-  const isHome = pathname === "/";
+  const isHome = pathname === "/" || pathname === "/beranda";
   // PR 027: Dasbor Zoonosis Lite has its own header title/subtitle (the page body carries no title).
   const isLite = pathname === "/dasbor/zoonosis-lite";
   const homeWrapRef = useRef<HTMLDivElement>(null);

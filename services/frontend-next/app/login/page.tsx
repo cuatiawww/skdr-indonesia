@@ -3,8 +3,9 @@
 // that asked for login, expired-session notice); visuals use the SKDR/Kemenkes design (teal brand palette, lime
 // accent, Kemenkes logo, Beranda imagery, Roboto).
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Activity, Eye, EyeOff, LayoutDashboard, Lock, LogIn, Map as MapIcon, ShieldCheck, User } from 'lucide-react'
+import { Activity, ArrowLeft, Eye, EyeOff, LayoutDashboard, Lock, LogIn, Map as MapIcon, ShieldCheck, User } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { useSettings } from '@/lib/settings-context'
@@ -53,7 +54,10 @@ function LoginForm() {
       <div className="flex w-full flex-col justify-between bg-white p-6 sm:p-10 lg:w-[45%] lg:p-12 xl:w-[42%] xl:p-16 2xl:w-[38%]">
         <div className="h-[4px] -mx-6 -mt-6 mb-6 bg-primary sm:-mx-10 sm:-mt-10 lg:-mx-12 lg:-mt-12 xl:-mx-16 xl:-mt-16" />
         <div className="flex items-center justify-between">
-          <span />
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-primary" data-testid="back-landing">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Halaman Utama</span>
+          </Link>
           <LanguageSwitcher />
         </div>
 

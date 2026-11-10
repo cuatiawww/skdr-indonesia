@@ -9,7 +9,7 @@ type Match = { group: SidebarGroup; item: SidebarItem; sub?: SidebarItem } | nul
 
 export default function Breadcrumbs({ match }: { match: Match }) {
   const pathname = usePathname() || '/'
-  if (pathname === '/' || !match) return null
+  if (pathname === '/' || pathname === '/beranda' || !match) return null
   const crumbs: { label: string; href?: string }[] = [{ label: match.group.title }]
   const itemHasPage = match.item.href && match.item.href !== '#'
   if (match.item.label !== match.group.title) crumbs.push({ label: match.item.label, href: itemHasPage ? match.item.href : undefined })
@@ -24,7 +24,7 @@ export default function Breadcrumbs({ match }: { match: Match }) {
   return (
     <nav aria-label="Breadcrumb" data-testid="breadcrumbs" className="px-4 pt-3 text-xs sm:px-6 lg:px-8">
       <ol className="flex flex-wrap items-center gap-1.5 text-slate-500">
-        <li><Link href="/" className="inline-flex items-center gap-1 hover:text-primary"><Home className="h-3.5 w-3.5" />Beranda</Link></li>
+        <li><Link href="/beranda" className="inline-flex items-center gap-1 hover:text-primary"><Home className="h-3.5 w-3.5" />Beranda</Link></li>
         {crumbs.map((c, i) => (
           <li key={i} className="inline-flex items-center gap-1.5">
             <ChevronRight className="h-3 w-3 text-slate-300" />
