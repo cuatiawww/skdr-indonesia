@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import PetaMultiMode from "@/components/dashboard/PetaMultiMode";
 import { tr } from "@/lib/i18n/LanguageContext";
@@ -316,7 +316,8 @@ export default function DashboardPage() {
     saveGeo({ diseases: applied.diseases, provinceIds: applied.provinceIds, kabkotaIds: applied.kabkotaIds, units: applied.units || [] });
   }, [applied]);
   // PR 016: one global Sumber filter (Semua/EBS/Kasus PE, in the URL) drives the whole dashboard; default Semua.
-  const { sumber, setSumber, ukuran, setUkuran, ready: sumberReady } = useSumber();
+  // PR 039: the second source on this page is Laporan Agregat IBS (URL ?sumber=ibs); data from Form EBS & Form IBS.
+  const { sumber, setSumber, ukuran, setUkuran, ready: sumberReady } = useSumber({ peParam: "ibs" });
   const [data, setData] = useState<PublicDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -437,6 +438,7 @@ export default function DashboardPage() {
         isLoading={loading}
         sumber={sumber}
         onSumberChange={setSumber}
+        sumberLabels={{ pe: "IBS" }}
         showKategori
         lockedKategori={lockedKategori || undefined}
       />

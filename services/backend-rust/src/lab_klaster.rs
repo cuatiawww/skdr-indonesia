@@ -1,4 +1,6 @@
 //! PR 021: seksi Laboratorium dan Klaster, dari data API (Alert SKDR mingguan + EBS). Tidak memakai data form.
+//! PR 039: sumbernya kini Laporan Agregat IBS (view dash_ibs_fakta; Jumlah Lab > 0 = ada spesimen, hasil lab belum ada di form
+//! agregat sehingga kelas "belum") dan Laporan EBS (view dash_ebs_reports), keduanya diisi di SKDR Indonesia (migrasi 058).
 //! Aturan (kata hasil positif/negatif, nilai KLB, diagnosa klaster) dari app_settings.lab_klaster_config.
 use axum::{extract::{Query, State}, Json};
 use deadpool_postgres::Object;
@@ -61,7 +63,7 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
     let cls = "a.lab_kelas";
     let spec = "a.ada_spesimen";
     let p: Vec<&(dyn ToSql + Sync)> = a.p().to_vec();
-    let from = format!("FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id WHERE {AW}");
+    let from = format!("FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id WHERE {AW}");
     let k = c.query_one(&format!(
         "SELECT COUNT(*)::bigint, COUNT(*) FILTER (WHERE {spec})::bigint, COUNT(*) FILTER (WHERE {cls} <> 'belum')::bigint,
                 COUNT(*) FILTER (WHERE {cls} = 'positif')::bigint, COUNT(*) FILTER (WHERE {cls} = 'negatif')::bigint,
@@ -74,12 +76,12 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
     let by_prov = c.query(&format!(
         "SELECT COALESCE(l.name, a.provinsi, 'Tidak diketahui'), COUNT(*)::bigint, COUNT(*) FILTER (WHERE {spec})::bigint,
                 COUNT(*) FILTER (WHERE {cls} = 'positif')::bigint
-         FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_locations l ON l.id = a.province_id WHERE {AW}
+         FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_locations l ON l.id = a.province_id WHERE {AW}
          GROUP BY 1 ORDER BY 3 DESC, 2 DESC LIMIT {top}"), &p).await.map_err(internal)?;
     // PR 028: matriks provinsi × penyakit, untuk provinsi teratas yang sama dengan by_province (urut spesimen, lalu alert).
     let by_pd = c.query(&format!(
         "WITH b AS (SELECT COALESCE(l.name, a.provinsi, 'Tidak diketahui') AS prov, {LBL} AS dis, {spec} AS sp, {cls} AS kl
-                    FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_locations l ON l.id = a.province_id WHERE {AW}),
+                    FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_locations l ON l.id = a.province_id WHERE {AW}),
               tp AS (SELECT prov FROM b GROUP BY 1 ORDER BY COUNT(*) FILTER (WHERE sp) DESC, COUNT(*) DESC LIMIT {top})
          SELECT b.prov, b.dis, COUNT(*)::bigint, COUNT(*) FILTER (WHERE b.sp)::bigint, COUNT(*) FILTER (WHERE b.kl = 'positif')::bigint
          FROM b JOIN tp USING (prov) GROUP BY 1, 2"), &p).await.map_err(internal)?;
@@ -90,8 +92,8 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
         "SELECT a.spesimen, COUNT(*)::bigint {from} AND {spec} GROUP BY 1 ORDER BY 2 DESC LIMIT {top}"), &p).await.map_err(internal)?;
     let masker = crate::privacy::Masker::load(&c).await;
     let recent = c.query(&format!(
-        "SELECT a.tahun, a.minggu, {LBL}, a.unit, a.kota, a.provinsi, s.spesimen_diperiksa, s.hasil_pemeriksaan, {cls}, a.kasus
-         FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id JOIN skdr_alerts s ON s.id = a.alert_id
+        "SELECT a.tahun, a.minggu, {LBL}, a.unit, a.kota, a.provinsi, a.spesimen, NULL::text, {cls}, a.kasus
+         FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id
          WHERE {AW} AND {spec} ORDER BY a.yw DESC, a.alert_id DESC LIMIT 50"), &p).await.map_err(internal)?;
     // EBS: diagnosa yang menyebut hasil/konfirmasi laboratorium
     let words = likes(&strs(&cf, "ebs_lab_diagnosa_words"));
@@ -99,7 +101,7 @@ pub async fn laboratorium(State(s): State<AppState>, Query(q): Query<DashQuery>)
     let mut ep: Vec<&(dyn ToSql + Sync)> = ebs.p();
     ep.push(&words);
     let e = c.query(&format!(
-        "SELECT trim(e.diagnosa), COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint FROM ebs_reports e WHERE {EW} AND lower(e.diagnosa) LIKE ANY($8)
+        "SELECT trim(e.diagnosa), COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint FROM dash_ebs_reports e WHERE {EW} AND lower(e.diagnosa) LIKE ANY($8)
          GROUP BY 1 ORDER BY 2 DESC"), &ep).await.map_err(internal)?;
     let n = |r: &tokio_postgres::Row, i: usize| r.get::<_, i64>(i);
     Ok(Json(json!({ "success": true, "data": {
@@ -160,7 +162,7 @@ pub async fn klaster(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let kc = kcap(&c).await;
     let top = cf.get("top_n").and_then(|v| v.as_i64()).unwrap_or(15);
     let p: Vec<&(dyn ToSql + Sync)> = a.p().to_vec();
-    let from = format!("FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_kabkota k ON k.id = a.kabkota_id WHERE {AW}");
+    let from = format!("FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id LEFT JOIN master_kabkota k ON k.id = a.kabkota_id WHERE {AW}");
     let isk = "a.is_klb";
     let r24 = "a.respon24_ok";
     let kp = c.query_one(&format!(
@@ -185,7 +187,7 @@ pub async fn klaster(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let ebs = ebs_params(&q, &f);
     let mut ep: Vec<&(dyn ToSql + Sync)> = ebs.p();
     ep.push(&eklb); ep.push(&ediag);
-    let ew = format!("FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id LEFT JOIN master_kabkota k ON k.id = e.kabkota_id
+    let ew = format!("FROM dash_ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id LEFT JOIN master_kabkota k ON k.id = e.kabkota_id
         WHERE {EW} AND (lower(trim(COALESCE(e.klb,''))) = ANY($8) OR lower(trim(COALESCE(e.diagnosa,''))) = ANY($9))");
     let ek = c.query_one(&format!("SELECT COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(e.jml_kematian),0)::bigint {ew}"), &ep)
         .await.map_err(internal)?;

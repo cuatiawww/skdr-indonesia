@@ -3,6 +3,8 @@
 //! implemented/pending list) live in app_settings.dashboard_executive (migration 019), not in code.
 //! Rules from the sheet: EBS alerts and individual reports are labelled by source and never summed;
 //! CFR only from confirmed cases (rabies: klinis + konfirmasi) with known outcome; 95% CI = Wilson.
+//! PR 039: EBS = Laporan EBS (view dash_ebs_reports); individual reports = Laporan Individu IBS (view dash_ibs_individu,
+//! same columns as pe_cases) instead of Form PE. Both views come from migration 060.
 use axum::{extract::{Query, State}, Json};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -53,7 +55,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         .and_then(|r| serde_json::from_str(&r.get::<_, String>(0)).ok())
         .unwrap_or(Value::Null);
     let groups_cfg: Vec<Value> = cfg.get("groups").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let show_ebs = !matches!(f.source.as_deref(), Some("form") | Some("pe"));
+    let show_ebs = !matches!(f.source.as_deref(), Some("form") | Some("pe") | Some("ibs"));
     let show_ind = f.source.as_deref() != Some("ebs");
 
     // disease filter -> groups (by master code or name); a non-zoonosis disease leaves no group
@@ -88,7 +90,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
                                          AND e.create_date::date - e.tgl_laporan <= 1)::bigint,
                         COUNT(*) FILTER (WHERE e.sts_rumor IS NULL OR NOT (e.sts_rumor = ANY($8)))::bigint,
                         COUNT(*) FILTER (WHERE (e.sts_rumor IS NULL OR NOT (e.sts_rumor = ANY($8))) AND (e.create_date IS NULL OR e.tgl_laporan IS NULL))::bigint
-                 FROM ebs_reports e
+                 FROM dash_ebs_reports e
                  WHERE ($1::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(e.tgl_laporan, e.create_date::date) <= $2)
                    AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit)
@@ -109,7 +111,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
         }
     }
 
-    // ---- individual reports (Form PE): per form, effective class (override > computed), workflow status, outcome
+    // ---- individual reports (PR 039: Laporan Individu IBS, was Form PE): per form, effective class (override > computed), workflow status, outcome
     let counted = strs(cfg.get("pe_count_statuses"));
     let mut pe: HashMap<String, Vec<(String, String, Option<String>, bool, i64)>> = HashMap::new();
     if show_ind {
@@ -117,7 +119,7 @@ pub async fn executive(State(s): State<AppState>, Query(q): Query<DashQuery>) ->
             .query(
                 "SELECT form_key, COALESCE(classification_override, classification, 'belum') cls, status, outcome,
                         (nik IS NOT NULL AND nik <> '') has_nik, COUNT(*)::bigint
-                 FROM pe_cases
+                 FROM dash_ibs_individu
                  WHERE deleted_at IS NULL AND ($1::date IS NULL OR COALESCE(tgl_laporan, created_at::date) >= $1)
                    AND ($2::date IS NULL OR COALESCE(tgl_laporan, created_at::date) <= $2)
                    AND (cardinality($3::int[]) = 0 OR province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR kabkota_id = ANY($4)) AND skdr_unit_ok(data->>'unit_pelapor')

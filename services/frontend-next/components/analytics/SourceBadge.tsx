@@ -21,7 +21,7 @@ export function SourceKey({ source, label, className = '' }: { source: Source; l
 }
 
 /** The single global Sumber filter (segmented control). */
-export function SourceFilter({ value, onChange }: { value: Sumber | string; onChange: (v: Sumber) => void }) {
+export function SourceFilter({ value, onChange, labels }: { value: Sumber | string; onChange: (v: Sumber) => void; labels?: Partial<Record<Sumber, string>> }) {
   const { t } = useTranslation()
   return (
     <div role="radiogroup" aria-label={t('skdr.source.filter')} className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 text-xs font-bold" data-testid="global-source-filter">
@@ -29,7 +29,7 @@ export function SourceFilter({ value, onChange }: { value: Sumber | string; onCh
         <button key={s} type="button" role="radio" aria-checked={value === s} onClick={() => onChange(s)} data-value={s}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${value === s ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-brand-50'}`}>
           {s === 'ebs' ? <span className={`h-2 w-2 rounded-full ${value === s ? 'bg-white' : 'bg-ebs'}`} /> : s === 'pe' ? <span className={`h-1.5 w-1.5 rotate-45 ${value === s ? 'bg-white' : 'bg-pe'}`} /> : null}
-          {s === 'all' ? t('skdr.source.all') : t(`skdr.source.${s}`)}
+          {labels?.[s] ?? (s === 'all' ? t('skdr.source.all') : t(`skdr.source.${s}`))}
         </button>
       ))}
     </div>

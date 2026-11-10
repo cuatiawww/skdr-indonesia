@@ -315,7 +315,7 @@ export default function ExecutiveSummary({ query, afterCards, slots = {}, sumber
     ),
     cfr: (
       <section className="skdr-section w-full space-y-4">
-        <SectionHeader title="Case fatality rate (CFR)" description="Kematian per kasus Alert SKDR per penyakit dengan IK 95%; CFR Kasus PE tampil bila datanya ada." />
+        <SectionHeader title="Case fatality rate (CFR)" description="Kematian per kasus Laporan Agregat IBS per penyakit dengan IK 95%; CFR Laporan Individu IBS tampil bila datanya ada." />
         <AlertCfr query={query as Record<string, unknown>} />
       {/* PR 022: CFR Kasus PE only when there are PE cases with a known outcome (no table of zeros) */}
       {showPe && d.cfr.groups.some((g) => g.rows.some((r) => r.known > 0 || r.deaths > 0)) ? (

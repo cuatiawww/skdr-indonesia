@@ -23,6 +23,7 @@ mod kategori;
 mod lab_klaster;
 mod dash_alert;
 mod ebs_dash;
+mod impor_lama;
 
 use axum::{http::StatusCode, routing::{delete, get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -68,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
     ebs::spawn_scheduler(pool.clone(), ebs_running.clone());
     let alert_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     alert::spawn_scheduler(pool.clone(), alert_running.clone());
+    impor_lama::spawn_scheduler(pool.clone());
 
     let state = AppState { pool, ebs_running, alert_running };
     let app = Router::new()

@@ -69,6 +69,8 @@ interface Props {
   /** PR 016: global Sumber (Semua/EBS/PE) rendered inside the bar; applies immediately. */
   sumber?: string;
   onSumberChange?: (v: Sumber) => void;
+  /** PR 039: override Sumber option labels (main dashboard: pe slot = 'IBS'). */
+  sumberLabels?: Partial<Record<Sumber, string>>;
   /** false on /penyakit/[kode] where the disease is fixed by the page. */
   showDisease?: boolean;
   /** hide the title/period header row (compact use). */
@@ -110,6 +112,7 @@ export default function SkdrFilterBar({
   isLoading = false,
   sumber,
   onSumberChange,
+  sumberLabels,
   showDisease = true,
   compact = false,
   showKategori = false,
@@ -250,7 +253,7 @@ export default function SkdrFilterBar({
             <div className="flex min-w-0 flex-col gap-1.5">
               <span className={lbl}><Radio className="h-3 w-3 text-primary" />{t('skdr.source.filter')}</span>
               <div className="[&>div]:flex [&>div]:h-10 [&>div]:w-full [&>div]:items-stretch [&_button]:flex-1 [&_button]:justify-center">
-                <SourceFilter value={sumber || 'all'} onChange={onSumberChange} />
+                <SourceFilter value={sumber || 'all'} onChange={onSumberChange} labels={sumberLabels} />
               </div>
             </div>
           ) : null}

@@ -270,6 +270,7 @@ pub(crate) const NORM_SQL: &str = "trim(regexp_replace(regexp_replace(lower(%s),
 
 /// GET /api/v1/filters/units — Unit pelapor options: reporting units as recorded in EBS (`unit`) and PE (`unit_pelapor`),
 /// cascading from province/kab-kota; each flagged when its name matches a master fasyankes in the same kab/kota.
+/// PR 039: units now come from Laporan EBS (dash_ebs_reports) and Laporan Agregat IBS (laporan_ibs, counted in the "pe" slot).
 pub async fn units(State(s): State<AppState>, Query(q): Query<UnitQuery>) -> Result<Json<Value>, ApiError> {
     let c = s.pool.get().await.map_err(internal)?;
     let (prov, kab) = (ints(&q.province_id), ints(&q.kabkota_id));
@@ -277,9 +278,9 @@ pub async fn units(State(s): State<AppState>, Query(q): Query<UnitQuery>) -> Res
     let nf = NORM_SQL.replace("%s", "f.nama");
     let rows = c.query(&format!(
         "WITH u AS (
-           SELECT trim(e.unit) name, e.kabkota_id, e.province_id, NULLIF(trim(e.kel_unit), '') kind, 'ebs' src FROM ebs_reports e WHERE NULLIF(trim(e.unit), '') IS NOT NULL
+           SELECT trim(e.unit) name, e.kabkota_id, e.province_id, NULLIF(trim(e.kel_unit), '') kind, 'ebs' src FROM dash_ebs_reports e WHERE NULLIF(trim(e.unit), '') IS NOT NULL
            UNION ALL
-           SELECT trim(p.data->>'unit_pelapor'), p.kabkota_id, p.province_id, NULL, 'pe' FROM pe_cases p WHERE p.deleted_at IS NULL AND NULLIF(trim(p.data->>'unit_pelapor'), '') IS NOT NULL),
+           SELECT trim(p.unit_nama), p.kabkota_id, p.province_id, NULLIF(trim(p.data->>'jenis_unit'), ''), 'pe' FROM laporan_ibs p WHERE p.status = 'dikirim' AND p.deleted_at IS NULL AND NULLIF(trim(p.unit_nama), '') IS NOT NULL),
          g AS (
            SELECT lower(u.name) val, MIN(u.name) label, MIN(u.kind) kind, u.kabkota_id, COUNT(*) FILTER (WHERE u.src = 'ebs') ebs, COUNT(*) FILTER (WHERE u.src = 'pe') pe
            FROM u WHERE (cardinality($1::int[]) = 0 OR u.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR u.kabkota_id = ANY($2))

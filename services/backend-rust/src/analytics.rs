@@ -12,6 +12,8 @@ use crate::{internal, ApiError, AppState};
 
 const WEEK: &str = "(%s - EXTRACT(DOW FROM %s)::int)";
 fn week_of(col: &str) -> String { WEEK.replace("%s", col) }
+// PR 039: overview + summary (Dasbor Utama, daftar Penyakit) read Laporan EBS (dash_ebs_reports) and Laporan Agregat IBS
+// (dash_ibs_cases: weighted rows, counted with skdr_nsum(c.n), not COUNT(*)) from migration 060; disease detail / latest / home still read ebs_reports + pe_cases.
 const EBS_DATE: &str = "COALESCE(e.tgl_laporan, e.create_date::date)";
 const PE_DATE: &str = "COALESCE(c.tgl_laporan, c.created_at::date)";
 
@@ -51,7 +53,8 @@ fn week_json(ws: &[NaiveDate]) -> Vec<Value> {
 
 fn src(f: &Resolved) -> (bool, bool) {
     let s = f.source.as_deref();
-    (!matches!(s, Some("pe") | Some("form")), s != Some("ebs"))
+    // PR 039: "ibs" (Laporan Agregat IBS) takes the second-source slot that Kasus PE used.
+    (!matches!(s, Some("pe") | Some("ibs") | Some("form")), s != Some("ebs"))
 }
 
 /// GET /api/v1/analytics/overview — weekly trend per disease (EBS alerts/cases, Kasus PE) + heatmap epi week × province.
@@ -76,7 +79,7 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
         let sql = format!(
             "SELECT {w} wk, e.disease_id, d.code, d.name, e.province_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint,
                     COALESCE(SUM(LEAST(COALESCE(e.jml_kematian,0), COALESCE(e.jml_kasus,0))),0)::bigint
-             FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id
+             FROM dash_ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id
              WHERE {dt} BETWEEN $1 AND $2 AND (cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit)
                AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))
              GROUP BY 1, 2, 3, 4, 5", w = week_of(EBS_DATE), dt = EBS_DATE);
@@ -98,8 +101,8 @@ pub async fn overview(State(s): State<AppState>, Query(q): Query<DashQuery>) -> 
     }
     if show_pe && !dis_missing {
         let sql = format!(
-            "SELECT {w} wk, c.disease_id, d.code, d.name, c.province_id, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint
-             FROM pe_cases c LEFT JOIN master_diseases d ON d.id = c.disease_id
+            "SELECT {w} wk, c.disease_id, d.code, d.name, c.province_id, skdr_nsum(c.n)::bigint, skdr_nsum(c.n) FILTER (WHERE c.outcome = 'Meninggal')::bigint
+             FROM dash_ibs_cases c LEFT JOIN master_diseases d ON d.id = c.disease_id
              WHERE c.deleted_at IS NULL AND c.status = ANY($6) AND {dt} BETWEEN $1 AND $2
                AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))
              GROUP BY 1, 2, 3, 4, 5", w = week_of(PE_DATE), dt = PE_DATE);
@@ -311,13 +314,13 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     if on_ebs {
         let r = c.query_one(&format!("SELECT COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint,
                 COUNT(DISTINCT e.province_id)::bigint, COUNT(DISTINCT e.kabkota_id)::bigint, COUNT(*) FILTER (WHERE e.sts_rumor ILIKE 'Terverifikasi%')::bigint
-              FROM ebs_reports e WHERE {ebs_where}"), &ep).await.map_err(internal)?;
+              FROM dash_ebs_reports e WHERE {ebs_where}"), &ep).await.map_err(internal)?;
         kpi_ebs = json!({ "alerts": r.get::<_, i64>(0), "cases": r.get::<_, i64>(1), "deaths": r.get::<_, i64>(2), "provinces": r.get::<_, i64>(3), "kabkota": r.get::<_, i64>(4), "verified": r.get::<_, i64>(5) });
     }
     if on_pe {
-        let r = c.query_one(&format!("SELECT COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint,
-                COUNT(DISTINCT c.province_id)::bigint, COUNT(DISTINCT c.kabkota_id)::bigint, COUNT(*) FILTER (WHERE c.status IN ('terverifikasi','final'))::bigint
-              FROM pe_cases c WHERE {pe_where}"), &pp).await.map_err(internal)?;
+        let r = c.query_one(&format!("SELECT skdr_nsum(c.n)::bigint, skdr_nsum(c.n) FILTER (WHERE c.outcome = 'Meninggal')::bigint,
+                COUNT(DISTINCT c.province_id)::bigint, COUNT(DISTINCT c.kabkota_id)::bigint, skdr_nsum(c.n) FILTER (WHERE c.status IN ('terverifikasi','final'))::bigint
+              FROM dash_ibs_cases c WHERE {pe_where}"), &pp).await.map_err(internal)?;
         kpi_pe = json!({ "cases": r.get::<_, i64>(0), "deaths": r.get::<_, i64>(1), "provinces": r.get::<_, i64>(2), "kabkota": r.get::<_, i64>(3), "verified": r.get::<_, i64>(4) });
     }
 
@@ -332,24 +335,24 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let mut ebs_unmapped = 0i64;
     if on_ebs {
         for r in c.query(&format!("SELECT {w}, e.disease_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint
-                FROM ebs_reports e WHERE {ebs_where} GROUP BY 1, 2", w = week_of(EBS_DATE)), &ep).await.map_err(internal)? {
+                FROM dash_ebs_reports e WHERE {ebs_where} GROUP BY 1, 2", w = week_of(EBS_DATE)), &ep).await.map_err(internal)? {
             let Some(&i) = idx.get(&r.get::<_, NaiveDate>(0)) else { continue };
             match r.get::<_, Option<i32>>(1) {
                 Some(d) => { let e = ebs_w.entry(d).or_insert_with(|| (vec![0; n], vec![0; n], 0)); e.0[i] += r.get::<_, i64>(2); e.1[i] += r.get::<_, i64>(3); e.2 += r.get::<_, i64>(4); }
                 None => ebs_unmapped += r.get::<_, i64>(2),
             }
         }
-        for r in c.query(&format!("SELECT e.disease_id, COUNT(DISTINCT e.province_id)::bigint FROM ebs_reports e WHERE {ebs_where} AND e.disease_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT e.disease_id, COUNT(DISTINCT e.province_id)::bigint FROM dash_ebs_reports e WHERE {ebs_where} AND e.disease_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
             regs.entry(r.get(0)).or_default().0 = r.get(1);
         }
     }
     if on_pe {
-        for r in c.query(&format!("SELECT {w}, c.disease_id, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint
-                FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1, 2", w = week_of(PE_DATE)), &pp).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT {w}, c.disease_id, skdr_nsum(c.n)::bigint, skdr_nsum(c.n) FILTER (WHERE c.outcome = 'Meninggal')::bigint
+                FROM dash_ibs_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1, 2", w = week_of(PE_DATE)), &pp).await.map_err(internal)? {
             let Some(&i) = idx.get(&r.get::<_, NaiveDate>(0)) else { continue };
             let e = pe_w.entry(r.get(1)).or_insert_with(|| (vec![0; n], 0)); e.0[i] += r.get::<_, i64>(2); e.1 += r.get::<_, i64>(3);
         }
-        for r in c.query(&format!("SELECT c.disease_id, COUNT(DISTINCT c.province_id)::bigint FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1"), &pp).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT c.disease_id, COUNT(DISTINCT c.province_id)::bigint FROM dash_ibs_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1"), &pp).await.map_err(internal)? {
             regs.entry(r.get(0)).or_default().1 = r.get(1);
         }
     }
@@ -361,7 +364,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let mut known_pe: HashMap<i32, i64> = HashMap::new();
     let lp: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&f.province, &f.kabkota, &dis];
     if on_ebs {
-        for r in c.query(&format!("SELECT e.disease_id, MAX({EBS_DATE}) FROM ebs_reports e WHERE {ebs_where} AND e.disease_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT e.disease_id, MAX({EBS_DATE}) FROM dash_ebs_reports e WHERE {ebs_where} AND e.disease_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
             last.entry(r.get(0)).or_default().0 = r.get(1);
         }
         let fl = "(cardinality($1::int[]) = 0 OR e.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR e.kabkota_id = ANY($2)) AND skdr_unit_ok(e.unit) AND (cardinality($3::int[]) = 0 OR e.disease_id = ANY($3))";
@@ -369,31 +372,31 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
                     COUNT(*) FILTER (WHERE (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '24 hours' AND (e.create_date AT TIME ZONE 'Asia/Jakarta') <= now())::bigint,
                     COUNT(*) FILTER (WHERE (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '48 hours' AND (e.create_date AT TIME ZONE 'Asia/Jakarta') < now() - interval '24 hours')::bigint,
                     bool_or((e.create_date AT TIME ZONE 'Asia/Jakarta') < now() - interval '24 hours')
-                FROM ebs_reports e WHERE {fl} AND e.disease_id IS NOT NULL AND e.create_date IS NOT NULL GROUP BY 1"), &lp).await.map_err(internal)? {
+                FROM dash_ebs_reports e WHERE {fl} AND e.disease_id IS NOT NULL AND e.create_date IS NOT NULL GROUP BY 1"), &lp).await.map_err(internal)? {
             if r.get::<_, Option<bool>>(3).unwrap_or(false) { d24e.insert(r.get(0), json!({ "cur": r.get::<_, i64>(1), "prev": r.get::<_, i64>(2) })); }
         }
     }
     if on_pe {
         let pk: [&(dyn tokio_postgres::types::ToSql + Sync); 7] = [&w0, &w1, &f.province, &f.kabkota, &dis, &counted, &known_out];
-        for r in c.query(&format!("SELECT c.disease_id, MAX({PE_DATE}), COUNT(*) FILTER (WHERE c.outcome = ANY($7))::bigint FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1"), &pk).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT c.disease_id, MAX({PE_DATE}), skdr_nsum(c.n) FILTER (WHERE c.outcome = ANY($7))::bigint FROM dash_ibs_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1"), &pk).await.map_err(internal)? {
             last.entry(r.get(0)).or_default().1 = r.get(1);
             known_pe.insert(r.get(0), r.get(2));
         }
         let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND (cardinality($1::int[]) = 0 OR c.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR c.kabkota_id = ANY($2)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($3::int[]) = 0 OR c.disease_id = ANY($3))";
         let lpp: [&(dyn tokio_postgres::types::ToSql + Sync); 4] = [&f.province, &f.kabkota, &dis, &counted];
         for r in c.query(&format!("SELECT c.disease_id,
-                    COUNT(*) FILTER (WHERE c.created_at >= now() - interval '24 hours' AND c.created_at <= now())::bigint,
-                    COUNT(*) FILTER (WHERE c.created_at >= now() - interval '48 hours' AND c.created_at < now() - interval '24 hours')::bigint,
+                    skdr_nsum(c.n) FILTER (WHERE c.created_at >= now() - interval '24 hours' AND c.created_at <= now())::bigint,
+                    skdr_nsum(c.n) FILTER (WHERE c.created_at >= now() - interval '48 hours' AND c.created_at < now() - interval '24 hours')::bigint,
                     bool_or(c.created_at < now() - interval '24 hours')
-                FROM pe_cases c WHERE {fl} AND c.disease_id IS NOT NULL GROUP BY 1"), &lpp).await.map_err(internal)? {
+                FROM dash_ibs_cases c WHERE {fl} AND c.disease_id IS NOT NULL GROUP BY 1"), &lpp).await.map_err(internal)? {
             if r.get::<_, Option<bool>>(3).unwrap_or(false) { d24p.insert(r.get(0), json!({ "cur": r.get::<_, i64>(1), "prev": r.get::<_, i64>(2) })); }
         }
     }
     // PR 016 (sheet No. 17): Kasus PE per case status, labels/order from the registry (dashboard_executive.groups[].pe_status)
     let mut cls: HashMap<(i32, String), i64> = HashMap::new();
     if on_pe {
-        for r in c.query(&format!("SELECT c.disease_id, COALESCE(NULLIF(COALESCE(c.classification_override, c.classification), ''), '') , COUNT(*)::bigint
-                FROM pe_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1, 2"), &pp).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT c.disease_id, COALESCE(NULLIF(COALESCE(c.classification_override, c.classification), ''), '') , skdr_nsum(c.n)::bigint
+                FROM dash_ibs_cases c WHERE {pe_where} AND c.disease_id IS NOT NULL GROUP BY 1, 2"), &pp).await.map_err(internal)? {
             cls.insert((r.get(0), r.get(1)), r.get(2));
         }
     }
@@ -439,13 +442,13 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let mut prov: HashMap<i32, [i64; 5]> = HashMap::new(); // ebs alerts, ebs cases, ebs deaths, pe cases, pe deaths
     if on_ebs {
         for r in c.query(&format!("SELECT e.province_id, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint
-                FROM ebs_reports e WHERE {ebs_where} AND e.province_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
+                FROM dash_ebs_reports e WHERE {ebs_where} AND e.province_id IS NOT NULL GROUP BY 1"), &ep).await.map_err(internal)? {
             let v = prov.entry(r.get(0)).or_default(); v[0] = r.get(1); v[1] = r.get(2); v[2] = r.get(3);
         }
     }
     if on_pe {
-        for r in c.query(&format!("SELECT c.province_id, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint
-                FROM pe_cases c WHERE {pe_where} AND c.province_id IS NOT NULL GROUP BY 1"), &pp).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT c.province_id, skdr_nsum(c.n)::bigint, skdr_nsum(c.n) FILTER (WHERE c.outcome = 'Meninggal')::bigint
+                FROM dash_ibs_cases c WHERE {pe_where} AND c.province_id IS NOT NULL GROUP BY 1"), &pp).await.map_err(internal)? {
             let v = prov.entry(r.get(0)).or_default(); v[3] = r.get(1); v[4] = r.get(2);
         }
     }
@@ -465,8 +468,8 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     // ≤ 56 days, otherwise epi weeks. "until" = latest report date with data (UI note "data s.d. …"); no private window.
     let fe = "(cardinality($3::int[]) = 0 OR e.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR e.kabkota_id = ANY($4)) AND skdr_unit_ok(e.unit) AND (cardinality($5::int[]) = 0 OR e.disease_id = ANY($5))";
     let fpe = "c.deleted_at IS NULL AND c.status = ANY($6) AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))";
-    let ebs_latest: Option<NaiveDate> = if on_ebs { c.query_one(&format!("SELECT MAX({EBS_DATE}) FROM ebs_reports e WHERE {EBS_DATE} BETWEEN $1 AND $2 AND {fe}"), &ep).await.map_err(internal)?.get(0) } else { None };
-    let pe_latest: Option<NaiveDate> = if on_pe { c.query_one(&format!("SELECT MAX({PE_DATE}) FROM pe_cases c WHERE {PE_DATE} BETWEEN $1 AND $2 AND {fpe}"), &pp).await.map_err(internal)?.get(0) } else { None };
+    let ebs_latest: Option<NaiveDate> = if on_ebs { c.query_one(&format!("SELECT MAX({EBS_DATE}) FROM dash_ebs_reports e WHERE {EBS_DATE} BETWEEN $1 AND $2 AND {fe}"), &ep).await.map_err(internal)?.get(0) } else { None };
+    let pe_latest: Option<NaiveDate> = if on_pe { c.query_one(&format!("SELECT MAX({PE_DATE}) FROM dash_ibs_cases c WHERE {PE_DATE} BETWEEN $1 AND $2 AND {fpe}"), &pp).await.map_err(internal)?.get(0) } else { None };
     let latest = [ebs_latest, pe_latest].into_iter().flatten().max();
     let d0 = w0;
     let d1 = cap;
@@ -484,7 +487,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     if on_ebs {
         let mut a = [vec![0i64; nb], vec![0i64; nb], vec![0i64; nb], vec![0i64; nb]];
         for r in c.query(&format!("SELECT {bucket_e} d, COUNT(*)::bigint, COALESCE(SUM(e.jml_kasus),0)::bigint, COALESCE(SUM(LEAST(e.jml_kematian, e.jml_kasus)),0)::bigint, COUNT(DISTINCT e.province_id)::bigint
-                FROM ebs_reports e WHERE {ebs_where} GROUP BY 1"), &rp).await.map_err(internal)? {
+                FROM dash_ebs_reports e WHERE {ebs_where} GROUP BY 1"), &rp).await.map_err(internal)? {
             let Some(&i) = didx.get(&r.get::<_, NaiveDate>(0)) else { continue };
             for k in 0..4 { a[k][i] = r.get::<_, i64>(k + 1); }
         }
@@ -492,13 +495,13 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
         let fp: [&(dyn tokio_postgres::types::ToSql + Sync); 3] = [&f.province, &f.kabkota, &dis];
         let r = c.query_one(&format!("WITH x AS (SELECT e.jml_kasus k, LEAST(e.jml_kematian, e.jml_kasus) m, e.province_id p,
                     CASE WHEN (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
-                  FROM ebs_reports e WHERE {fl} AND e.create_date IS NOT NULL
+                  FROM dash_ebs_reports e WHERE {fl} AND e.create_date IS NOT NULL
                     AND (e.create_date AT TIME ZONE 'Asia/Jakarta') >= now() - interval '48 hours' AND (e.create_date AT TIME ZONE 'Asia/Jakarta') <= now())
              SELECT COUNT(*) FILTER (WHERE cur = 1)::bigint, COUNT(*) FILTER (WHERE cur = 0)::bigint,
                     COALESCE(SUM(k) FILTER (WHERE cur = 1),0)::bigint, COALESCE(SUM(k) FILTER (WHERE cur = 0),0)::bigint,
                     COALESCE(SUM(m) FILTER (WHERE cur = 1),0)::bigint, COALESCE(SUM(m) FILTER (WHERE cur = 0),0)::bigint,
                     COUNT(DISTINCT p) FILTER (WHERE cur = 1)::bigint, COUNT(DISTINCT p) FILTER (WHERE cur = 0)::bigint,
-                    EXISTS (SELECT 1 FROM ebs_reports e WHERE {fl} AND (e.create_date AT TIME ZONE 'Asia/Jakarta') < now() - interval '24 hours')
+                    EXISTS (SELECT 1 FROM dash_ebs_reports e WHERE {fl} AND (e.create_date AT TIME ZONE 'Asia/Jakarta') < now() - interval '24 hours')
              FROM x"), &fp).await.map_err(internal)?;
         let g = |i: usize| r.get::<_, i64>(i);
         let d24 = if r.get::<_, bool>(8) { json!({ "alerts": pair(g(0), g(1)), "cases": pair(g(2), g(3)), "deaths": pair(g(4), g(5)), "provinces": pair(g(6), g(7)) }) } else { Value::Null };
@@ -507,19 +510,19 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     }
     if on_pe {
         let mut a = [vec![0i64; nb], vec![0i64; nb], vec![0i64; nb]];
-        for r in c.query(&format!("SELECT {bucket_p} d, COUNT(*)::bigint, COUNT(*) FILTER (WHERE c.outcome = 'Meninggal')::bigint, COUNT(DISTINCT c.province_id)::bigint
-                FROM pe_cases c WHERE {pe_where} GROUP BY 1"), &rpp).await.map_err(internal)? {
+        for r in c.query(&format!("SELECT {bucket_p} d, skdr_nsum(c.n)::bigint, skdr_nsum(c.n) FILTER (WHERE c.outcome = 'Meninggal')::bigint, COUNT(DISTINCT c.province_id)::bigint
+                FROM dash_ibs_cases c WHERE {pe_where} GROUP BY 1"), &rpp).await.map_err(internal)? {
             let Some(&i) = didx.get(&r.get::<_, NaiveDate>(0)) else { continue };
             for k in 0..3 { a[k][i] = r.get::<_, i64>(k + 1); }
         }
         let fl = "c.deleted_at IS NULL AND c.status = ANY($4) AND (cardinality($1::int[]) = 0 OR c.province_id = ANY($1)) AND (cardinality($2::int[]) = 0 OR c.kabkota_id = ANY($2)) AND skdr_unit_ok(c.data->>'unit_pelapor') AND (cardinality($3::int[]) = 0 OR c.disease_id = ANY($3))";
         let fp: [&(dyn tokio_postgres::types::ToSql + Sync); 4] = [&f.province, &f.kabkota, &dis, &counted];
-        let r = c.query_one(&format!("WITH x AS (SELECT c.outcome o, c.province_id p, CASE WHEN c.created_at >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
-                  FROM pe_cases c WHERE {fl} AND c.created_at >= now() - interval '48 hours' AND c.created_at <= now())
-             SELECT COUNT(*) FILTER (WHERE cur = 1)::bigint, COUNT(*) FILTER (WHERE cur = 0)::bigint,
-                    COUNT(*) FILTER (WHERE cur = 1 AND o = 'Meninggal')::bigint, COUNT(*) FILTER (WHERE cur = 0 AND o = 'Meninggal')::bigint,
+        let r = c.query_one(&format!("WITH x AS (SELECT c.outcome o, c.province_id p, c.n n, CASE WHEN c.created_at >= now() - interval '24 hours' THEN 1 ELSE 0 END cur
+                  FROM dash_ibs_cases c WHERE {fl} AND c.created_at >= now() - interval '48 hours' AND c.created_at <= now())
+             SELECT skdr_nsum(n) FILTER (WHERE cur = 1)::bigint, skdr_nsum(n) FILTER (WHERE cur = 0)::bigint,
+                    skdr_nsum(n) FILTER (WHERE cur = 1 AND o = 'Meninggal')::bigint, skdr_nsum(n) FILTER (WHERE cur = 0 AND o = 'Meninggal')::bigint,
                     COUNT(DISTINCT p) FILTER (WHERE cur = 1)::bigint, COUNT(DISTINCT p) FILTER (WHERE cur = 0)::bigint,
-                    EXISTS (SELECT 1 FROM pe_cases c WHERE {fl} AND c.created_at < now() - interval '24 hours')
+                    EXISTS (SELECT 1 FROM dash_ibs_cases c WHERE {fl} AND c.created_at < now() - interval '24 hours')
              FROM x"), &fp).await.map_err(internal)?;
         let g = |i: usize| r.get::<_, i64>(i);
         let d24 = if r.get::<_, bool>(6) { json!({ "cases": pair(g(0), g(1)), "deaths": pair(g(2), g(3)), "provinces": pair(g(4), g(5)) }) } else { Value::Null };
@@ -541,7 +544,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
                 COUNT(*) FILTER (WHERE {lag} <= 1)::bigint, COUNT(*) FILTER (WHERE {lag} > 1)::bigint,
                 COUNT(*) FILTER (WHERE e.create_date IS NULL OR e.tgl_laporan IS NULL)::bigint,
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY {lag})::float8, GROUPING(e.disease_id)::int
-              FROM ebs_reports e WHERE {ebs_where} AND NOT (COALESCE(e.sts_rumor, '') = ANY($6))
+              FROM dash_ebs_reports e WHERE {ebs_where} AND NOT (COALESCE(e.sts_rumor, '') = ANY($6))
               GROUP BY ROLLUP (e.disease_id)");
         let mut overall = Value::Null;
         let mut per: HashMap<i32, Value> = HashMap::new();
@@ -559,7 +562,7 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
         // PR 018: per-signal timing (latest alerts in the filter) for the 7-1-7 detail; each row opens the signal modal
         let sig = c.query(&format!("SELECT e.id_ebs, e.no_ebs, COALESCE(d.name, e.diagnosa), e.kota, e.propinsi, e.tgl_laporan::text,
                     to_char(e.create_date, 'YYYY-MM-DD HH24:MI'), {lag}, e.sts_rumor
-                FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id
+                FROM dash_ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id
                 WHERE {ebs_where} AND NOT (COALESCE(e.sts_rumor, '') = ANY($6))
                 ORDER BY {EBS_DATE} DESC NULLS LAST, e.id_ebs DESC LIMIT 30"), &ep2).await.map_err(internal)?;
         let signals: Vec<Value> = sig.iter().map(|r| json!({ "id": r.get::<_, i64>(0), "no_ebs": r.get::<_, Option<String>>(1), "disease": r.get::<_, Option<String>>(2),

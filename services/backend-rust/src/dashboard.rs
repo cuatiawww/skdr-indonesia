@@ -1,4 +1,6 @@
 //! NLP-PENYAKIT main-dashboard endpoints (same JSON shape), fed only by form case reports.
+//! PR 039: surveillance_reports (migration 060) = Laporan EBS (source "ebs") + Laporan Agregat IBS (source "ibs") entered in
+//! SKDR Indonesia; the old Form PE branch is no longer part of the main dashboard. `source=pe` (legacy links) means "ibs".
 use axum::{extract::{Query, State}, Json};
 use chrono::{Datelike, Duration, NaiveDate};
 use deadpool_postgres::Object;
@@ -149,7 +151,9 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
         None
     };
     // PR 012: "pe" = Kasus PE (individual reports); "form" = legacy case_reports (hidden menu, data kept)
-    let source = q.source.clone().map(|s| s.trim().to_lowercase()).filter(|s| s == "form" || s == "ebs" || s == "pe");
+    // PR 039: the second source of the dashboard is now Laporan Agregat IBS; "pe" (old links / other pages) is read as "ibs".
+    let source = q.source.clone().map(|s| s.trim().to_lowercase()).map(|s| if s == "pe" { "ibs".to_string() } else { s })
+        .filter(|s| s == "form" || s == "ebs" || s == "ibs");
     // PR 019: Unit pelapor — always (re)set on this pooled connection so a previous request's units never leak.
     let unit: Vec<String> = q.unit.as_deref().unwrap_or("").split('|').map(|u| u.trim().to_lowercase()).filter(|u| !u.is_empty() && !u.contains('\u{1f}')).collect();
     c.execute("SELECT set_config('skdr.units', $1, false)", &[&unit.join("\u{1f}")]).await.map_err(internal)?;
@@ -194,7 +198,13 @@ fn outbreak(
     cases: i64, deaths: i64, events: i64, case_date: String, created: String, reviewed: bool, detail: Value, src: String,
 ) -> Value {
     // PR 016: one marker per (location, disease, source) so EBS signals and Kasus PE are never merged on the map.
-    let (sname, stype) = match src.as_str() { "ebs" => ("EBS SKDR Kemenkes", "ebs"), "pe" => ("Penyelidikan Epidemiologi (Kasus PE)", "pe"), _ => ("Formulir Laporan Kasus", "form") };
+    // PR 039: IBS markers keep the UI's second-source slot ("pe" = diamond marker / teal colour) so the map code is unchanged.
+    let (sname, stype) = match src.as_str() {
+        "ebs" => ("Laporan EBS (SKDR Indonesia)", "ebs"),
+        "ibs" => ("Laporan Agregat IBS (SKDR Indonesia)", "pe"),
+        "pe" => ("Penyelidikan Epidemiologi (Kasus PE)", "pe"),
+        _ => ("Formulir Laporan Kasus", "form"),
+    };
     json!({
         "location_name": loc, "disease": disease, "country": country, "province": province, "city": null,
         "latitude": lat, "longitude": lng, "cases": cases, "deaths": deaths,

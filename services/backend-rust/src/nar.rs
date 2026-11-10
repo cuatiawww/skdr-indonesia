@@ -2,6 +2,7 @@
 //! Only item 76 (% NIK terisi, excluding GHPR) and the "tanpa NIK" segment of item 80 can be computed from SKDR data;
 //! items that need the NAR (lab) API are returned as `blocked` with what integration is required — never estimated.
 //! Excluded classifications and the NIK validity pattern come from app_settings.dashboard_executive.nar (migration 030).
+//! PR 039: counted from Laporan Agregat IBS (view dash_ibs_cases) instead of Form PE; aggregate rows carry no NIK.
 use axum::{extract::{Query, State}, Json};
 use serde_json::{json, Value};
 
@@ -22,10 +23,10 @@ pub async fn summary(State(s): State<AppState>, Query(q): Query<DashQuery>) -> R
     let w0 = f.start.unwrap_or(chrono::NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
     let w1 = f.end.unwrap_or(chrono::NaiveDate::from_ymd_opt(2999, 12, 31).unwrap());
     let rows = c.query(&format!(
-        "SELECT d.code, d.name, COUNT(*)::bigint,
-                COUNT(*) FILTER (WHERE NULLIF(trim(c.nik), '') IS NOT NULL)::bigint,
-                COUNT(*) FILTER (WHERE trim(c.nik) ~ $8)::bigint
-         FROM pe_cases c JOIN master_diseases d ON d.id = c.disease_id
+        "SELECT d.code, d.name, skdr_nsum(c.n)::bigint,
+                skdr_nsum(c.n) FILTER (WHERE NULLIF(trim(c.nik), '') IS NOT NULL)::bigint,
+                skdr_nsum(c.n) FILTER (WHERE trim(c.nik) ~ $8)::bigint
+         FROM dash_ibs_cases c JOIN master_diseases d ON d.id = c.disease_id
          WHERE c.deleted_at IS NULL AND c.status = ANY($6) AND {PE_DATE} BETWEEN $1 AND $2
            AND (cardinality($3::int[]) = 0 OR c.province_id = ANY($3)) AND (cardinality($4::int[]) = 0 OR c.kabkota_id = ANY($4)) AND skdr_unit_ok(c.data->>'unit_pelapor')
            AND (cardinality($5::int[]) = 0 OR c.disease_id = ANY($5))

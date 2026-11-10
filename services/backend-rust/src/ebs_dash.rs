@@ -1,4 +1,5 @@
 //! PR 023: analitik EBS lanjutan untuk Dasbor Utama + peta Sebaran wilayah, dari ebs_reports (API EBS SKDR).
+//! PR 039: sumbernya kini Laporan EBS yang diisi di SKDR Indonesia (view dash_ebs_reports, kolom sama dengan ebs_reports).
 //! Semua parameter (batas kasus, kelas histogram, jendela unit diam, target respons, kata kunci tindakan/saran)
 //! dari app_settings.ebs_dashboard_config (migrasi 049). Teks bebas (kronologi/tindakan/saran) tidak pernah dikirim:
 //! hanya jumlah per kelas kata kunci, jadi nama orang di teks tidak keluar.
@@ -66,7 +67,7 @@ pub async fn analitik(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
     let (cap, ks, kd) = caps(&cf);
     let pr = P::new(&f, &eq);
     let p = pr.p();
-    let from = format!("FROM ebs_reports e WHERE {W}");
+    let from = format!("FROM dash_ebs_reports e WHERE {W}");
     let n = |r: &tokio_postgres::Row, i: usize| r.get::<_, i64>(i);
 
     let kp = c.query_one(&format!("SELECT COUNT(*)::bigint, COALESCE(SUM({ks}),0)::bigint, COALESCE(SUM({kd}),0)::bigint,
@@ -81,15 +82,15 @@ pub async fn analitik(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
 
     // unit diam: melapor di jendela dasar, tidak melapor di N minggu terakhir (acuan = akhir data dalam filter)
     let (bw, sw) = (num(&cf, "silent_baseline_weeks", 12.0) as i32, num(&cf, "silent_weeks", 4.0) as i32);
-    let silent = c.query(&format!("WITH ref AS (SELECT MAX(e.tgl_laporan) r FROM ebs_reports e WHERE {W}),
+    let silent = c.query(&format!("WITH ref AS (SELECT MAX(e.tgl_laporan) r FROM dash_ebs_reports e WHERE {W}),
         u AS (SELECT e.unit, MAX(e.kel_unit) ku, MAX(e.kota) kota,
                      COUNT(*) FILTER (WHERE e.tgl_laporan > ref.r - {sw}*7 - {bw}*7 AND e.tgl_laporan <= ref.r - {sw}*7)::bigint base,
                      COUNT(*) FILTER (WHERE e.tgl_laporan > ref.r - {sw}*7)::bigint recent, MAX(e.tgl_laporan)::text last
-              FROM ebs_reports e, ref WHERE {W} AND trim(COALESCE(e.unit,'')) <> '' AND e.tgl_laporan > ref.r - {sw}*7 - {bw}*7 GROUP BY 1)
+              FROM dash_ebs_reports e, ref WHERE {W} AND trim(COALESCE(e.unit,'')) <> '' AND e.tgl_laporan > ref.r - {sw}*7 - {bw}*7 GROUP BY 1)
         SELECT unit, ku, kota, base, last, (SELECT r::text FROM ref) FROM u WHERE recent = 0 AND base >= 2 ORDER BY base DESC LIMIT 50"), &p).await.map_err(internal)?;
-    let silent_total = c.query_one(&format!("WITH ref AS (SELECT MAX(e.tgl_laporan) r FROM ebs_reports e WHERE {W}),
+    let silent_total = c.query_one(&format!("WITH ref AS (SELECT MAX(e.tgl_laporan) r FROM dash_ebs_reports e WHERE {W}),
         u AS (SELECT e.unit, COUNT(*) FILTER (WHERE e.tgl_laporan <= ref.r - {sw}*7) base, COUNT(*) FILTER (WHERE e.tgl_laporan > ref.r - {sw}*7) recent
-              FROM ebs_reports e, ref WHERE {W} AND trim(COALESCE(e.unit,'')) <> '' AND e.tgl_laporan > ref.r - {sw}*7 - {bw}*7 GROUP BY 1)
+              FROM dash_ebs_reports e, ref WHERE {W} AND trim(COALESCE(e.unit,'')) <> '' AND e.tgl_laporan > ref.r - {sw}*7 - {bw}*7 GROUP BY 1)
         SELECT COUNT(*) FILTER (WHERE recent = 0 AND base >= 2)::bigint, COUNT(*) FILTER (WHERE base >= 2)::bigint FROM u"), &p).await.map_err(internal)?;
 
     // 7-1-7 respons: pembaruan status pertama (update_date) sejak laporan dibuat (create_date)
@@ -103,7 +104,7 @@ pub async fn analitik(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
         COUNT(*) FILTER (WHERE e.update_date IS NOT NULL AND e.update_date >= e.create_date AND extract(epoch FROM e.update_date - e.create_date)/86400 <= {tgt})::bigint,
         percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM e.update_date - e.create_date)/86400)
           FILTER (WHERE e.update_date IS NOT NULL AND e.update_date >= e.create_date)::float8
-        FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id WHERE {W} GROUP BY 1 ORDER BY 2 DESC LIMIT 15"), &p).await.map_err(internal)?;
+        FROM dash_ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id WHERE {W} GROUP BY 1 ORDER BY 2 DESC LIMIT 15"), &p).await.map_err(internal)?;
 
     // funnel + tren status
     let funnel = c.query(&format!("SELECT COALESCE(NULLIF(trim(e.sts_rumor),''),'(kosong)'), COUNT(*)::bigint {from} GROUP BY 1 ORDER BY 2 DESC"), &p).await.map_err(internal)?;
@@ -124,12 +125,12 @@ pub async fn analitik(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
     }
     let flag = num(&cf, "outlier_flag_kasus", 100.0) as i32;
     let out = c.query(&format!("SELECT e.no_ebs, e.tgl_laporan::text, COALESCE(d.name, trim(e.diagnosa)), e.kota, e.propinsi, e.jml_kasus, e.jml_kematian
-        FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id WHERE {W} AND (e.jml_kasus >= {flag} OR e.jml_kematian < 0)
+        FROM dash_ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id WHERE {W} AND (e.jml_kasus >= {flag} OR e.jml_kematian < 0)
         ORDER BY (e.jml_kematian < 0) DESC, e.jml_kasus DESC LIMIT 40"), &p).await.map_err(internal)?;
     let klb = c.query(&format!("SELECT trim(COALESCE(e.klb,'')), COUNT(*)::bigint, COALESCE(SUM({ks}),0)::bigint, COALESCE(SUM({kd}),0)::bigint {from} GROUP BY 1 ORDER BY 1 DESC"), &p).await.map_err(internal)?;
     let coord = c.query(&format!("SELECT COALESCE(l.name, e.propinsi), COUNT(*)::bigint,
         COUNT(*) FILTER (WHERE e.latitude IS NOT NULL AND e.longitude IS NOT NULL AND e.latitude <> 0)::bigint
-        FROM ebs_reports e LEFT JOIN master_locations l ON l.id = e.province_id WHERE {W} GROUP BY 1 ORDER BY 2 DESC"), &p).await.map_err(internal)?;
+        FROM dash_ebs_reports e LEFT JOIN master_locations l ON l.id = e.province_id WHERE {W} GROUP BY 1 ORDER BY 2 DESC"), &p).await.map_err(internal)?;
     // tindakan / saran: kelas kata kunci, hanya jumlah
     let mut classes = vec![];
     for (field, key) in [("tindakan", "tindakan_kelas"), ("saran", "saran_kelas")] {
@@ -149,7 +150,7 @@ pub async fn analitik(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
     }
     // perbandingan tahun lalu (mingguan)
     let wk = || format!("SELECT extract(isoyear FROM e.tgl_laporan)::int, extract(week FROM e.tgl_laporan)::int, COUNT(*)::bigint, COALESCE(SUM({ks}),0)::bigint
-        FROM ebs_reports e WHERE {W} GROUP BY 1, 2 ORDER BY 1, 2");
+        FROM dash_ebs_reports e WHERE {W} GROUP BY 1, 2 ORDER BY 1, 2");
     let cur = c.query(&wk(), &p).await.map_err(internal)?;
     let pv = pr.prev();
     let prev_rows = if pr.d0.is_some() { c.query(&wk(), &pv.p()).await.map_err(internal)? } else { vec![] };
@@ -214,14 +215,14 @@ pub async fn wilayah(State(s): State<AppState>, Query(q): Query<DashQuery>, Quer
         format!("SELECT {key}, {name}, {geo}, {lat}::float8, {lng}::float8, COUNT(*)::bigint, COALESCE(SUM({ks}),0)::bigint, COALESCE(SUM({kd}),0)::bigint,
                 COUNT(*) FILTER (WHERE e.latitude IS NOT NULL AND e.longitude IS NOT NULL AND e.latitude <> 0)::bigint,
                 COUNT(*) FILTER (WHERE trim(COALESCE(e.klb,'')) = '1')::bigint
-         FROM ebs_reports e {join} WHERE {W} AND {key} IS NOT NULL {gb}")
+         FROM dash_ebs_reports e {join} WHERE {W} AND {key} IS NOT NULL {gb}")
     };
     let rows = c.query(&sql(), &pr.p()).await.map_err(internal)?;
     let pv = pr.prev();
     let prev_rows = if pr.d0.is_some() { c.query(&sql(), &pv.p()).await.map_err(internal)? } else { vec![] };
     let prev: HashMap<String, i64> = prev_rows.iter().map(|r| (r.get::<_, String>(0), r.get::<_, i64>(5))).collect();
-    let opts = c.query("SELECT 'kel_unit', COALESCE(NULLIF(trim(kel_unit),''),'(kosong)'), COUNT(*)::bigint FROM ebs_reports GROUP BY 2
-                        UNION ALL SELECT 'sts_rumor', COALESCE(NULLIF(trim(sts_rumor),''),'(kosong)'), COUNT(*)::bigint FROM ebs_reports GROUP BY 2 ORDER BY 1, 3 DESC", &[])
+    let opts = c.query("SELECT 'kel_unit', COALESCE(NULLIF(trim(kel_unit),''),'(kosong)'), COUNT(*)::bigint FROM dash_ebs_reports GROUP BY 2
+                        UNION ALL SELECT 'sts_rumor', COALESCE(NULLIF(trim(sts_rumor),''),'(kosong)'), COUNT(*)::bigint FROM dash_ebs_reports GROUP BY 2 ORDER BY 1, 3 DESC", &[])
         .await.map_err(internal)?;
     let n = |r: &tokio_postgres::Row, i: usize| r.get::<_, i64>(i);
     Ok(Json(json!({ "success": true, "data": {

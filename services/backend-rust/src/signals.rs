@@ -2,6 +2,8 @@
 //! source = "ebs" (id = id_ebs) or "pe" (id = pe_cases.id). Only stored fields are returned; dates that the source
 //! does not carry are null and listed in `missing` (the UI shows "Data belum tersedia"), never estimated.
 //! 7-1-7 targets (7 / 1 / 7 days) are the framework definition; colour thresholds come from dashboard_executive.t717.
+//! PR 039: negative ids are local form reports (migration 060): ebs -> Laporan EBS (dash_ebs_reports), pe -> Laporan
+//! Individu IBS (dash_ibs_individu). The CFR death list (pe_deaths) now reads Laporan Individu IBS.
 use axum::{extract::{Path, Query, State}, http::StatusCode, Json};
 use crate::dashboard::{current_mmwr, resolve, DashQuery};
 use chrono::NaiveDate;
@@ -24,12 +26,12 @@ pub async fn detail(State(s): State<AppState>, Path((source, id)): Path<(String,
     match source.as_str() {
         "ebs" => {
             let r = c.query_opt(
-                "SELECT e.id_ebs, e.no_ebs, COALESCE(d.name, e.diagnosa), d.code, e.diagnosa, e.verifikasi, e.sts_rumor, e.klb,
+                &format!("SELECT e.id_ebs, e.no_ebs, COALESCE(d.name, e.diagnosa), d.code, e.diagnosa, e.verifikasi, e.sts_rumor, e.klb,
                         e.propinsi, e.kota, e.distrik, e.kel_unit, e.unit, COALESCE(e.latitude, k.latitude), COALESCE(e.longitude, k.longitude), e.latitude IS NOT NULL,
                         e.tgl_laporan, e.create_date::date, to_char(e.create_date, 'YYYY-MM-DD HH24:MI'), to_char(e.update_date, 'YYYY-MM-DD HH24:MI'),
                         e.jml_kasus, e.jml_kematian, e.kronologi, e.tindakan, e.saran, to_char(e.synced_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI')
-                 FROM ebs_reports e LEFT JOIN master_diseases d ON d.id = e.disease_id LEFT JOIN master_kabkota k ON k.id = e.kabkota_id
-                 WHERE e.id_ebs = $1", &[&id]).await.map_err(internal)?.ok_or_else(not_found)?;
+                 FROM {} e LEFT JOIN master_diseases d ON d.id = e.disease_id LEFT JOIN master_kabkota k ON k.id = e.kabkota_id
+                 WHERE e.id_ebs = $1", if id < 0 { "dash_ebs_reports" } else { "ebs_reports" }), &[&id]).await.map_err(internal)?.ok_or_else(not_found)?;
             let no_ebs: Option<String> = r.get(1);
             let pe = c.query("SELECT id, no_pe, form_key, status FROM pe_cases WHERE deleted_at IS NULL AND (ebs_link = $1 OR ebs_link = $2) ORDER BY id",
                 &[&no_ebs.clone().unwrap_or_default(), &id.to_string()]).await.map_err(internal)?;
@@ -61,22 +63,23 @@ pub async fn detail(State(s): State<AppState>, Path((source, id)): Path<(String,
                 "counts": { "cases": r.get::<_, Option<i32>>(20), "deaths": r.get::<_, Option<i32>>(21) },
                 "texts": texts, "privacy": { "masked": masker.enabled, "replacements": masked_n },
                 "reporter": r.get::<_, Option<String>>(12), "synced_at": r.get::<_, Option<String>>(25),
-                "links": pe.iter().map(|p| json!({ "label": p.get::<_, String>(1), "href": format!("/pe/{}/{}?mode=lihat", p.get::<_, String>(2), p.get::<_, i64>(0)), "status": p.get::<_, String>(3) })).collect::<Vec<_>>(),
+                "links": if id < 0 { vec![json!({ "label": "Buka Laporan EBS", "href": format!("/ebs/laporan/{}", -id) })] } else {
+                    pe.iter().map(|p| json!({ "label": p.get::<_, String>(1), "href": format!("/pe/{}/{}?mode=lihat", p.get::<_, String>(2), p.get::<_, i64>(0)), "status": p.get::<_, String>(3) })).collect::<Vec<_>>() },
             }})))
         }
         "pe" => {
             let r = c.query_opt(
-                "SELECT p.id, p.no_pe, p.form_key, d.name, d.code, p.status, COALESCE(p.classification_override, p.classification), p.classification_override IS NOT NULL,
+                &format!("SELECT p.id, p.no_pe, p.form_key, d.name, d.code, p.status, COALESCE(p.classification_override, p.classification), p.classification_override IS NOT NULL,
                         l.name, k.name, p.data->>'kecamatan', COALESCE(p.data->>'unit_pelapor', p.data->>'puskesmas'), k.latitude, k.longitude,
                         p.tgl_rumor, p.onset_date, p.tgl_laporan, p.created_at::date, to_char(p.created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI'), p.tgl_pe,
                         to_char(p.submitted_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI'), to_char(p.verified_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI'),
                         to_char(p.finalized_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI'), p.outcome, p.death_date::text, p.ebs_link, p.patient_name,
                         COALESCE(p.data->>'nama_petugas', p.data->>'nama_petugas_pe'), p.classification_basis, p.sex, p.age_years, cl.code,
                         df.schema->'classification'
-                 FROM pe_cases p LEFT JOIN master_diseases d ON d.id = p.disease_id LEFT JOIN master_locations l ON l.id = p.province_id
+                 FROM {} p LEFT JOIN master_diseases d ON d.id = p.disease_id LEFT JOIN master_locations l ON l.id = p.province_id
                  LEFT JOIN master_kabkota k ON k.id = p.kabkota_id LEFT JOIN pe_clusters cl ON cl.id = p.cluster_id
                  LEFT JOIN pe_form_definitions df ON df.id = p.definition_id
-                 WHERE p.id = $1 AND p.deleted_at IS NULL", &[&id]).await.map_err(internal)?.ok_or_else(not_found)?;
+                 WHERE p.id = $1 AND p.deleted_at IS NULL", if id < 0 { "dash_ibs_individu" } else { "pe_cases" }), &[&id]).await.map_err(internal)?.ok_or_else(not_found)?;
             let (rumor, onset, tgl, created, tpe): (Option<NaiveDate>, Option<NaiveDate>, Option<NaiveDate>, Option<NaiveDate>, Option<NaiveDate>) = (r.get(14), r.get(15), r.get(16), r.get(17), r.get(19));
             let emerg = onset.or(rumor);
             let cls: Option<String> = r.get(6);
@@ -113,7 +116,8 @@ pub async fn detail(State(s): State<AppState>, Path((source, id)): Path<(String,
                 "counts": { "cases": 1, "deaths": if outcome.as_deref() == Some("Meninggal") { 1 } else { 0 } },
                 "outcome": outcome, "death_date": r.get::<_, Option<String>>(24), "patient": { "initials": initials, "sex": r.get::<_, Option<String>>(29), "age_years": r.get::<_, Option<i32>>(30) },
                 "cluster": r.get::<_, Option<String>>(31), "ebs_link": r.get::<_, Option<String>>(25), "reporter": r.get::<_, Option<String>>(27),
-                "links": [{ "label": "Buka formulir PE", "href": format!("/pe/{}/{}?mode=lihat", form, r.get::<_, i64>(0)) }],
+                "links": [if id < 0 { json!({ "label": "Buka Laporan Individu IBS", "href": format!("/ibs/individu/{}", -id) }) }
+                          else { json!({ "label": "Buka formulir PE", "href": format!("/pe/{}/{}?mode=lihat", form, r.get::<_, i64>(0)) }) }],
             }})))
         }
         _ => Err((StatusCode::BAD_REQUEST, Json(json!({ "success": false, "error": "Sumber harus ebs atau pe" })))),
@@ -136,7 +140,7 @@ pub async fn pe_deaths(State(s): State<AppState>, Query(q): Query<DeathsQuery>, 
     let rows = c.query(
         "SELECT p.id, p.no_pe, COALESCE(p.data->>'unit_pelapor', p.data->>'puskesmas', p.data->>'nama_faskes'), k.name, l.name,
                 COALESCE(p.tgl_laporan, p.created_at::date), p.status, COALESCE(p.classification_override, p.classification), p.death_date::text
-         FROM pe_cases p LEFT JOIN master_kabkota k ON k.id = p.kabkota_id LEFT JOIN master_locations l ON l.id = p.province_id
+         FROM dash_ibs_individu p LEFT JOIN master_kabkota k ON k.id = p.kabkota_id LEFT JOIN master_locations l ON l.id = p.province_id
          WHERE p.deleted_at IS NULL AND p.form_key = $1 AND COALESCE(p.classification_override, p.classification) = ANY($2) AND p.outcome = $3
            AND (cardinality($4::text[]) = 0 OR p.status = ANY($4))
            AND ($5::date IS NULL OR COALESCE(p.tgl_laporan, p.created_at::date) >= $5) AND ($6::date IS NULL OR COALESCE(p.tgl_laporan, p.created_at::date) <= $6)

@@ -1,4 +1,6 @@
-//! PR 022: seksi Dasbor Utama dari Alert SKDR mingguan (skdr_alert_fakta): epi curve, Alert, CFR, 7-1-7.
+//! PR 022: seksi Dasbor Utama dari Alert SKDR mingguan: epi curve, Alert, CFR, 7-1-7.
+//! PR 039: sumbernya kini Laporan Agregat IBS yang diisi di SKDR Indonesia (view dash_ibs_fakta, kolom sama dengan
+//! skdr_alert_fakta; satu baris = satu laporan mingguan unit x penyakit dengan kasus > 0).
 //! Semua angka dihitung dari data API yang tersinkron; parameter tampilan (jendela rata-rata bergerak, ambang, urutan seksi)
 //! dari app_settings (migrasi 047). Tidak ada nilai contoh/perkiraan: bila data tidak ada, field bernilai null.
 use axum::{extract::{Query, State}, Json};
@@ -25,7 +27,7 @@ fn kd(cap: i64) -> String { format!("(CASE WHEN a.kasus <= {cap} THEN a.jml_kema
 async fn outliers(c: &Object, p: &[&(dyn ToSql + Sync)], cap: i64) -> Result<Vec<Value>, ApiError> {
     if cap == i64::MAX { return Ok(vec![]); }
     let r = c.query(&format!("SELECT a.tahun, a.minggu, COALESCE(d.name, a.nama_penyakit, '-'), a.kota, a.provinsi, a.kasus, a.jml_kematian
-        FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id WHERE {AW} AND a.kasus > {cap} ORDER BY a.kasus DESC LIMIT 20"), p)
+        FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id WHERE {AW} AND a.kasus > {cap} ORDER BY a.kasus DESC LIMIT 20"), p)
         .await.map_err(internal)?;
     Ok(r.iter().map(|r| json!({ "year": r.get::<_, i32>(0), "week": r.get::<_, i32>(1), "disease": r.get::<_, String>(2),
         "kabkota": r.get::<_, Option<String>>(3), "province": r.get::<_, Option<String>>(4), "cases": r.get::<_, i32>(5), "deaths": r.get::<_, i32>(6) })).collect())
@@ -66,7 +68,7 @@ pub async fn epicurve(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
     let (kse, kde) = (ks(cap), kd(cap));
     // no period chosen: latest synced year
     if a.w0 == 0 && a.w1 == 999_999 {
-        let y: Option<i32> = c.query_one("SELECT MAX(tahun) FROM skdr_alert_fakta", &[]).await.map_err(internal)?.get(0);
+        let y: Option<i32> = c.query_one("SELECT MAX(tahun) FROM dash_ibs_fakta", &[]).await.map_err(internal)?.get(0);
         if let Some(y) = y { a.w0 = y * 100 + 1; a.w1 = y * 100 + 53; }
     }
     let group = e.group.unwrap_or_else(|| "disease".into());
@@ -78,7 +80,7 @@ pub async fn epicurve(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
     };
     let sql = format!("SELECT a.tahun, a.minggu, {gsel}, COALESCE(SUM({kse}),0)::bigint, COALESCE(SUM({kde}),0)::bigint, COUNT(*)::bigint,
             COUNT(*) FILTER (WHERE a.is_klb)::bigint
-        FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id {gjoin} WHERE {AW} GROUP BY 1, 2, 3");
+        FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id {gjoin} WHERE {AW} GROUP BY 1, 2, 3");
     let p: Vec<&(dyn ToSql + Sync)> = a.p().to_vec();
     let rows = c.query(&sql, &p).await.map_err(internal)?;
     // previous year, same filter, totals only
@@ -88,7 +90,7 @@ pub async fn epicurve(State(s): State<AppState>, Query(q): Query<DashQuery>, Que
     let out_cur = outliers(&c, &p, cap).await?;
     let out_prev = outliers(&c, &pp, cap).await?;
     let prev = c.query(&format!("SELECT a.tahun*100 + a.minggu + 100, COALESCE(SUM({kse}),0)::bigint, COALESCE(SUM({kde}),0)::bigint
-        FROM skdr_alert_fakta a WHERE {AW} GROUP BY 1"), &pp).await.map_err(internal)?;
+        FROM dash_ibs_fakta a WHERE {AW} GROUP BY 1"), &pp).await.map_err(internal)?;
     let prev: HashMap<i32, (i64, i64)> = prev.iter().map(|r| (r.get(0), (r.get(1), r.get(2)))).collect();
 
     // weeks axis: every week from first to last week with data (gaps filled with 0)
@@ -161,7 +163,7 @@ pub async fn alert_skdr(State(s): State<AppState>, Query(q): Query<DashQuery>) -
     let cap = cap(&cf);
     let (kse, kde) = (ks(cap), kd(cap));
     let p: Vec<&(dyn ToSql + Sync)> = a.p().to_vec();
-    let from = format!("FROM skdr_alert_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id WHERE {AW}");
+    let from = format!("FROM dash_ibs_fakta a LEFT JOIN master_diseases d ON d.id = a.disease_id WHERE {AW}");
     // lag = tanggal verifikasi - akhir minggu epid (Sabtu)
     let lag = "(a.tgl_verifikasi::date - (to_date(a.tahun::text || lpad(a.minggu::text, 2, '0'), 'IYYYIW') + 5))";
     let k = c.query_one(&format!(
