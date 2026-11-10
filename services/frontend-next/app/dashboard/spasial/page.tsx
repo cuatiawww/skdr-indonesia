@@ -1,9 +1,11 @@
-'use client'
-// PR 029: Dasbor Limited placeholder (menu only for now; real feature postponed). Login required.
-import UnderDevelopment from '@/components/UnderDevelopment'
-import { useTranslation } from '@/lib/i18n/LanguageContext'
+// PR 044: Spasial (Dasbor Limited) - replaces the PR 029 placeholder. Login required (LIMITED_PREFIXES).
+import { Suspense } from 'react'
+import SpasialClient from '@/components/spasial/SpasialClient'
 
 export default function SpasialPage() {
-  const { t } = useTranslation()
-  return <div data-testid="limited-spasial"><UnderDevelopment description={t('skdr.access.spasialDesc')} /></div>
+  return (
+    <div data-testid="limited-spasial">
+      <Suspense fallback={null}><SpasialClient /></Suspense>
+    </div>
+  )
 }

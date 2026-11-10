@@ -189,7 +189,7 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_tv', 'Mode TV', '/tv', 'Tv', 3),
   ] },
   { id: 'grp_dasbor_limited', title: 'Dasbor Limited', order: 3, enabled: true, area: 'dashboard', requiresAuth: true, items: [
-    it('mod_spasial', 'Spasial', '/dashboard/spasial', 'MapPin', 1, { badge: 'Segera' }),
+    it('mod_spasial', 'Spasial', '/dashboard/spasial', 'MapPin', 1),
     it('mod_matriks_analisa', 'Matriks Analisa', '/dashboard/matriks-analisa', 'Layers', 2),
   ] },
   { id: 'grp_tatakelola', title: 'Tata Kelola', order: 4, enabled: true, area: 'tatakelola', requiresAuth: true, permission: 'tatakelola', items: [

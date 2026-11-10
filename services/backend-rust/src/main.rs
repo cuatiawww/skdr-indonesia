@@ -27,6 +27,7 @@ mod impor_lama;
 mod dasbor_ebs_ibs;
 mod dasbor_mbg;
 mod analisa;
+mod spasial;
 
 use axum::{http::StatusCode, routing::{delete, get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -115,6 +116,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/analisa/sinyal", get(analisa::sinyal))
         .route("/api/v1/analisa/daftar", get(analisa::daftar))
         .route("/api/v1/analisa/profil", get(analisa::profil))
+        .route("/api/v1/analisa/spasial", get(spasial::spasial))
+        .route("/api/v1/analisa/spasial/wilayah", get(spasial::wilayah_detail))
+        .route("/api/v1/analisa/spasial/daftar", get(spasial::daftar))
         .route("/api/v1/integrasi/alert-skdr/status", get(alert::status))
         .route("/api/v1/integrasi/alert-skdr/sync", post(alert::sync_now))
         .route("/api/v1/master/provinces", get(master::provinces))

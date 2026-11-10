@@ -46,6 +46,10 @@ pub struct Q {
     pub per: Option<i64>,
     pub q: Option<String>,
     pub urut: Option<String>,
+    // PR 044 Spasial
+    pub kasus_min: Option<i64>,
+    pub wlv: Option<String>,
+    pub wid: Option<i32>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -270,7 +274,7 @@ pub const USIA: &[(&str, &str)] = &[
 fn usia_label(k: &str) -> String { USIA.iter().find(|(a, _)| *a == k).map(|(_, b)| b.to_string()).unwrap_or_else(|| k.to_string()) }
 const BULAN: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
-fn wlabel(d: NaiveDate) -> String { let (y, w) = mmwr_week_of(d); week_label(y, w) }
+pub(crate) fn wlabel(d: NaiveDate) -> String { let (y, w) = mmwr_week_of(d); week_label(y, w) }
 
 fn periode_expr(per: &str) -> &'static str {
     match per { "bulan" => "to_char(f.tgl, 'YYYY-MM')", "tahun" => "EXTRACT(YEAR FROM f.ws + 3)::int::text", _ => "f.ws::text" }
@@ -288,10 +292,10 @@ fn periode_label(per: &str, k: &str) -> String {
 
 pub fn pct(n: i64, d: i64) -> Value { if d > 0 { json!((n as f64 * 1000.0 / d as f64).round() / 10.0) } else { Value::Null } }
 fn pct_cap(n: i64, d: i64) -> Value { if d > 0 { json!(((n.min(d)) as f64 * 1000.0 / d as f64).round() / 10.0) } else { Value::Null } }
-fn chg(cur: i64, prev: i64) -> Value { if prev > 0 { json!(((cur - prev) as f64 * 1000.0 / prev as f64).round() / 10.0) } else { Value::Null } }
+pub(crate) fn chg(cur: i64, prev: i64) -> Value { if prev > 0 { json!(((cur - prev) as f64 * 1000.0 / prev as f64).round() / 10.0) } else { Value::Null } }
 
 /// Wilson 95% CI for a proportion (CFR), in percent.
-fn wilson(k: i64, n: i64) -> Value {
+pub(crate) fn wilson(k: i64, n: i64) -> Value {
     if n <= 0 { return Value::Null; }
     let (z, nf, p) = (1.96f64, n as f64, k as f64 / n as f64);
     let den = 1.0 + z * z / nf;
@@ -326,7 +330,7 @@ async fn data_start(c: &deadpool_postgres::Object, f: &F) -> Result<(Option<Naiv
     })))
 }
 
-fn fmt_n(n: i64) -> String {
+pub(crate) fn fmt_n(n: i64) -> String {
     let s = n.abs().to_string();
     let mut out = String::new();
     for (i, ch) in s.chars().enumerate() { if i > 0 && (s.len() - i) % 3 == 0 { out.push('.'); } out.push(ch); }
@@ -334,7 +338,7 @@ fn fmt_n(n: i64) -> String {
 }
 fn src_label(s: Src) -> &'static str { match s { Src::Ebs => "Laporan EBS", Src::Ibs => "Laporan Agregat IBS", Src::Semua => "Laporan EBS + Laporan Agregat IBS" } }
 
-fn meta(f: &F, names: &Names) -> Value {
+pub(crate) fn meta(f: &F, names: &Names) -> Value {
     let (y0, w0) = mmwr_week_of(f.d0);
     let (y1, w1) = mmwr_week_of(f.d1);
     json!({
