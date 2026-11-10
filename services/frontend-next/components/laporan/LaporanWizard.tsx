@@ -486,8 +486,9 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
   )
 }
 
-function Stepper({ def, stats, tot, stepIdx, goto, errorsCount, jumpNext, editable }: {
-  def: FormDef; stats: ReturnType<typeof stepStats>; tot: ReturnType<typeof overall>; stepIdx: number; goto: (i: number) => void
+/** PR 033: exported — also used by the Pengawasan Gizi MBG wizard (same look & interaction) */
+export function Stepper({ def, stats, tot, stepIdx, goto, errorsCount, jumpNext, editable }: {
+  def: Pick<FormDef, 'steps'>; stats: ReturnType<typeof stepStats>; tot: ReturnType<typeof overall>; stepIdx: number; goto: (i: number) => void
   errorsCount: number; jumpNext: () => void; editable: boolean
 }) {
   const steps = def.steps

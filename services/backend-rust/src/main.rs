@@ -15,6 +15,7 @@ mod master_admin;
 mod pe;
 mod pe_engine;
 mod laporan;
+mod pengawasan_gizi;
 mod external_sync;
 mod alert;
 mod kategori;
@@ -134,6 +135,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/laporan/:jenis/:id/kirim", post(laporan::kirim))
         .route("/api/v1/laporan/:jenis/:id/lampiran", post(laporan::lampiran_upload).layer(axum::extract::DefaultBodyLimit::max(laporan::MAX_LAMPIRAN + 64 * 1024)))
         .route("/api/v1/laporan/:jenis/:id/lampiran/:lid", get(laporan::lampiran_get).delete(laporan::lampiran_delete))
+        // PR 033: Pengawasan Gizi MBG (kunjungan + Formulir 1–13, draf, kirim, lampiran)
+        .route("/api/v1/pengawasan-gizi-ref/prefill", get(pengawasan_gizi::prefill))
+        .route("/api/v1/pengawasan-gizi", get(pengawasan_gizi::list).post(pengawasan_gizi::create))
+        .route("/api/v1/pengawasan-gizi/:id", get(pengawasan_gizi::get_one).put(pengawasan_gizi::update).delete(pengawasan_gizi::remove))
+        .route("/api/v1/pengawasan-gizi/:id/kirim", post(pengawasan_gizi::kirim))
+        .route("/api/v1/pengawasan-gizi/:id/form/:no", get(pengawasan_gizi::form_get).put(pengawasan_gizi::form_save))
+        .route("/api/v1/pengawasan-gizi/:id/form/:no/kirim", post(pengawasan_gizi::form_kirim))
+        .route("/api/v1/pengawasan-gizi/:id/form/:no/buka", post(pengawasan_gizi::form_buka))
+        .route("/api/v1/pengawasan-gizi/:id/lampiran", post(pengawasan_gizi::lampiran_upload).layer(axum::extract::DefaultBodyLimit::max(laporan::MAX_LAMPIRAN + 64 * 1024)))
+        .route("/api/v1/pengawasan-gizi/:id/lampiran/:lid", get(pengawasan_gizi::lampiran_get).delete(pengawasan_gizi::lampiran_delete))
         // form
         .route("/api/v1/case-reports", get(case_reports::list).post(case_reports::create))
         // main dashboard (NLP shapes, form data only)

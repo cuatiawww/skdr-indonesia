@@ -11,6 +11,8 @@ export type FieldType =
   | 'province' | 'kabkota' | 'kecamatan' | 'unit' | 'agegrid' | 'ibsgrid' | 'lampiran' | 'epiweek' | 'tahun' | 'check' | 'domsama'
   // PR 031: decimal measurement ("36,5"), age in tahun/bulan/hari (three inputs, empty = not filled)
   | 'decimal' | 'umur'
+  // PR 033: custom renderer supplied by the module (Pengawasan Gizi MBG checklist rows, grids, uploads)
+  | 'mbg'
 
 export interface FieldDef {
   key: string
@@ -46,6 +48,8 @@ export interface FieldDef {
   locked?: (d: Data) => string | null
   /** info chip renderer */
   info?: (d: Data, ctx: { no: string | null }) => string
+  /** PR 033: type 'mbg' — renderer kind + parameters (see components/pengawasan-gizi/MbgFields.tsx) */
+  mbg?: { kind: string; [k: string]: any }
 }
 
 export interface SectionDef { id: string; title: string; desc?: string; fields: FieldDef[]; visible?: (d: Data) => boolean; tone?: 'accent' }
@@ -160,7 +164,7 @@ export function visibleFields(step: StepDef, d: Data): FieldDef[] {
   return out
 }
 
-export function stepStats(def: FormDef, d: Data, errors: Issue[]) {
+export function stepStats(def: Pick<FormDef, 'steps'>, d: Data, errors: Issue[]) {
   const errKeys = new Set(errors.map((e) => e.key.split('.')[0]))
   return def.steps.map((st) => {
     let total = 0, done = 0

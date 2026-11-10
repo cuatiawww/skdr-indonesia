@@ -27,7 +27,7 @@ type Obj = Map<String, Value>;
 
 const OFFSET_HOURS: i64 = 7; // WIB
 pub const MAX_LAMPIRAN: usize = 5 * 1024 * 1024;
-const LAMPIRAN_TIPE: &[&str] = &[
+pub const LAMPIRAN_TIPE: &[&str] = &[
     "application/pdf", "image/jpeg", "image/png", "image/webp", "text/csv", "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

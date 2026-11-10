@@ -10,7 +10,7 @@ export type Need = { kind: 'public' } | { kind: 'login' } | { kind: 'perm'; perm
 const under = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`)
 
 const DASHBOARD_PREFIXES = ['/dashboard', '/main-dashboard', '/dasbor', '/penyakit', '/tv', '/dokumentasi', '/laboratorium', '/klaster']
-const TATAKELOLA_PREFIXES = ['/tatakelola', '/pe', '/ebs', '/ibs', '/integrasi', '/master']
+const TATAKELOLA_PREFIXES = ['/tatakelola', '/pe', '/ebs', '/ibs', '/integrasi', '/master', '/pengawasan-gizi'] // PR 033: + Pengawasan Gizi MBG
 
 export const LIMITED_PREFIXES = ['/dashboard/spasial', '/dashboard/matriks-analisa']
 
