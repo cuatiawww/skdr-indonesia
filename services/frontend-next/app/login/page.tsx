@@ -5,7 +5,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Activity, ArrowLeft, Eye, EyeOff, LayoutDashboard, Lock, LogIn, Map as MapIcon, ShieldCheck, User } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Lock, LogIn, User } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 import { useSettings } from '@/lib/settings-context'
@@ -44,6 +44,7 @@ function LoginForm() {
   }
 
   const logo = settings.login_logo_url || settings.sidebar_logo_url || `${PUBLIC_BASE_PATH}/Logo-Kemenkes.png`
+  const loginBg = `${PUBLIC_BASE_PATH}/images/bg%20login%20skdr.webp`
   const appName = settings.app_name || t('skdr.layout.appName')
   const tagline = settings.app_tagline || t('skdr.layout.appTagline')
   const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50/70 py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-brand-100'
@@ -108,37 +109,8 @@ function LoginForm() {
       </div>
 
       {/* hero */}
-      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden bg-brand-900 p-10 text-white lg:flex xl:p-14">
-        <div aria-hidden className="absolute inset-0 bg-cover bg-[position:right_top] opacity-30 mix-blend-luminosity" style={{ backgroundImage: `url(${PUBLIC_BASE_PATH}/home.jpg)` }} />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-brand-900/95 via-brand-800/80 to-brand-600/60"
-          style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1 text-xs font-semibold tracking-wide text-brand-50 backdrop-blur-sm">
-            <ShieldCheck className="h-3.5 w-3.5 text-secondary" /> {t('skdr.auth.heroBadge')}
-          </div>
-        </div>
-        <div className="relative z-10 my-auto max-w-xl py-12">
-          <div className="h-1 w-16 rounded-full bg-secondary" />
-          <h2 className="mt-5 text-3xl font-black uppercase leading-tight tracking-tight xl:text-4xl">{appName}</h2>
-          <p className="mt-3 text-sm leading-relaxed text-brand-50/90 xl:text-base">{t('skdr.auth.heroText')}</p>
-          <div className="mt-8 grid grid-cols-2 gap-4">
-            {[
-              { icon: LayoutDashboard, k: 'heroCard1' },
-              { icon: MapIcon, k: 'heroCard2' },
-              { icon: Activity, k: 'heroCard3' },
-              { icon: ShieldCheck, k: 'heroCard4' },
-            ].map(({ icon: Icon, k }) => (
-              <div key={k} className="rounded-2xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md">
-                <div className="flex items-center gap-2.5">
-                  <Icon className="h-5 w-5 text-secondary" />
-                  <span className="text-xs font-bold uppercase tracking-wider">{t(`skdr.auth.${k}Title`)}</span>
-                </div>
-                <p className="mt-2 text-xs text-brand-50/90">{t(`skdr.auth.${k}Text`)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="relative z-10 text-xs text-brand-50/70">{t('skdr.auth.heroFoot')}</div>
+      <div className="relative hidden flex-1 overflow-hidden bg-slate-100 lg:block">
+        <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${loginBg}")` }} />
       </div>
     </div>
   )
