@@ -47,11 +47,12 @@ const wilayahReset = ['kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode'
 
 export const INDIVIDU_FORM: FormDef = {
   jenis: 'individu',
-  title: 'Form Individu (IBS)',
+  title: 'Laporan Individu IBS',
+  description: 'Untuk mencatat satu pasien per laporan (Surveilans Berbasis Indikator): identitas pasien, penyakit yang didiagnosis, hasil pemeriksaan, dan status akhir pasien.',
   short: 'Individu',
-  eyebrow: 'SKDR-IBS · Form Individu',
+  eyebrow: 'SKDR-IBS · Data per Pasien',
   listHref: '/ibs/individu',
-  listTitle: 'Form Individu',
+  listTitle: 'Laporan Individu IBS',
   addLabel: 'Pasien Baru',
   searchPlaceholder: 'Cari nomor, pasien, No Epid, diagnosa, unit…',
   prefillKeys: ['jenis_unit', 'provinsi_id', 'kabkota_id', 'kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode', 'petugas', 'hp_petugas'],

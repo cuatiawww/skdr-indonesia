@@ -197,9 +197,9 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_form_pe', 'Form PE', '#', 'FileText', 1, { source: 'pe_forms', subItems: [
       { id: 'sub_pe_daftar', label: 'Daftar PE', href: '/pe', icon: 'FileSpreadsheet', order: 99, enabled: true },
     ] }),
-    it('mod_laporan_ebs', 'Laporan EBS', '/ebs/laporan', 'Radio', 2), // PR 030
-    it('mod_laporan_ibs', 'Entri Data Agregat', '/ibs/laporan', 'FileSpreadsheet', 3, { description: 'Entri data agregat mingguan per Puskesmas/unit (SKDR-IBS) — tabel 24 penyakit + Total Kunjungan' }), // PR 030, label PR 031
-    it('mod_laporan_individu', 'Form Individu', '/ibs/individu', 'Stethoscope', 4, { description: 'Form Individu IBS — data per pasien (penyakit agregat, pemeriksaan, SOAP)' }), // PR 031
+    it('mod_laporan_ebs', 'Laporan Agregat EBS', '/ebs/laporan', 'Radio', 2, { description: 'Laporan kejadian/rumor penyakit di masyarakat — jumlah kasus & kematian per kelompok usia dan jenis kelamin' }), // PR 030, label PR 035
+    it('mod_laporan_ibs', 'Laporan Agregat IBS', '/ibs/laporan', 'FileSpreadsheet', 3, { description: 'Rekap mingguan Puskesmas/unit — jumlah kasus, kematian, dan lab per penyakit + total kunjungan' }), // PR 030, label PR 031/035
+    it('mod_laporan_individu', 'Laporan Individu IBS', '/ibs/individu', 'Stethoscope', 4, { description: 'Data satu pasien per laporan — diagnosa, pemeriksaan, dan status akhir pasien' }), // PR 031, label PR 035
     // PR 034: satu menu "Program MBG" — Pengawasan Gizi (PR 033) + Keracunan Pangan
     it('mod_program_mbg', 'Program MBG', '#', 'Utensils', 5, { description: 'Program Makan Bergizi Gratis — pengawasan standar gizi SPPG dan laporan keracunan pangan', subItems: [
       { id: 'mod_pengawasan_gizi', label: 'Pengawasan Gizi MBG', href: '/pengawasan-gizi', icon: 'ClipboardCheck', order: 1, enabled: true, description: 'Kunjungan pengawasan standar gizi MBG ke SPPG — Formulir 1–13 (ketenagaan, SOP, daya terima, rekap)' },

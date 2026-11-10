@@ -66,6 +66,8 @@ export interface Refs {
 export interface FormDef {
   jenis: Jenis
   title: string
+  /** one plain-language sentence under the list & wizard title (what the form is for) */
+  description: string
   short: string
   eyebrow: string
   listHref: string

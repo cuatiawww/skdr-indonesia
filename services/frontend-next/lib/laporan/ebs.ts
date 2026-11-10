@@ -22,11 +22,12 @@ const wilayahReset = ['kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode'
 
 export const EBS_FORM: FormDef = {
   jenis: 'ebs',
-  title: 'Formulir Surveilans Berbasis Kejadian (EBS)',
+  title: 'Laporan Agregat EBS',
+  description: 'Untuk melaporkan satu kejadian atau rumor penyakit di masyarakat (Surveilans Berbasis Kejadian): jumlah kasus dan kematian dicatat sekaligus menurut kelompok usia dan jenis kelamin, beserta hasil laboratorium, tata laksana, status KLB, dan tindakan yang sudah dilakukan.',
   short: 'EBS',
-  eyebrow: 'SKDR-EBS · Laporan',
+  eyebrow: 'SKDR-EBS · Surveilans Berbasis Kejadian',
   listHref: '/ebs/laporan',
-  listTitle: 'Laporan EBS',
+  listTitle: 'Laporan Agregat EBS',
   addLabel: 'Laporan EBS Baru',
   searchPlaceholder: 'Cari nomor, penyakit, unit…',
   prefillKeys: ['jenis_unit', 'provinsi_id', 'kabkota_id', 'kecamatan', 'kecamatan_nama', 'unit_pelapor', 'unit_kode', 'nama_pelapor', 'hp_pelapor'],

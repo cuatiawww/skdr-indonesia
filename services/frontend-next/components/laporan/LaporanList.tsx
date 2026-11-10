@@ -29,7 +29,7 @@ const LP: Record<string, string> = { Pria: 'L', Wanita: 'P' }
 const badge = (cls: string) => `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${cls}`
 const actBtn = 'inline-flex h-7 w-7 items-center justify-center rounded-lg border transition'
 
-export default function LaporanList({ def, subtitle }: { def: FormDef; subtitle: string }) {
+export default function LaporanList({ def, subtitle }: { def: FormDef; subtitle?: string }) {
   const { can } = useAuth()
   const ebs = def.jenis === 'ebs'
   const ind = def.jenis === 'individu'
@@ -70,7 +70,7 @@ export default function LaporanList({ def, subtitle }: { def: FormDef; subtitle:
 
   return (
     <div className="skdr-page w-full bg-page px-4 py-6 sm:px-6 lg:px-8">
-      <PageHeader eyebrow={def.eyebrow} title={def.listTitle} subtitle={subtitle} actions={<>
+      <PageHeader eyebrow={def.eyebrow} title={def.listTitle} subtitle={subtitle ?? def.description} actions={<>
         <button onClick={load} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs hover:bg-slate-50 disabled:opacity-50">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Muat ulang
         </button>

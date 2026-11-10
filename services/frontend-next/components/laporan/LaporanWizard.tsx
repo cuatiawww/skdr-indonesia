@@ -287,7 +287,7 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
     if (errors.length) { toast.error(`Masih ada ${errors.length} isian yang belum valid`); jumpNext(); return }
     const dupWeek = reported.find((r) => r.minggu === Number(data.minggu) && r.status === 'dikirim')
     if (dupWeek) { toast.error(`Minggu ${data.minggu} untuk unit ini sudah dilaporkan (${dupWeek.no})`); return }
-    if (!window.confirm(`Kirim laporan ${def.short}? Setelah dikirim laporan tidak dapat diubah lagi.`)) return
+    if (!window.confirm(`Kirim ${def.listTitle}? Setelah dikirim laporan tidak dapat diubah lagi.`)) return
     setSubmitting(true)
     try {
       const rid = await flush()
@@ -334,7 +334,7 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
   const indInfo = jenis === 'ibs' && dupInd && dupInd.periode > 0 && (
     <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800" data-testid="lap-info-individu">
       <Info className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>Terdapat <b>{dupInd.periode}</b> data Form Individu untuk unit ini pada Minggu {data.minggu}/{data.tahun}. Angka agregat tetap diisi manual (aturan sinkronisasi Individu → Agregat belum dipastikan). <Link href="/ibs/individu" className="font-semibold underline">Lihat Form Individu</Link></span>
+      <span>Terdapat <b>{dupInd.periode}</b> data Laporan Individu IBS untuk unit ini pada Minggu {data.minggu}/{data.tahun}. Angka agregat tetap diisi manual (aturan sinkronisasi Individu → Agregat belum dipastikan). <Link href="/ibs/individu" className="font-semibold underline">Lihat Laporan Individu IBS</Link></span>
     </div>
   )
   const weekPanel = weekDup && (
@@ -356,6 +356,7 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
           <div className="min-w-0">
             <div className="skdr-eyebrow">{def.eyebrow}</div>
             <h1 className="skdr-section-title">{def.title}</h1>
+            <p className="skdr-section-desc max-w-3xl" data-testid="lap-desc">{def.description}</p>
             <p className="skdr-section-desc">
               {rec ? <span className="font-mono font-semibold text-slate-700">{rec.no_laporan}</span> : 'Draf baru (nomor dibuat saat pertama tersimpan)'}
               {rec && <> · <span className={badge(STATUS_CLS[rec.status] || '')}>{STATUS_LABEL[rec.status] || rec.status}</span></>}
