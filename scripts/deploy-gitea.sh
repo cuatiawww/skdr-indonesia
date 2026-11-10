@@ -68,6 +68,7 @@ git reset --hard "$TARGET_SHA"
 
 docker compose config --quiet
 docker compose up -d --build --force-recreate
+docker image prune -f >/dev/null 2>&1 || true
 
 backend_container='skdr-indonesia-backend'
 for _ in $(seq 1 60); do

@@ -24,7 +24,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build backend image validation
-        run: docker build --pull -t skdr-indonesia-backend-ci services/backend-rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker rmi -f skdr-indonesia-backend-ci >/dev/null 2>&1 || true; docker image prune -f >/dev/null 2>&1 || true' EXIT
+          docker rmi -f skdr-indonesia-backend-ci >/dev/null 2>&1 || true
+          docker image prune -f >/dev/null 2>&1 || true
+          docker builder prune -f --filter "until=24h" >/dev/null 2>&1 || true
+          docker build --pull -t skdr-indonesia-backend-ci services/backend-rust
 
       - name: Install frontend dependencies
         working-directory: services/frontend-next
