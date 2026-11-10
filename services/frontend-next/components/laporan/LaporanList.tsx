@@ -166,7 +166,6 @@ export default function LaporanList({ def, subtitle }: { def: FormDef; subtitle:
         <TableState loading={loading} error={error} empty={rows.length === 0} />
         {rows.length > 0 && <Pagination page={page} totalPages={totalPages} total={total} onPrev={() => setPage((p) => Math.max(1, p - 1))} onNext={() => setPage((p) => Math.min(totalPages, p + 1))} onGoTo={setPage} pageSize={perPage} onPageSizeChange={(n: number) => { setPerPage(n); setPage(1) }} />}
       </div>
-      <p className="text-[11px] text-slate-400">Laporan disimpan di database SKDR Indonesia (lokal) — belum dikirim ke skdr.kemkes.go.id.</p>
 
       <Modal open={!!del} title="Hapus draf" onClose={() => !deleting && setDel(null)}>
         {del && (
