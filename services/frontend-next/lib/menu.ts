@@ -184,6 +184,7 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
     it('mod_main_dashboard', 'Dasbor Utama', '/main-dashboard', 'LayoutDashboard', 1),
     it('mod_dasbor_ebs_ibs', 'Dasbor SKDR EBS & IBS', '/dasbor/ebs-ibs', 'BarChart3', 1.8, { description: 'Dasbor analitik dari Transaksi Form Laporan EBS, Entri Data Agregat IBS, dan Form Individu IBS' }),
+    it('mod_dasbor_mbg', 'Dasbor MBG', '/dasbor/mbg', 'Utensils', 1.9, { description: 'Dasbor Program Makan Bergizi Gratis: pengawasan standar gizi SPPG dan kejadian keracunan pangan MBG' }),
     it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),
     it('mod_tv', 'Mode TV', '/tv', 'Tv', 3),
   ] },

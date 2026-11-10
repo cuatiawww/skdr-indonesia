@@ -15,7 +15,7 @@ use crate::{internal, ApiError, AppState};
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
-fn csv_text(s: &Option<String>) -> Vec<String> {
+pub fn csv_text(s: &Option<String>) -> Vec<String> {
     s.as_deref()
         .unwrap_or("")
         .split(',')
@@ -24,7 +24,7 @@ fn csv_text(s: &Option<String>) -> Vec<String> {
         .collect()
 }
 
-fn csv_ints(s: &Option<String>) -> Vec<i32> {
+pub fn csv_ints(s: &Option<String>) -> Vec<i32> {
     s.as_deref()
         .unwrap_or("")
         .split(',')
@@ -32,20 +32,20 @@ fn csv_ints(s: &Option<String>) -> Vec<i32> {
         .collect()
 }
 
-fn opt_str(s: &Option<String>) -> Option<String> {
+pub fn opt_str(s: &Option<String>) -> Option<String> {
     s.as_ref()
         .map(|x| x.trim().to_string())
         .filter(|x| !x.is_empty() && x != "all")
 }
 
-fn opt_date(s: &Option<String>) -> Option<NaiveDate> {
+pub fn opt_date(s: &Option<String>) -> Option<NaiveDate> {
     s.as_deref()
         .map(str::trim)
         .filter(|x| !x.is_empty())
         .and_then(|x| NaiveDate::parse_from_str(x, "%Y-%m-%d").ok())
 }
 
-fn json_int(v: Option<&Value>) -> i64 {
+pub fn json_int(v: Option<&Value>) -> i64 {
     match v {
         Some(Value::Number(n)) => n.as_i64().or_else(|| n.as_f64().map(|f| f as i64)).unwrap_or(0),
         Some(Value::String(s)) => s.trim().parse::<i64>().unwrap_or(0),
@@ -54,7 +54,7 @@ fn json_int(v: Option<&Value>) -> i64 {
     .max(0)
 }
 
-fn json_dec(v: Option<&Value>) -> Option<f64> {
+pub fn json_dec(v: Option<&Value>) -> Option<f64> {
     match v {
         Some(Value::Number(n)) => n.as_f64().filter(|f| f.is_finite() && *f > 0.0),
         Some(Value::String(s)) => s
@@ -88,16 +88,16 @@ pub fn mmwr_week_of(d: NaiveDate) -> (i32, i32) {
     (y, w.max(1))
 }
 
-fn week_start_date(year: i32, week: i32) -> NaiveDate {
+pub fn week_start_date(year: i32, week: i32) -> NaiveDate {
     mmwr_week_one(year) + chrono::Duration::days((week - 1) as i64 * 7)
 }
 
-fn week_label(year: i32, week: i32) -> String {
+pub fn week_label(year: i32, week: i32) -> String {
     format!("M{week:02}/{:02}", year % 100)
 }
 
 /// Builds a contiguous MMWR week axis covering all observed `(year, week)` pairs (capped at last 52 weeks if huge).
-fn build_week_axis(observed: &[(i32, i32)]) -> Vec<(i32, i32, String, String)> {
+pub fn build_week_axis(observed: &[(i32, i32)]) -> Vec<(i32, i32, String, String)> {
     if observed.is_empty() {
         return vec![];
     }
@@ -122,7 +122,7 @@ fn build_week_axis(observed: &[(i32, i32)]) -> Vec<(i32, i32, String, String)> {
     }
 }
 
-fn pct(num: i64, den: i64) -> Option<f64> {
+pub fn pct(num: i64, den: i64) -> Option<f64> {
     if den > 0 {
         Some((num as f64 * 1000.0 / den as f64).round() / 10.0)
     } else {
@@ -130,7 +130,7 @@ fn pct(num: i64, den: i64) -> Option<f64> {
     }
 }
 
-fn n(r: &tokio_postgres::Row, i: usize) -> i64 {
+pub fn n(r: &tokio_postgres::Row, i: usize) -> i64 {
     r.get(i)
 }
 

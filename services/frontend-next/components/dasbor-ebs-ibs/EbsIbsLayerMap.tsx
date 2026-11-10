@@ -23,17 +23,107 @@ import 'ol/ol.css'
 import { Flame, Layers, MapPin, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
 import type { MapPoint, MapRegion } from '@/lib/dasbor-ebs-ibs-api'
+import type { MbgMapPoint, MbgMapRegion } from '@/lib/dasbor-mbg-api'
 
 type BaseMap = 'osm' | 'light' | 'satellite' | 'terrain' | 'dark'
 export type EbsMapMetric = 'kasus' | 'laporan' | 'kematian' | 'klb'
 export type IbsMapMetric = 'agregat_kasus' | 'agregat_laporan' | 'individu_pasien' | 'agregat_kunjungan'
-type MetricKey = EbsMapMetric | IbsMapMetric
+export type GiziMapMetric = 'kunjungan' | 'rekap12_baik' | 'rekap12_belum_baik' | 'avg_skor'
+export type KeracunanMapMetric = 'kasus' | 'kejadian' | 'meninggal' | 'terpapar'
+export type MapMode = 'ebs' | 'ibs' | 'gizi' | 'keracunan'
+type MetricKey = EbsMapMetric | IbsMapMetric | GiziMapMetric | KeracunanMapMetric
+type AnyRegion = MapRegion | MbgMapRegion
+type AnyPoint = MapPoint | MbgMapPoint
 
 const geoCache: Record<string, Promise<any>> = {}
 const loadGeo = (file: string) => (geoCache[file] ||= fetch(`${PUBLIC_BASE_PATH}/data/${file}`).then((r) => r.json()))
 
-const SCALE_EBS = ['#f1f5f9', '#ccfbf1', '#5eead4', '#14b8a6', '#0f766e', '#115e59']
-const SCALE_IBS = ['#f1f5f9', '#dbeafe', '#93c5fd', '#3b82f6', '#1d4ed8', '#1e3a8a']
+const MODE_CFG: Record<MapMode, {
+  title: string
+  palette: string[]
+  defaultMetric: MetricKey
+  metrics: { key: MetricKey; label: string }[]
+  normalFill: string
+  alertFill: string
+  normalLabel: string
+  alertLabel: string
+  normalDotCls: string
+  alertDotCls: string
+  isAlert: (p: AnyPoint) => boolean
+}> = {
+  ebs: {
+    title: 'EBS',
+    palette: ['#f1f5f9', '#ccfbf1', '#5eead4', '#14b8a6', '#0f766e', '#115e59'],
+    defaultMetric: 'kasus',
+    metrics: [
+      { key: 'kasus', label: 'Jumlah Kasus' },
+      { key: 'laporan', label: 'Jumlah Laporan' },
+      { key: 'kematian', label: 'Jumlah Kematian' },
+      { key: 'klb', label: 'Kejadian KLB' },
+    ],
+    normalFill: 'rgba(13, 148, 136, 0.85)',
+    alertFill: 'rgba(220, 38, 38, 0.85)',
+    normalLabel: 'Non-KLB',
+    alertLabel: 'Ada KLB',
+    normalDotCls: 'bg-teal-600',
+    alertDotCls: 'bg-red-600',
+    isAlert: (p) => Number((p as MapPoint).klb || 0) > 0,
+  },
+  ibs: {
+    title: 'IBS',
+    palette: ['#f1f5f9', '#dbeafe', '#93c5fd', '#3b82f6', '#1d4ed8', '#1e3a8a'],
+    defaultMetric: 'agregat_kasus',
+    metrics: [
+      { key: 'agregat_kasus', label: 'Kasus Agregat' },
+      { key: 'agregat_laporan', label: 'Laporan Agregat' },
+      { key: 'individu_pasien', label: 'Pasien Form Individu' },
+      { key: 'agregat_kunjungan', label: 'Total Kunjungan' },
+    ],
+    normalFill: 'rgba(37, 99, 235, 0.85)',
+    alertFill: 'rgba(124, 58, 237, 0.85)',
+    normalLabel: 'Agregat / Gabungan',
+    alertLabel: 'Khusus Individu',
+    normalDotCls: 'bg-blue-600',
+    alertDotCls: 'bg-violet-600',
+    isAlert: (p) => Number((p as MapPoint).individu_pasien || 0) > 0 && Number((p as MapPoint).agregat_kasus || 0) === 0,
+  },
+  gizi: {
+    title: 'Pengawasan Gizi MBG',
+    palette: ['#f1f5f9', '#d1fae5', '#6ee7b7', '#10b981', '#059669', '#065f46'],
+    defaultMetric: 'kunjungan',
+    metrics: [
+      { key: 'kunjungan', label: 'Jumlah Kunjungan' },
+      { key: 'rekap12_baik', label: 'Standar Gizi BAIK (F12)' },
+      { key: 'rekap12_belum_baik', label: 'Perlu Perbaikan (F12)' },
+      { key: 'avg_skor', label: 'Rata-rata Skor SOP' },
+    ],
+    normalFill: 'rgba(5, 150, 105, 0.88)',
+    alertFill: 'rgba(217, 119, 6, 0.90)',
+    normalLabel: 'SPPG Baik / Terpantau',
+    alertLabel: 'Ada F12 BELUM BAIK',
+    normalDotCls: 'bg-emerald-600',
+    alertDotCls: 'bg-amber-600',
+    isAlert: (p) => Number((p as MbgMapPoint).rekap12_belum_baik || 0) > 0,
+  },
+  keracunan: {
+    title: 'Keracunan Pangan MBG',
+    palette: ['#f1f5f9', '#ffedd5', '#fdba74', '#f97316', '#dc2626', '#991b1b'],
+    defaultMetric: 'kasus',
+    metrics: [
+      { key: 'kasus', label: 'Jumlah Kasus' },
+      { key: 'kejadian', label: 'Jumlah Kejadian' },
+      { key: 'meninggal', label: 'Korban Meninggal' },
+      { key: 'terpapar', label: 'Populasi Terpapar' },
+    ],
+    normalFill: 'rgba(234, 88, 12, 0.88)',
+    alertFill: 'rgba(185, 28, 28, 0.92)',
+    normalLabel: 'Kejadian Non-Fatal',
+    alertLabel: 'Ada Kematian',
+    normalDotCls: 'bg-orange-600',
+    alertDotCls: 'bg-red-700',
+    isAlert: (p) => Number((p as MbgMapPoint).meninggal || 0) > 0,
+  },
+}
 
 function shadeColor(v: number, max: number, palette: string[]) {
   if (v <= 0 || max <= 0) return palette[0]
@@ -67,32 +157,21 @@ export default function EbsIbsLayerMap({
   onDrillDown,
   onResetLevel,
 }: {
-  mode: 'ebs' | 'ibs'
+  mode: MapMode
   level: 'prov' | 'kab'
   parentName?: string | null
-  regions: MapRegion[]
-  points: MapPoint[]
+  regions: AnyRegion[]
+  points: AnyPoint[]
   onDrillDown: (provId: number, provName: string) => void
   onResetLevel: () => void
 }) {
-  const palette = mode === 'ebs' ? SCALE_EBS : SCALE_IBS
-  const metricOptions: { key: MetricKey; label: string }[] = mode === 'ebs'
-    ? [
-        { key: 'kasus', label: 'Jumlah Kasus' },
-        { key: 'laporan', label: 'Jumlah Laporan' },
-        { key: 'kematian', label: 'Jumlah Kematian' },
-        { key: 'klb', label: 'Kejadian KLB' },
-      ]
-    : [
-        { key: 'agregat_kasus', label: 'Kasus Agregat' },
-        { key: 'agregat_laporan', label: 'Laporan Agregat' },
-        { key: 'individu_pasien', label: 'Pasien Form Individu' },
-        { key: 'agregat_kunjungan', label: 'Total Kunjungan' },
-      ]
+  const cfg = MODE_CFG[mode]
+  const palette = cfg.palette
+  const metricOptions = cfg.metrics
 
-  const [metric, setMetric] = useState<MetricKey>(mode === 'ebs' ? 'kasus' : 'agregat_kasus')
+  const [metric, setMetric] = useState<MetricKey>(cfg.defaultMetric)
   useEffect(() => {
-    setMetric(mode === 'ebs' ? 'kasus' : 'agregat_kasus')
+    setMetric(MODE_CFG[mode].defaultMetric)
   }, [mode])
 
   const [panelOpen, setPanelOpen] = useState(true)
@@ -106,8 +185,8 @@ export default function EbsIbsLayerMap({
   const [heatRadius, setHeatRadius] = useState(18)
   const [heatBlur, setHeatBlur] = useState(22)
   const [fs, setFs] = useState(false)
-  const [hoverRegion, setHoverRegion] = useState<MapRegion | null>(null)
-  const [hoverPoint, setHoverPoint] = useState<MapPoint | null>(null)
+  const [hoverRegion, setHoverRegion] = useState<AnyRegion | null>(null)
+  const [hoverPoint, setHoverPoint] = useState<AnyPoint | null>(null)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const mapEl = useRef<HTMLDivElement>(null)
@@ -120,13 +199,18 @@ export default function EbsIbsLayerMap({
   const heatSrc = useRef(new VectorSource())
   const markerSrc = useRef(new VectorSource())
 
-  const valOfRegion = (r?: MapRegion | null) => {
+  const valOfRegion = (r?: AnyRegion | null) => {
     if (!r) return 0
     return Number((r as Record<string, unknown>)[metric] ?? 0)
   }
 
-  const valOfPoint = (p: MapPoint) => {
-    if (metric === 'agregat_kunjungan') return Number(p.agregat_kasus ?? 0) || Number(p.agregat_laporan ?? 0)
+  const valOfPoint = (p: AnyPoint) => {
+    if (metric === 'agregat_kunjungan') {
+      const mp = p as MapPoint
+      return Number(mp.agregat_kasus ?? 0) || Number(mp.agregat_laporan ?? 0)
+    }
+    if (metric === 'avg_skor') return Number((p as MbgMapPoint).kunjungan ?? 0)
+    if (metric === 'terpapar') return Number((p as MbgMapPoint).kasus ?? 0)
     return Number((p as Record<string, unknown>)[metric] ?? 0)
   }
 
@@ -161,13 +245,13 @@ export default function EbsIbsLayerMap({
     mapObj.current = m
 
     m.on('pointermove', (ev) => {
-      let pt: MapPoint | null = null
-      let rg: MapRegion | null = null
+      let pt: AnyPoint | null = null
+      let rg: AnyRegion | null = null
       let rgLvl: string | null = null
       m.forEachFeatureAtPixel(ev.pixel, (f) => {
-        if (!pt && f.get('point')) pt = f.get('point') as MapPoint
+        if (!pt && f.get('point')) pt = f.get('point') as AnyPoint
         if (!rg && f.get('region')) {
-          rg = f.get('region') as MapRegion
+          rg = f.get('region') as AnyRegion
           rgLvl = (f.get('lvl') as string) || null
         }
       })
@@ -180,7 +264,7 @@ export default function EbsIbsLayerMap({
     m.on('singleclick', (ev) => {
       const f = m.forEachFeatureAtPixel(ev.pixel, (x) => (x.get('region') ? x : null))
       if (!f) return
-      const r = f.get('region') as MapRegion | undefined
+      const r = f.get('region') as AnyRegion | undefined
       if (r && f.get('lvl') === 'prov') {
         const id = Number(r.key)
         if (Number.isFinite(id) && id > 0) onDrillDown(id, r.name)
@@ -227,10 +311,7 @@ export default function EbsIbsLayerMap({
 
       const mf = new Feature({ geometry: geom.clone(), point: p })
       const radius = 5 + Math.round(13 * Math.sqrt((v || 1) / ptDenom))
-      const isHighlight = mode === 'ebs' ? (p.klb || 0) > 0 : (p.individu_pasien || 0) > 0 && (p.agregat_kasus || 0) === 0
-      const fill = mode === 'ebs'
-        ? (isHighlight ? 'rgba(220, 38, 38, 0.85)' : 'rgba(13, 148, 136, 0.85)')
-        : (isHighlight ? 'rgba(124, 58, 237, 0.85)' : 'rgba(37, 99, 235, 0.85)')
+      const fill = cfg.isAlert(p) ? cfg.alertFill : cfg.normalFill
       mf.setStyle(new Style({
         image: new CircleStyle({
           radius,
@@ -295,7 +376,7 @@ export default function EbsIbsLayerMap({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-            <span>Peta Spasial &amp; Layering Wilayah ({mode === 'ebs' ? 'EBS' : 'IBS'})</span>
+            <span>Peta Spasial &amp; Layering Wilayah ({cfg.title})</span>
             <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-700">
               {nf(points.length)} titik · {nf(regions.length)} wilayah
             </span>
@@ -473,43 +554,81 @@ export default function EbsIbsLayerMap({
           {/* Hover tooltip */}
           {(hoverPoint || hoverRegion) ? (
             <div className="pointer-events-none absolute right-3 top-3 z-20 max-w-xs rounded-xl border border-slate-200 bg-white/95 px-3.5 py-2.5 text-xs shadow-md">
-              {hoverPoint ? (
-                <>
-                  <div className="font-bold text-slate-900">{hoverPoint.unit_nama}</div>
-                  <div className="text-[11px] text-slate-500">
-                    {[hoverPoint.jenis_unit, hoverPoint.kabkota_name, hoverPoint.province_name].filter(Boolean).join(' · ')}
-                  </div>
-                  {mode === 'ebs' ? (
-                    <div className="mt-1.5 space-y-0.5 text-slate-700">
-                      <div><b>{nf(hoverPoint.laporan)}</b> laporan · <b>{nf(hoverPoint.kasus)}</b> kasus · <b>{nf(hoverPoint.kematian)}</b> kematian</div>
-                      <div>KLB: <b>{nf(hoverPoint.klb)}</b> · Terakhir: {hoverPoint.last_date || '—'}</div>
+              {hoverPoint ? (() => {
+                const ptEbs = hoverPoint as MapPoint
+                const ptMbg = hoverPoint as MbgMapPoint
+                return (
+                  <>
+                    <div className="font-bold text-slate-900">
+                      {mode === 'gizi' ? (ptMbg.nama_sppg || ptMbg.unit_nama || 'SPPG')
+                        : mode === 'keracunan' ? (ptMbg.label || ptMbg.nama_sppg || 'Kejadian MBG')
+                          : ptEbs.unit_nama}
                     </div>
-                  ) : (
-                    <div className="mt-1.5 space-y-0.5 text-slate-700">
-                      <div>Agregat: <b>{nf(hoverPoint.agregat_laporan)}</b> lap · <b>{nf(hoverPoint.agregat_kasus)}</b> kasus · <b>{nf(hoverPoint.agregat_kematian)}</b> mati</div>
-                      <div>Form Individu: <b>{nf(hoverPoint.individu_pasien)}</b> pasien · Terakhir: {hoverPoint.last_periode || '—'}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {mode === 'gizi'
+                        ? [ptMbg.unit_nama ? `PKM ${ptMbg.unit_nama}` : null, ptMbg.kabkota_name, ptMbg.province_name].filter(Boolean).join(' · ')
+                        : mode === 'keracunan'
+                          ? [ptMbg.nama_sppg, ptMbg.kabkota_name, ptMbg.province_name].filter(Boolean).join(' · ')
+                          : [ptEbs.jenis_unit, ptEbs.kabkota_name, ptEbs.province_name].filter(Boolean).join(' · ')}
                     </div>
-                  )}
-                  <div className="mt-1 text-[10px] text-slate-400">Sumber koordinat: {hoverPoint.coord_source || 'master'}</div>
-                </>
-              ) : hoverRegion ? (
-                <>
-                  <div className="font-bold text-slate-900">{hoverRegion.name}</div>
-                  {mode === 'ebs' ? (
-                    <div className="mt-1 space-y-0.5 text-slate-700">
-                      <div><b>{nf(hoverRegion.laporan)}</b> laporan ({nf(hoverRegion.dikirim)} dikirim, {nf(hoverRegion.draf)} draf)</div>
-                      <div><b>{nf(hoverRegion.kasus)}</b> kasus · <b>{nf(hoverRegion.kematian)}</b> kematian · <b>{nf(hoverRegion.klb)}</b> KLB</div>
-                      <div>Unit pelapor: <b>{nf(hoverRegion.unit_unik)}</b></div>
-                    </div>
-                  ) : (
-                    <div className="mt-1 space-y-0.5 text-slate-700">
-                      <div>Agregat: <b>{nf(hoverRegion.agregat_laporan)}</b> lap · <b>{nf(hoverRegion.agregat_kasus)}</b> kasus · <b>{nf(hoverRegion.agregat_kematian)}</b> mati</div>
-                      <div>Form Individu: <b>{nf(hoverRegion.individu_pasien)}</b> pasien · Total Kunjungan: <b>{nf(hoverRegion.agregat_kunjungan)}</b></div>
-                      <div>Unit pelapor: <b>{nf(hoverRegion.unit_unik)}</b></div>
-                    </div>
-                  )}
-                </>
-              ) : null}
+                    {mode === 'ebs' ? (
+                      <div className="mt-1.5 space-y-0.5 text-slate-700">
+                        <div><b>{nf(ptEbs.laporan)}</b> laporan · <b>{nf(ptEbs.kasus)}</b> kasus · <b>{nf(ptEbs.kematian)}</b> kematian</div>
+                        <div>KLB: <b>{nf(ptEbs.klb)}</b> · Terakhir: {ptEbs.last_date || '—'}</div>
+                      </div>
+                    ) : mode === 'ibs' ? (
+                      <div className="mt-1.5 space-y-0.5 text-slate-700">
+                        <div>Agregat: <b>{nf(ptEbs.agregat_laporan)}</b> lap · <b>{nf(ptEbs.agregat_kasus)}</b> kasus · <b>{nf(ptEbs.agregat_kematian)}</b> mati</div>
+                        <div>Form Individu: <b>{nf(ptEbs.individu_pasien)}</b> pasien · Terakhir: {ptEbs.last_periode || '—'}</div>
+                      </div>
+                    ) : mode === 'gizi' ? (
+                      <div className="mt-1.5 space-y-0.5 text-slate-700">
+                        <div><b>{nf(ptMbg.kunjungan)}</b> kunjungan · F12 BAIK: <b>{nf(ptMbg.rekap12_baik)}</b> · BELUM BAIK: <b>{nf(ptMbg.rekap12_belum_baik)}</b></div>
+                        <div>Terakhir: {ptMbg.last_date || '—'}</div>
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 space-y-0.5 text-slate-700">
+                        <div><b>{nf(ptMbg.kejadian)}</b> kejadian · <b>{nf(ptMbg.kasus)}</b> kasus · <b>{nf(ptMbg.meninggal)}</b> meninggal</div>
+                        <div>Lab Hasil: <b>{nf(ptMbg.lab_hasil)}</b> · Terakhir: {ptMbg.last_date || '—'}</div>
+                      </div>
+                    )}
+                    <div className="mt-1 text-[10px] text-slate-400">Sumber koordinat: {hoverPoint.coord_source || 'master'}</div>
+                  </>
+                )
+              })() : hoverRegion ? (() => {
+                const rgEbs = hoverRegion as MapRegion
+                const rgMbg = hoverRegion as MbgMapRegion
+                return (
+                  <>
+                    <div className="font-bold text-slate-900">{hoverRegion.name}</div>
+                    {mode === 'ebs' ? (
+                      <div className="mt-1 space-y-0.5 text-slate-700">
+                        <div><b>{nf(rgEbs.laporan)}</b> laporan ({nf(rgEbs.dikirim)} dikirim, {nf(rgEbs.draf)} draf)</div>
+                        <div><b>{nf(rgEbs.kasus)}</b> kasus · <b>{nf(rgEbs.kematian)}</b> kematian · <b>{nf(rgEbs.klb)}</b> KLB</div>
+                        <div>Unit pelapor: <b>{nf(rgEbs.unit_unik)}</b></div>
+                      </div>
+                    ) : mode === 'ibs' ? (
+                      <div className="mt-1 space-y-0.5 text-slate-700">
+                        <div>Agregat: <b>{nf(rgEbs.agregat_laporan)}</b> lap · <b>{nf(rgEbs.agregat_kasus)}</b> kasus · <b>{nf(rgEbs.agregat_kematian)}</b> mati</div>
+                        <div>Form Individu: <b>{nf(rgEbs.individu_pasien)}</b> pasien · Total Kunjungan: <b>{nf(rgEbs.agregat_kunjungan)}</b></div>
+                        <div>Unit pelapor: <b>{nf(rgEbs.unit_unik)}</b></div>
+                      </div>
+                    ) : mode === 'gizi' ? (
+                      <div className="mt-1 space-y-0.5 text-slate-700">
+                        <div><b>{nf(rgMbg.kunjungan)}</b> kunjungan ({nf(rgMbg.dikirim)} dikirim) · SPPG: <b>{nf(rgMbg.sppg_unik)}</b></div>
+                        <div>F12 Gizi: <b>{nf(rgMbg.rekap12_baik)}</b> BAIK / <b>{nf(rgMbg.rekap12_belum_baik)}</b> BELUM BAIK</div>
+                        <div>Rata-rata Skor SOP: <b>{rgMbg.avg_skor != null ? `${rgMbg.avg_skor.toFixed(1)}%` : '—'}</b></div>
+                      </div>
+                    ) : (
+                      <div className="mt-1 space-y-0.5 text-slate-700">
+                        <div><b>{nf(rgMbg.kejadian)}</b> kejadian ({nf(rgMbg.ditutup)} ditutup) · SPPG: <b>{nf(rgMbg.sppg_unik)}</b></div>
+                        <div><b>{nf(rgMbg.kasus)}</b> kasus · <b>{nf(rgMbg.meninggal)}</b> meninggal · <b>{nf(rgMbg.terpapar)}</b> terpapar</div>
+                        <div>Lab Hasil: <b>{nf(rgMbg.lab_hasil)}</b></div>
+                      </div>
+                    )}
+                  </>
+                )
+              })() : null}
             </div>
           ) : null}
 
@@ -526,17 +645,8 @@ export default function EbsIbsLayerMap({
             </div>
             {showMarkers ? (
               <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-[10px] text-slate-600">
-                {mode === 'ebs' ? (
-                  <>
-                    <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-teal-600" /> Non-KLB</span>
-                    <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Ada KLB</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> Agregat / Gabungan</span>
-                    <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-violet-600" /> Khusus Individu</span>
-                  </>
-                )}
+                <span className="inline-flex items-center gap-1"><span className={`h-2.5 w-2.5 rounded-full ${cfg.normalDotCls}`} /> {cfg.normalLabel}</span>
+                <span className="inline-flex items-center gap-1"><span className={`h-2.5 w-2.5 rounded-full ${cfg.alertDotCls}`} /> {cfg.alertLabel}</span>
               </div>
             ) : null}
           </div>
