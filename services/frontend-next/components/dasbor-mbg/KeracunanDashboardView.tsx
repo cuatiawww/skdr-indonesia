@@ -10,11 +10,9 @@
 // 7. Register Investigasi Kejadian KLB & Lampiran Analitik Mingguan
 import {
   Activity,
-  AlertTriangle,
   FlaskConical,
   Hospital,
   ShieldAlert,
-  Siren,
   Skull,
   Timer,
   Users,
@@ -75,8 +73,6 @@ export default function KeracunanDashboardView({
   const granLabel = GRAN_OPTS.find((g) => g.value === f.gran)?.label
   const lvl = autoRegionLevel(f)
   const rank = [...(data?.ranking?.[lvl] || [])].sort((a, b) => b.kasus - a.kasus || b.kejadian - a.kejadian)
-  const topSopGap = data?.lingkungan_sop?.sop_gap?.[0] || null
-  const topSamplePos = data?.pangan?.sampel_positif?.[0] || null
 
   return (
     <div className="space-y-5" data-testid="keracunan-dashboard-view">
@@ -152,54 +148,6 @@ export default function KeracunanDashboardView({
                 lr ? ` · ${nf(lr.kejadian_positif)} sampel positif` : ''
               }`}
             />
-          </div>
-
-          {/* Ringkasan Eksekutif Analisa Masalah & Pengerahan Respons KLB */}
-          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs lg:grid-cols-3">
-            <div className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs">
-              <div className="flex items-center gap-1.5 font-extrabold text-red-900">
-                <Siren className="h-3.5 w-3.5 text-red-700" /> Evaluasi Beban &amp; Keparahan KLB
-              </div>
-              <p className="mt-1.5 leading-relaxed text-slate-700">
-                Tercatat <b>{nf(k.total_kejadian)} kejadian KLB</b> dengan <b>{nf(k.total_kasus)} korban sakit</b> (Attack Rate rata-rata{' '}
-                <b>{pf(k.attack_rate_pct)}</b>) dan tingkat rawat inap{' '}
-                <b>{pf(k.total_kasus ? (k.rawat_inap * 100) / k.total_kasus : null)}</b>.
-                {rank[0] ? (
-                  <>
-                    {' '}
-                    Wilayah dengan beban tertinggi adalah <b>{rank[0].name}</b> ({nf(rank[0].kasus)} kasus, {nf(rank[0].kejadian)} kejadian).
-                  </>
-                ) : null}
-              </p>
-            </div>
-            <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 text-xs">
-              <div className="flex items-center gap-1.5 font-extrabold text-amber-900">
-                <Timer className="h-3.5 w-3.5 text-amber-700" /> Hambatan Respons Cepat &amp; Lab
-              </div>
-              <p className="mt-1.5 leading-relaxed text-slate-700">
-                Ketepatan pelaporan ≤24 jam mencapai <b>{pf(kt?.pct_le24)}</b> (median selang lapor{' '}
-                <b>{fmtJam(kt?.median_jam)}</b>). Sebanyak <b>{nf(k.lab_dikirim + k.lab_belum)} dari {nf(k.total_kejadian)} kejadian</b>{' '}
-                belum memperoleh hasil laboratorium final sehingga konfirmasi patogen perlu dipercepat.
-              </p>
-            </div>
-            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-3 text-xs">
-              <div className="flex items-center gap-1.5 font-extrabold text-teal-900">
-                <AlertTriangle className="h-3.5 w-3.5 text-teal-700" /> Sumber Risiko &amp; Tindakan Lapangan
-              </div>
-              <p className="mt-1.5 leading-relaxed text-slate-700">
-                {topSamplePos ? (
-                  <>
-                    Sampel positif terbanyak ditemukan pada <b>{topSamplePos.nama}</b> ({topSamplePos.positif}/{topSamplePos.diuji} positif).{' '}
-                  </>
-                ) : null}
-                {topSopGap ? (
-                  <>
-                    Pelanggaran SOP dapur tertinggi adalah <b>{topSopGap.nama}</b> ({nf(topSopGap.gap_total)} temuan gap).{' '}
-                  </>
-                ) : null}
-                Prioritaskan pengamanan sampel sisa makanan dan audit sanitasi air/peralatan dapur SPPG.
-              </p>
-            </div>
           </div>
 
           {/* BAGIAN 2: DISTRIBUSI GEOSPASIAL KLB & PERINGKAT WILAYAH TERDAMPAK */}
