@@ -1,6 +1,8 @@
 'use client'
-// PR 057: Deteksi Outbreak Statistik (EARS & Farrington), Hotspot Karhutla vs ISPA, & JEE/IHR
-import { useMemo, useState } from 'react'
+// PR 057 (Revised): Deteksi Outbreak Statistik (EARS & Farrington), Hotspot Karhutla vs ISPA, & JEE/IHR
+// - Clean layout without duplicate in-card filter dropdowns
+// - Fully driven by dynamic left sidebar filter panel
+import { useMemo } from 'react'
 import {
   Activity,
   AlertCircle,
@@ -35,12 +37,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { EarsAlgoritma, SkdrFilter } from '@/lib/dasbor-skdr-filter'
+import type { SkdrFilter } from '@/lib/dasbor-skdr-filter'
 
 export default function SkdrDeteksiView({ f }: { f: SkdrFilter }) {
-  const [algoritma, setAlgoritma] = useState<EarsAlgoritma>(f.earsAlgoritma || 'c2')
-  const [hanyaAlert, setHanyaAlert] = useState<boolean>(f.earsHanyaAlert)
-  const [lag, setLag] = useState<number>(f.hotspotLag || 0)
+  const algoritma = f.earsAlgoritma || 'c2'
+  const hanyaAlert = f.earsHanyaAlert
+  const lag = f.hotspotLag || 0
 
   // Statistical Anomaly Matrix
   const anomalyRows = [
@@ -128,7 +130,6 @@ export default function SkdrDeteksiView({ f }: { f: SkdrFilter }) {
       const rawHotspot = Math.round(
         Math.max(10, 80 + 140 * Math.sin((i / 11) * Math.PI) + Math.cos(i * 3) * 30)
       )
-      // When lag is 1 or 2, cases shift
       const lagIndex = Math.max(0, i - lag)
       const laggedHotspot = Math.round(
         Math.max(10, 80 + 140 * Math.sin((lagIndex / 11) * Math.PI) + Math.cos(lagIndex * 3) * 30)
@@ -154,11 +155,20 @@ export default function SkdrDeteksiView({ f }: { f: SkdrFilter }) {
     { subjek: 'Kapasitas Titik Masuk (PoE)', skor: 3.7, standarWho: 4.0 },
   ]
 
+  const algoritmaLabel =
+    algoritma === 'c1'
+      ? 'EARS C1 (Baseline 7 Hari)'
+      : algoritma === 'c3'
+      ? 'EARS C3 (Deviasi 3 Hari)'
+      : algoritma === 'farrington'
+      ? 'Farrington Quasi-Poisson (Musiman)'
+      : 'EARS C2 (Standar CDC / WHO, Lag 2 Hari)'
+
   return (
     <div className="space-y-6" data-testid="skdr-deteksi-view">
-      {/* Section 1: Statistical Outbreak Detection Engine (EARS / Farrington) */}
+      {/* Section 1: Statistical Outbreak Detection Engine (Clean, No in-card dropdowns) */}
       <div className="skdr-card p-5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
               <Cpu className="h-4 w-4" /> Algoritma Deteksi Outbreak Statistik
@@ -171,33 +181,15 @@ export default function SkdrDeteksiView({ f }: { f: SkdrFilter }) {
             </p>
           </div>
 
-          {/* Model Selector & Filter */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                Pilih Model Algoritma
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+              Model: {algoritmaLabel}
+            </span>
+            {hanyaAlert && (
+              <span className="rounded-xl bg-red-100 text-red-700 px-3 py-1.5 text-xs font-bold">
+                Filter: Hanya Alert
               </span>
-              <select
-                value={algoritma}
-                onChange={(e) => setAlgoritma(e.target.value as any)}
-                className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 shadow-xs outline-none focus:border-primary"
-              >
-                <option value="c1">EARS C1 (Mild, 7-Hari)</option>
-                <option value="c2">EARS C2 (CDC Standard, Lag 2-Hari)</option>
-                <option value="c3">EARS C3 (Konservatif, Deviasi 3-Hari)</option>
-                <option value="farrington">Farrington Quasi-Poisson (Musiman)</option>
-              </select>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer mt-4 text-xs font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={hanyaAlert}
-                onChange={(e) => setHanyaAlert(e.target.checked)}
-                className="rounded border-slate-300 text-primary focus:ring-primary/30"
-              />
-              <span>Hanya Tampilkan ALERT</span>
-            </label>
+            )}
           </div>
         </div>
 
@@ -275,19 +267,9 @@ export default function SkdrDeteksiView({ f }: { f: SkdrFilter }) {
               </h3>
             </div>
 
-            {/* Time Lag Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-500">Lag Waktu:</span>
-              <select
-                value={lag}
-                onChange={(e) => setLag(Number(e.target.value))}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800"
-              >
-                <option value={0}>+0 Minggu (Minggu Sama)</option>
-                <option value={1}>+1 Minggu (Dampak Asap)</option>
-                <option value={2}>+2 Minggu Kemudian</option>
-              </select>
-            </div>
+            <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+              {lag === 0 ? 'Lag +0 Minggu' : `Lag +${lag} Minggu`}
+            </span>
           </div>
 
           <div className="mt-4 h-72 w-full">

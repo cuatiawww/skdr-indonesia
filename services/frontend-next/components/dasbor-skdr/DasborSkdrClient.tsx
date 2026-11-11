@@ -1,5 +1,5 @@
 'use client'
-// PR 057: Unified Orchestrator Client for Dasbor SKDR Terpadu
+// PR 057 (Revised): Unified Orchestrator Client for Dasbor SKDR Terpadu
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
@@ -18,7 +18,6 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react'
-import PageHeader from '@/components/PageHeader'
 import SkdrFilterPanel from '@/components/dasbor-skdr/SkdrFilterPanel'
 import SkdrRingkasanView from '@/components/dasbor-skdr/SkdrRingkasanView'
 import SkdrTrenView from '@/components/dasbor-skdr/SkdrTrenView'
@@ -59,21 +58,15 @@ export default function DasborSkdrClient({ page: tab }: { page: SkdrTab }) {
     }
   }, [])
 
-  // Sync filter changes into URL search params
-  const updateFilter = useCallback(
-    (patch: Partial<SkdrFilter>) => {
-      setF((prev) => {
-        const next = { ...prev, ...patch }
-        if (typeof window !== 'undefined') {
-          const qs = writeSkdrFilter(next)
-          const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`
-          window.history.replaceState(null, '', newUrl)
-        }
-        return next
-      })
-    },
-    []
-  )
+  // Explicit apply handler: updates applied filter and updates URL search params
+  const handleApply = useCallback((applied: SkdrFilter) => {
+    setF(applied)
+    if (typeof window !== 'undefined') {
+      const qs = writeSkdrFilter(applied)
+      const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`
+      window.history.replaceState(null, '', newUrl)
+    }
+  }, [])
 
   const togglePanel = () => {
     setPanelOpen((cur) => {
@@ -162,20 +155,20 @@ export default function DasborSkdrClient({ page: tab }: { page: SkdrTab }) {
 
       {/* Main Layout: Dynamic Sidebar Filter Panel + View Content */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Left Filter Panel (Collapsible) */}
+        {/* Left Filter Panel (Collapsible, Auto Height, No Horizontal Overflow) */}
         {panelOpen && (
-          <div className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[280px]">
+          <div className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[280px] max-w-full">
             <SkdrFilterPanel
               f={f}
-              set={updateFilter}
+              onApply={handleApply}
               tab={tab}
               onClose={() => setPanelOpen(false)}
             />
           </div>
         )}
 
-        {/* Right Active View Content */}
-        <div className="min-w-0 flex-1">
+        {/* Right Active View Content (Clean, No Duplicate In-Card Filters) */}
+        <div className="min-w-0 flex-1 w-full">
           {tab === 'ringkasan' && <SkdrRingkasanView f={f} />}
           {tab === 'tren' && <SkdrTrenView f={f} />}
           {tab === 'distribusi' && <SkdrDistribusiView f={f} />}

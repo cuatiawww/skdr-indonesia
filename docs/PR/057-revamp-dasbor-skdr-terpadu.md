@@ -6,11 +6,11 @@ Berdasarkan hasil eksplorasi mendalam dan reverse engineering terhadap sistem ak
 Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1 Dasbor SKDR Terpadu** yang dinamis, menghilangkan dikotomi "Dashboard 1 vs Dashboard 2", namun menyatukan seluruh 12 kapabilitas analitis tersebut ke dalam 6 sub-menu terstruktur di bawah menu induk `Dasbor SKDR` (`mod_main_dashboard`) pada grup sidebar `DASBOR`, dengan styling modern Tailwind CSS yang konsisten dengan desain sistem aplikasi:
 
 1. **Ringkasan Utama (IBS & EBS)** (`/dashboard/skdr/ringkasan` & `/main-dashboard`):
-   - Sintesis eksekutif nasional: beban kasus mingguan IBS, sinyal & rumor EBS, respon verifikasi ≤24 jam (%), pemantauan kepatuhan kelengkapan & ketepatan pelaporan faskes (target minimal ≥80%), status verifikasi alert (Stacked bar), Top 10 alert penyakit, dan Peta Spasial Klaster Nasional (OpenLayers).
+   - Sintesis eksekutif nasional: beban kasus mingguan IBS, sinyal EBS, respon verifikasi ≤24 jam (%), pemantauan kepatuhan kelengkapan & ketepatan pelaporan faskes (target minimal ≥80%), status verifikasi alert (Stacked bar), Top 10 alert penyakit, dan Peta Spasial Klaster Nasional (OpenLayers).
 2. **Tren Penyakit (IBS)** (`/dashboard/skdr/tren`):
-   - Kurva tren mingguan 1–52 per penyakit indikator (pilihan 36 penyakit potensi KLB), garis ambang batas alert ($\text{Mean} + 2\text{SD}$ baseline), komparasi multi-tahun (2024–2026), komparasi multi-wilayah (komparasi hingga 3 provinsi/kabupaten), lapisan iklim Copernicus ERA5 (suhu, curah hujan, kelembapan), narasi interpretasi epidemiologi otomatis AI, serta tabel rekapitulasi mingguan.
+   - Kurva tren mingguan 1–52 per penyakit indikator (pilihan 36 penyakit potensi KLB), garis ambang batas alert ($\text{Mean} + 2\text{SD}$ baseline), komparasi multi-tahun (2024–2026), komparasi multi-wilayah (komparasi hingga 3 provinsi/kabupaten), lapisan iklim Copernicus ERA5 (suhu, curah hujan, kelembapan), serta tabel rekapitulasi mingguan. (Blok kartu narasi AI dilepas sesuai permintaan untuk menjaga kerapian tata letak).
 3. **Distribusi & Demografi** (`/dashboard/skdr/distribusi`):
-   - Distribusi epidemiologi menurut orang (piramida golongan umur `<1 th`, `1-4 th`, `5-14 th`, `15-44 th`, `≥45 th` dan rasio gender L/P), komposisi tipe unit pelapor (Puskesmas, RS, Klinik, Lab), serta tabel peringkat Top 10 wilayah beban kasus & attack rate per 100.000 penduduk.
+   - Distribusi epidemiologi menurut orang (piramida golongan umur `<1 th`, `1–4 th`, `5–14 th`, `15–44 th`, `≥45 th` dan rasio gender L/P), komposisi tipe unit pelapor (Puskesmas, RS, Klinik, Lab), serta tabel peringkat Top 10 wilayah beban kasus & attack rate per 100.000 penduduk.
 4. **WHO 7-1-7 & Kinerja EBS** (`/dashboard/skdr/717`):
    - Pengukuran ketepatan respon standar global WHO: Deteksi $\le 7$ hari (T1), Notifikasi $\le 1$ hari (T2), Respon awal TGC $\le 7$ hari (T3), corong kualitas sinyal (Signal Quality Funnel & konversi rumor ke KLB), sebaran sumber sinyal, dan log After Action Review (AAR) pasca-KLB.
 5. **Deteksi Outbreak & Iklim** (`/dashboard/skdr/deteksi`):
@@ -18,16 +18,17 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
 6. **Buletin & Infografis** (`/dashboard/skdr/buletin`):
    - Generator buletin surveilans epidemiologi mingguan otomatis berskala nasional/provinsi siap cetak/ekspor PDF & Word (.docx), serta poster infografis digital 1-halaman siap unduh PNG untuk diseminasi ke publik dan pimpinan.
 
-## Komponen & Fitur Baru
-- **Panel Filter Samping Dinamis (`SkdrFilterPanel.tsx`)**:
-  - Panel samping sticky 280px yang dapat diciutkan (`PanelLeftClose`/`PanelLeftOpen`), mendukung responsivitas desktop & seluler.
-  - Filter pilar: `Semua` | `IBS (Rutin)` | `EBS (Sinyal)`.
-  - Periode: Tahun berjalan & rentang Minggu Epidemiologi (1–52) dilengkapi preset cepat (*4 Minggu*, *12 Minggu*, *Tahun Berjalan*).
-  - Wilayah bertingkat: Provinsi $\to$ Kabupaten/Kota via `SearchSelect`.
-  - Pilihan 36 Penyakit Indikator SKDR (`MASTER_36_DISEASES`).
-  - Parameter kontekstual per tab (overlay iklim, algoritma EARS, lag waktu karhutla).
-- **Secondary Quick Navigation Bar**: Bilah navigasi pil di bagian atas untuk berpindah instan antar 6 sub-dasbor tanpa harus selalu membuka sidebar.
-- **Kompatibilitas Penuh**: Rute `/main-dashboard` dan `/dashboard/skdr` tetap aktif dan langsung merender sub-dasbor Ringkasan Utama tanpa breaking change pada tautan atau bookmark yang sudah ada.
+## Revisi UX Sesuai Feedback Pengguna
+1. **Auto Layout & Perbaikan Overflow Panel Filter**:
+   - Memperbaiki masalah elemen select yang memotong batas kartu dan memicu scrollbar horizontal pada panel samping (seperti terlihat pada screenshot). Semua input/select kini menggunakan `w-full max-w-full truncate box-border` dan kontainer menggunakan `overflow-x-hidden` dengan tata letak fleksibel otomatis.
+2. **Penyederhanaan Label Pilar**:
+   - Label filter disederhanakan murni menjadi `Semua`, `IBS`, dan `EBS` tanpa embel-embel `(Rutin)` atau `(Sinyal)`.
+3. **Pelepasan Kartu Narasi Ekstra**:
+   - Melepas blok kartu naratif *"Interpretasi Epidemiologi Otomatis SKDR"* pada kurva tren penyakit agar tidak memakan ruang section, sehingga visualisasi grafik dan data table tampil lebih luas dan fokus.
+4. **Tombol "Terapkan Filter" (Draft State)**:
+   - Filtering tidak lagi otomatis terpicu di setiap klik input. Panel filter kini memiliki state lokal (*draft*) dengan tombol utama **"Terapkan Filter"** bertanda badge perubahan; data dasbor baru direfresh setelah tombol ditekan.
+5. **Sentralisasi Filter Dinamis (Pembersihan Kontrol di Kartu)**:
+   - Melepas dropdown/kontrol ganda di dalam kartu (dropdown ganti penyakit, tipe grafik, dan lag) dan memindahkannya seluruhnya ke dalam panel filter samping dinamis. Kartu di sisi konten kini murni menampilkan data visual, kurva, dan tabel tanpa gangguan elemen input ganda.
 
 ## Berkas yang Diubah / Dibuat
 - `database/init/071_dasbor_skdr_unified_submenus.sql`: Migrasi SQL idempoten mendaftarkan 6 subItems di bawah `mod_main_dashboard` pada `app_settings.navigation_menu`.
@@ -36,13 +37,13 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
 - `services/frontend-next/lib/dasbor-skdr-filter.ts`: Definisi tipe filter, URL state serializer/deserializer, dan metadata halaman.
 - `services/frontend-next/lib/dasbor-skdr-api.ts`: Master data 36 penyakit indikator dan tipe data metrik SKDR.
 - `services/frontend-next/lib/menu.ts`: Registrasi `DASBOR_SKDR_SUB_ITEMS` dan `DASBOR_SKDR_MENU_ITEM` ke `DEFAULT_NAVIGATION_CONFIG`.
-- `services/frontend-next/components/dasbor-skdr/DasborSkdrClient.tsx`: Klien orkestrasi dasbor utama terpadu.
-- `services/frontend-next/components/dasbor-skdr/SkdrFilterPanel.tsx`: Komponen panel filter samping dinamis.
+- `services/frontend-next/components/dasbor-skdr/DasborSkdrClient.tsx`: Klien orkestrasi dasbor utama terpadu dengan sticky filter drawer.
+- `services/frontend-next/components/dasbor-skdr/SkdrFilterPanel.tsx`: Komponen panel filter samping dinamis auto-layout + tombol Terapkan.
 - `services/frontend-next/components/dasbor-skdr/SkdrRingkasanView.tsx`: Sub-view Ringkasan Utama (IBS & EBS).
-- `services/frontend-next/components/dasbor-skdr/SkdrTrenView.tsx`: Sub-view Kurva Tren Kasus Mingguan IBS & Iklim.
-- `services/frontend-next/components/dasbor-skdr/SkdrDistribusiView.tsx`: Sub-view Distribusi Umur, Gender & Peringkat Wilayah.
+- `services/frontend-next/components/dasbor-skdr/SkdrTrenView.tsx`: Sub-view Kurva Tren Kasus Mingguan IBS & Iklim (tanpa kartu narasi).
+- `services/frontend-next/components/dasbor-skdr/SkdrDistribusiView.tsx`: Sub-view Distribusi Umur, Gender & Peringkat Wilayah (tanpa in-card dropdown).
 - `services/frontend-next/components/dasbor-skdr/Skdr717View.tsx`: Sub-view Capaian WHO 7-1-7 & Corong Kualitas Sinyal EBS.
-- `services/frontend-next/components/dasbor-skdr/SkdrDeteksiView.tsx`: Sub-view Deteksi Outbreak EARS/Farrington & Hotspot NASA.
+- `services/frontend-next/components/dasbor-skdr/SkdrDeteksiView.tsx`: Sub-view Deteksi Outbreak EARS/Farrington & Hotspot NASA (tanpa in-card dropdown).
 - `services/frontend-next/components/dasbor-skdr/SkdrBuletinView.tsx`: Sub-view Generator Buletin & Infografis Digital.
 - `services/frontend-next/app/dashboard/skdr/page.tsx`: Index redirect ke `/dashboard/skdr/ringkasan`.
 - `services/frontend-next/app/dashboard/skdr/ringkasan/page.tsx`: Rute sub-menu Ringkasan Utama.
@@ -58,11 +59,11 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
 - TypeScript compilation check (`docker exec skdr-frontend-next npx tsc --noEmit`): **0 error**.
 - Pengujian migrasi database `071_dasbor_skdr_unified_submenus.sql` dan `071_rollback.sql` pada container `skdr-postgres`: sukses idempoten (`BEGIN SELECT 1 UPDATE 1 COMMIT`).
 - Verifikasi rute HTTP:
-  - `/skdr/dashboard/skdr/ringkasan` -> HTTP 200 (length 33.6KB)
-  - `/skdr/dashboard/skdr/tren` -> HTTP 200 (length 33.6KB)
-  - `/skdr/dashboard/skdr/distribusi` -> HTTP 200 (length 33.6KB)
-  - `/skdr/dashboard/skdr/717` -> HTTP 200 (length 33.6KB)
-  - `/skdr/dashboard/skdr/deteksi` -> HTTP 200 (length 33.6KB)
-  - `/skdr/dashboard/skdr/buletin` -> HTTP 200 (length 33.6KB)
-  - `/skdr/main-dashboard` -> HTTP 200 (length 33.6KB)
-- **Status Git**: Seluruh perubahan tersimpan secara lokal tanpa push ke remote/Gitea sesuai instruksi pengguna.
+  - `/skdr/dashboard/skdr/ringkasan` -> HTTP 200
+  - `/skdr/dashboard/skdr/tren` -> HTTP 200
+  - `/skdr/dashboard/skdr/distribusi` -> HTTP 200
+  - `/skdr/dashboard/skdr/717` -> HTTP 200
+  - `/skdr/dashboard/skdr/deteksi` -> HTTP 200
+  - `/skdr/dashboard/skdr/buletin` -> HTTP 200
+  - `/skdr/main-dashboard` -> HTTP 200
+- **Status Git**: Seluruh perubahan tersimpan secara lokal tanpa push ke remote / Gitea sesuai instruksi pengguna.

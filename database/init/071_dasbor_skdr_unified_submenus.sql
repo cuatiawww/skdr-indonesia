@@ -106,3 +106,4 @@ WHERE key = 'navigation_menu'
   AND jsonb_typeof(value::jsonb) = 'array';
 
 COMMIT;
+

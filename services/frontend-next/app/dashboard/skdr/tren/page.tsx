@@ -4,3 +4,4 @@ import DasborSkdrClient from '@/components/dasbor-skdr/DasborSkdrClient'
 export default function SkdrTrenPage() {
   return <DasborSkdrClient page="tren" />
 }
+

@@ -13,6 +13,7 @@ import {
 export type SkdrTab = 'ringkasan' | 'tren' | 'distribusi' | '717' | 'deteksi' | 'buletin'
 export type SumberFilter = 'semua' | 'ibs' | 'ebs'
 export type EarsAlgoritma = 'c1' | 'c2' | 'c3' | 'farrington'
+export type ModeTren = 'tahunan' | 'multiTahun' | 'komparasiWilayah'
 
 export interface SkdrFilter {
   sumber: SumberFilter
@@ -23,6 +24,7 @@ export interface SkdrFilter {
   prov: string[]
   kab: string[]
   penyakit: string[]
+  modeTren: ModeTren
   komparasiWilayah: string[]
   iklimOverlay: boolean
   earsAlgoritma: EarsAlgoritma
@@ -48,7 +50,7 @@ export const SKDR_PAGES: SkdrPageMeta[] = [
     icon: LayoutDashboard,
     eyebrow: 'Dasbor SKDR · Ringkasan Terpadu',
     title: 'Ringkasan Eksekutif Surveilans Nasional',
-    desc: 'Sintesis komando surveilans nasional: beban kasus IBS, rumor & sinyal EBS, kelengkapan & ketepatan faskes (target ≥80%), serta peta spasial klaster.',
+    desc: 'Sintesis komando surveilans nasional: beban kasus IBS, sinyal EBS, kelengkapan & ketepatan faskes (target ≥80%), serta peta spasial klaster.',
   },
   {
     key: 'tren',
@@ -111,7 +113,8 @@ export function defaultSkdrFilter(): SkdrFilter {
     ew: week,
     prov: [],
     kab: [],
-    penyakit: ['01AWD'], // Default to Diare Akut
+    penyakit: ['01AWD'], // Default Diare Akut
+    modeTren: 'tahunan',
     komparasiWilayah: [],
     iklimOverlay: false,
     earsAlgoritma: 'c2',
@@ -157,6 +160,10 @@ export function readSkdrFilter(sp: URLSearchParams): SkdrFilter {
   const earsAlgoritma: EarsAlgoritma =
     ears === 'c1' || ears === 'c3' || ears === 'farrington' ? ears : 'c2'
 
+  const modeRaw = (sp.get('modeTren') || '').trim()
+  const modeTren: ModeTren =
+    modeRaw === 'multiTahun' || modeRaw === 'komparasiWilayah' ? modeRaw : 'tahunan'
+
   return {
     sumber,
     sy: num('startYear', d.sy),
@@ -166,6 +173,7 @@ export function readSkdrFilter(sp: URLSearchParams): SkdrFilter {
     prov: LIST(sp.get('prov')),
     kab: LIST(sp.get('kab')),
     penyakit: sp.get('penyakit') ? LIST(sp.get('penyakit')) : d.penyakit,
+    modeTren,
     komparasiWilayah: LIST(sp.get('komparasi')),
     iklimOverlay: sp.get('iklim') === '1',
     earsAlgoritma,
@@ -184,6 +192,7 @@ export function writeSkdrFilter(f: SkdrFilter): string {
   if (f.prov.length) sp.set('prov', f.prov.join(','))
   if (f.kab.length) sp.set('kab', f.kab.join(','))
   if (f.penyakit.length) sp.set('penyakit', f.penyakit.join(','))
+  if (f.modeTren !== 'tahunan') sp.set('modeTren', f.modeTren)
   if (f.komparasiWilayah.length) sp.set('komparasi', f.komparasiWilayah.join(','))
   if (f.iklimOverlay) sp.set('iklim', '1')
   if (f.earsAlgoritma !== 'c2') sp.set('ears', f.earsAlgoritma)
@@ -199,7 +208,8 @@ export function activeFilterCount(f: SkdrFilter, tab: SkdrTab): number {
   if (f.sy !== cur.year || f.sw !== 1 || f.ey !== cur.year || f.ew !== cur.week) count++
   if (f.prov.length) count += f.prov.length
   if (f.kab.length) count += f.kab.length
-  if (tab === 'tren' && f.penyakit.length > 1) count += f.penyakit.length - 1
+  if (f.penyakit.length > 1) count += f.penyakit.length - 1
+  if (tab === 'tren' && f.modeTren !== 'tahunan') count++
   if (tab === 'tren' && f.komparasiWilayah.length) count += f.komparasiWilayah.length
   if (tab === 'tren' && f.iklimOverlay) count++
   if (tab === 'deteksi' && f.earsAlgoritma !== 'c2') count++

@@ -107,7 +107,7 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
         <div className="skdr-card p-5 border-l-4 border-l-primary relative overflow-hidden">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-[11px] font-black uppercase tracking-wider">
-              {f.sumber === 'ebs' ? 'Sinyal EBS Terpantau' : 'Total Kasus IBS (Rutin)'}
+              {f.sumber === 'ebs' ? 'Sinyal EBS' : 'Total Kasus IBS'}
             </span>
             <div className="rounded-xl bg-primary/10 p-2 text-primary">
               <Stethoscope className="h-5 w-5" />
@@ -130,7 +130,7 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
         <div className="skdr-card p-5 border-l-4 border-l-amber-500 relative overflow-hidden">
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-[11px] font-black uppercase tracking-wider">
-              Sinyal & Rumor EBS
+              Sinyal EBS
             </span>
             <div className="rounded-xl bg-amber-50 p-2 text-amber-600">
               <AlertTriangle className="h-5 w-5" />

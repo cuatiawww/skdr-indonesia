@@ -310,3 +310,4 @@ export default function SkdrBuletinView({ f }: { f: SkdrFilter }) {
     </div>
   )
 }
+

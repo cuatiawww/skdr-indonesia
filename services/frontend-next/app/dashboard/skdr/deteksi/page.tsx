@@ -4,3 +4,4 @@ import DasborSkdrClient from '@/components/dasbor-skdr/DasborSkdrClient'
 export default function SkdrDeteksiPage() {
   return <DasborSkdrClient page="deteksi" />
 }
+

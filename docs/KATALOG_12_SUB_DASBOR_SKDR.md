@@ -133,3 +133,4 @@ flowchart TD
 * **Filter**: Tahun (2019–2026), Wilayah, Selector Time-Lag (+0, +1, +2 minggu setelah paparan asap), Sub-Tab (Sebaran Hotspot, Korelasi ISPA, Kualitas Udara AQI, Dampak Asap, Analisa AI).
 * **Visualisasi**: Peta Spasial Sebaran Hotspot Bergradasi Panas, Dual-Axis Time Series Chart (Titik Hotspot vs Kasus ISPA), Scatter Plot Regresi Korelasi $R^2$, Tabel Top 20 Wilayah Terpapar.
 * **Endpoints**: `GET /hotspot/get_korelasi`, `GET /hotspot/get_karhutla_summary`.
+

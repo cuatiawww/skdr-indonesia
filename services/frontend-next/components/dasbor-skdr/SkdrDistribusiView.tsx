@@ -1,6 +1,8 @@
 'use client'
-// PR 057: Distribusi & Demografi - Classical descriptive epidemiology
-import { useMemo, useState } from 'react'
+// PR 057 (Revised): Distribusi & Demografi
+// - Clean layout without duplicate in-card disease dropdown
+// - Fully driven by dynamic left sidebar filter panel
+import { useMemo } from 'react'
 import {
   Activity,
   ArrowUpRight,
@@ -32,7 +34,7 @@ const GENDER_COLORS = ['#0284c7', '#ec4899']
 const UNIT_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#06b6d4']
 
 export default function SkdrDistribusiView({ f }: { f: SkdrFilter }) {
-  const [selectedDisease, setSelectedDisease] = useState<string>(f.penyakit[0] || '01AWD')
+  const selectedDisease = f.penyakit[0] || '01AWD'
 
   const diseaseInfo = useMemo(() => {
     return (
@@ -82,9 +84,9 @@ export default function SkdrDistribusiView({ f }: { f: SkdrFilter }) {
 
   return (
     <div className="space-y-6" data-testid="skdr-distribusi-view">
-      {/* Header with Disease Selector */}
+      {/* Header Banner (Clean, No in-card dropdown) */}
       <div className="skdr-card p-5">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
               <Users className="h-4 w-4" /> Distribusi Epidemiologi Deskriptif
@@ -96,21 +98,10 @@ export default function SkdrDistribusiView({ f }: { f: SkdrFilter }) {
               Analisa sebaran menurut orang (golongan usia & jenis kelamin), unit pelapor, dan tempat (peringkat wilayah).
             </p>
           </div>
-          <div className="w-full md:w-72">
-            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-600 mb-1">
-              Pilih Penyakit
-            </label>
-            <select
-              value={selectedDisease}
-              onChange={(e) => setSelectedDisease(e.target.value)}
-              className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 shadow-xs outline-none hover:border-brand-400 focus:border-primary"
-            >
-              {MASTER_36_DISEASES.map((d) => (
-                <option key={d.code} value={d.code}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-2">
+            <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+              Tahun {f.ey} · Minggu 1–{f.ew}
+            </span>
           </div>
         </div>
       </div>

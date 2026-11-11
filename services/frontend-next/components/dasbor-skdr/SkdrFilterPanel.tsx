@@ -1,9 +1,13 @@
 'use client'
-// PR 057: Dynamic Sidebar Filter Panel for Dasbor SKDR Terpadu
+// PR 057 (Revised): Dynamic Sidebar Filter Panel for Dasbor SKDR Terpadu
+// - Auto layout, no horizontal scroll, no overflowing inputs
+// - Clean labels: Semua, IBS, EBS (no Rutin/Sinyal terms)
+// - Explicit "Terapkan Filter" button (draft state, applies on click)
+// - Centralized filtering: all tab options managed here so cards stay clean
 import { useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays,
-  ChevronDown,
+  Check,
   Filter,
   Layers,
   RotateCcw,
@@ -17,6 +21,8 @@ import {
   activeFilterCount,
   defaultSkdrFilter,
   presetRange,
+  type EarsAlgoritma,
+  type ModeTren,
   type SkdrFilter,
   type SkdrTab,
   type SumberFilter,
@@ -24,23 +30,30 @@ import {
 import { MASTER_36_DISEASES } from '@/lib/dasbor-skdr-api'
 
 const box =
-  'h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 outline-none transition hover:border-brand-300 focus:border-primary focus:ring-1 focus:ring-primary/30'
-const lbl = 'mb-1.5 flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600'
+  'h-9 w-full max-w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 outline-none transition hover:border-brand-300 focus:border-primary focus:ring-1 focus:ring-primary/30 truncate box-border'
+const lbl =
+  'mb-1 flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600'
 
 export default function SkdrFilterPanel({
   f,
-  set,
+  onApply,
   tab,
   onClose,
 }: {
   f: SkdrFilter
-  set: (p: Partial<SkdrFilter>) => void
+  onApply: (applied: SkdrFilter) => void
   tab: SkdrTab
   onClose?: () => void
 }) {
+  // Local draft state for explicit "Terapkan Filter" action
+  const [draft, setDraft] = useState<SkdrFilter>(f)
   const [provs, setProvs] = useState<MasterProvince[]>([])
   const [kabs, setKabs] = useState<MasterKabkota[]>([])
-  const [advOpen, setAdvOpen] = useState(false)
+
+  // Keep draft in sync if external applied filters change (e.g. from URL load)
+  useEffect(() => {
+    setDraft(f)
+  }, [f])
 
   useEffect(() => {
     fetchProvinces()
@@ -48,26 +61,41 @@ export default function SkdrFilterPanel({
       .catch(() => setProvs([]))
   }, [])
 
-  const provKey = f.prov.join(',')
+  const provKey = draft.prov.join(',')
   useEffect(() => {
-    if (!f.prov.length) {
+    if (!draft.prov.length) {
       setKabs([])
       return
     }
-    Promise.all(f.prov.map((p) => fetchKabkota(Number(p)).catch(() => [] as MasterKabkota[])))
+    Promise.all(draft.prov.map((p) => fetchKabkota(Number(p)).catch(() => [] as MasterKabkota[])))
       .then((l) => setKabs(l.flat()))
       .catch(() => setKabs([]))
   }, [provKey])
 
-  const count = activeFilterCount(f, tab)
+  const setPatch = (patch: Partial<SkdrFilter>) => {
+    setDraft((prev) => ({ ...prev, ...patch }))
+  }
+
+  const handleApply = () => {
+    onApply(draft)
+  }
+
+  const handleReset = () => {
+    const def = defaultSkdrFilter()
+    setDraft(def)
+    onApply(def)
+  }
+
+  const count = activeFilterCount(draft, tab)
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(f)
 
   return (
     <aside
-      className="flex max-h-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xs"
+      className="flex w-full max-w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs box-border"
       data-testid="skdr-filter-panel"
     >
       {/* Panel Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <span>Filter Dasbor SKDR</span>
@@ -84,9 +112,9 @@ export default function SkdrFilterPanel({
           {count > 0 && (
             <button
               type="button"
-              onClick={() => set(defaultSkdrFilter())}
+              onClick={handleReset}
               className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              title="Reset Filter"
+              title="Atur Ulang Filter"
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -95,7 +123,7 @@ export default function SkdrFilterPanel({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 lg:hidden"
               aria-label="Sembunyikan filter"
             >
               <X className="h-4 w-4" />
@@ -104,9 +132,9 @@ export default function SkdrFilterPanel({
         </div>
       </div>
 
-      {/* Filter Body */}
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 text-xs">
-        {/* Pilar Surveilans */}
+      {/* Filter Body with Clean Auto Layout */}
+      <div className="w-full space-y-4 overflow-x-hidden p-4 text-xs box-border">
+        {/* Pilar Surveilans: Clean labels (Semua, IBS, EBS) */}
         <div>
           <div className={lbl}>
             <Layers className="h-3.5 w-3.5 text-primary" />
@@ -116,16 +144,16 @@ export default function SkdrFilterPanel({
             {(
               [
                 ['semua', 'Semua'],
-                ['ibs', 'IBS (Rutin)'],
-                ['ebs', 'EBS (Sinyal)'],
+                ['ibs', 'IBS'],
+                ['ebs', 'EBS'],
               ] as [SumberFilter, string][]
             ).map(([val, label]) => (
               <button
                 key={val}
                 type="button"
-                onClick={() => set({ sumber: val })}
+                onClick={() => setPatch({ sumber: val })}
                 className={`rounded-lg py-1.5 text-center text-[11px] font-bold transition ${
-                  f.sumber === val
+                  draft.sumber === val
                     ? 'bg-white text-primary shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
@@ -136,55 +164,59 @@ export default function SkdrFilterPanel({
           </div>
         </div>
 
-        {/* Periode Epidemiologi */}
+        {/* Periode Waktu */}
         <div>
           <div className={lbl}>
             <CalendarDays className="h-3.5 w-3.5 text-primary" />
-            <span>Periode Epidemiologi</span>
+            <span>Periode Waktu</span>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="w-12 text-[11px] font-semibold text-slate-500">Tahun</span>
+              <span className="w-12 shrink-0 text-[11px] font-semibold text-slate-500">Tahun</span>
               <select
                 className={box}
-                value={f.ey}
+                value={draft.ey}
                 onChange={(e) => {
                   const y = Number(e.target.value)
-                  set({ sy: y, ey: y })
+                  setPatch({ sy: y, ey: y })
                 }}
               >
-                <option value={2026}>2026 (Tahun Berjalan)</option>
+                <option value={2026}>2026</option>
                 <option value={2025}>2025</option>
                 <option value={2024}>2024</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-12 text-[11px] font-semibold text-slate-500">Minggu</span>
-              <div className="flex flex-1 items-center gap-1.5">
+              <span className="w-12 shrink-0 text-[11px] font-semibold text-slate-500">Minggu</span>
+              <div className="flex flex-1 items-center gap-1.5 min-w-0">
                 <input
                   type="number"
                   min={1}
                   max={52}
-                  className={box}
-                  value={f.sw}
-                  onChange={(e) => set({ sw: Math.max(1, Math.min(52, Number(e.target.value))) })}
-                  placeholder="Mulai (1)"
+                  className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none text-center"
+                  value={draft.sw}
+                  onChange={(e) =>
+                    setPatch({ sw: Math.max(1, Math.min(52, Number(e.target.value))) })
+                  }
+                  placeholder="1"
                 />
-                <span className="text-slate-400">s/d</span>
+                <span className="text-slate-400 font-bold shrink-0">s/d</span>
                 <input
                   type="number"
                   min={1}
                   max={52}
-                  className={box}
-                  value={f.ew}
-                  onChange={(e) => set({ ew: Math.max(1, Math.min(52, Number(e.target.value))) })}
-                  placeholder="Sampai (52)"
+                  className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none text-center"
+                  value={draft.ew}
+                  onChange={(e) =>
+                    setPatch({ ew: Math.max(1, Math.min(52, Number(e.target.value))) })
+                  }
+                  placeholder="52"
                 />
               </div>
             </div>
           </div>
-          {/* Quick Presets */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* Presets */}
+          <div className="mt-2 flex flex-wrap gap-1">
             {(
               [
                 ['4m', '4 Minggu'],
@@ -195,8 +227,8 @@ export default function SkdrFilterPanel({
               <button
                 key={kind}
                 type="button"
-                onClick={() => set(presetRange(kind))}
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 transition hover:border-primary hover:text-primary"
+                onClick={() => setPatch(presetRange(kind))}
+                className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:border-primary hover:text-primary transition"
               >
                 {label}
               </button>
@@ -204,11 +236,11 @@ export default function SkdrFilterPanel({
           </div>
         </div>
 
-        {/* Pilihan Penyakit */}
+        {/* Pilihan Penyakit (Centralized across dashboard) */}
         <div>
           <div className={lbl}>
             <Stethoscope className="h-3.5 w-3.5 text-primary" />
-            <span>Penyakit Indikator (36 Penyakit)</span>
+            <span>Penyakit Indikator</span>
           </div>
           <SearchSelect
             multiple
@@ -217,9 +249,9 @@ export default function SkdrFilterPanel({
               label: `${d.kode_sms ? `[${d.kode_sms}] ` : ''}${d.name}`,
               hint: d.category,
             }))}
-            value={f.penyakit}
-            placeholder="Pilih Penyakit Indikator..."
-            onChange={(penyakit) => set({ penyakit })}
+            value={draft.penyakit}
+            placeholder="Pilih Penyakit..."
+            onChange={(penyakit) => setPatch({ penyakit })}
             testId="filter-penyakit"
           />
         </div>
@@ -230,9 +262,9 @@ export default function SkdrFilterPanel({
           <SearchSelect
             multiple
             options={provs.map((p) => ({ value: String(p.id), label: p.name }))}
-            value={f.prov}
+            value={draft.prov}
             placeholder="Semua Provinsi (Nasional)"
-            onChange={(prov) => set({ prov, kab: [] })}
+            onChange={(prov) => setPatch({ prov, kab: [] })}
             testId="filter-provinsi"
           />
         </div>
@@ -244,93 +276,130 @@ export default function SkdrFilterPanel({
             options={kabs.map((k) => ({
               value: String(k.id),
               label: k.name,
-              hint: f.prov.length > 1 ? k.province_name : undefined,
+              hint: draft.prov.length > 1 ? k.province_name : undefined,
             }))}
-            value={f.kab}
-            disabled={!f.prov.length}
+            value={draft.kab}
+            disabled={!draft.prov.length}
             disabledHint="Pilih provinsi terlebih dahulu"
             placeholder="Semua Kab/Kota"
-            onChange={(kab) => set({ kab })}
+            onChange={(kab) => setPatch({ kab })}
             testId="filter-kabkota"
           />
         </div>
 
-        {/* Filter Kontekstual Per Tab */}
+        {/* Parameter Khusus Tab Tren (Moved here from card) */}
         {tab === 'tren' && (
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-3">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-              Opsi Tren Penyakit
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer text-slate-700">
-              <input
-                type="checkbox"
-                checked={f.iklimOverlay}
-                onChange={(e) => set({ iklimOverlay: e.target.checked })}
-                className="rounded border-slate-300 text-primary focus:ring-primary/30"
-              />
-              <span className="font-semibold text-[11px]">
-                Lapisan Iklim Copernicus ERA5 (Suhu/Hujan)
-              </span>
-            </label>
-          </div>
-        )}
-
-        {tab === 'deteksi' && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-3">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-              Parameter Algoritma Deteksi Outbreak
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-600">
+              Konfigurasi Tren Penyakit
             </div>
             <div>
-              <span className="text-[11px] font-semibold text-slate-600">Model Statistik</span>
+              <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Tipe Komparasi
+              </span>
               <select
-                className={`mt-1 ${box}`}
-                value={f.earsAlgoritma}
-                onChange={(e) => set({ earsAlgoritma: e.target.value as any })}
+                className={box}
+                value={draft.modeTren}
+                onChange={(e) => setPatch({ modeTren: e.target.value as ModeTren })}
               >
-                <option value="c1">EARS C1 (Sensitivitas Ringan, Baseline 7 Hari)</option>
-                <option value="c2">EARS C2 (Standar CDC / WHO, Lag 2 Hari)</option>
-                <option value="c3">EARS C3 (Konservatif, Deviasi 3 Hari)</option>
-                <option value="farrington">Farrington Quasi-Poisson (Musiman)</option>
+                <option value="tahunan">Tahun Berjalan vs Tahun Lalu</option>
+                <option value="multiTahun">Multi-Tahun (2024–2026)</option>
+                <option value="komparasiWilayah">Komparasi Antar-Wilayah</option>
               </select>
             </div>
             <label className="flex items-center gap-2 cursor-pointer text-slate-700">
               <input
                 type="checkbox"
-                checked={f.earsHanyaAlert}
-                onChange={(e) => set({ earsHanyaAlert: e.target.checked })}
+                checked={draft.iklimOverlay}
+                onChange={(e) => setPatch({ iklimOverlay: e.target.checked })}
+                className="rounded border-slate-300 text-primary focus:ring-primary/30"
+              />
+              <span className="font-semibold text-[11px] leading-tight">
+                Lapisan Iklim Copernicus ERA5
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* Parameter Khusus Tab Deteksi (Moved here from card, no overflow!) */}
+        {tab === 'deteksi' && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-3 max-w-full overflow-hidden">
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-600">
+              Model Deteksi Outbreak
+            </div>
+            <div className="w-full max-w-full overflow-hidden">
+              <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Model Statistik
+              </span>
+              <select
+                className={box}
+                value={draft.earsAlgoritma}
+                onChange={(e) => setPatch({ earsAlgoritma: e.target.value as EarsAlgoritma })}
+              >
+                <option value="c1">EARS C1 (Baseline 7 Hari)</option>
+                <option value="c2">EARS C2 (CDC / WHO, Lag 2 Hari)</option>
+                <option value="c3">EARS C3 (Deviasi 3 Hari)</option>
+                <option value="farrington">Farrington (Musiman)</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer text-slate-700">
+              <input
+                type="checkbox"
+                checked={draft.earsHanyaAlert}
+                onChange={(e) => setPatch({ earsHanyaAlert: e.target.checked })}
                 className="rounded border-slate-300 text-primary focus:ring-primary/30"
               />
               <span className="font-semibold text-[11px]">Hanya Tampilkan ALERT</span>
             </label>
-            <div>
-              <span className="text-[11px] font-semibold text-slate-600">Time-Lag Karhutla vs ISPA</span>
+            <div className="w-full max-w-full overflow-hidden">
+              <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Time-Lag Karhutla vs ISPA
+              </span>
               <select
-                className={`mt-1 ${box}`}
-                value={f.hotspotLag}
-                onChange={(e) => set({ hotspotLag: Number(e.target.value) })}
+                className={box}
+                value={draft.hotspotLag}
+                onChange={(e) => setPatch({ hotspotLag: Number(e.target.value) })}
               >
                 <option value={0}>Minggu Sama (+0 Minggu)</option>
-                <option value={1}>Dampak +1 Minggu Kemudian</option>
-                <option value={2}>Dampak +2 Minggu Kemudian</option>
+                <option value={1}>Dampak +1 Minggu</option>
+                <option value={2}>Dampak +2 Minggu</option>
               </select>
             </div>
           </div>
         )}
       </div>
 
-      {/* Panel Footer */}
-      <div className="border-t border-slate-100 p-3 bg-slate-50/50 flex items-center justify-between">
-        <span className="text-[11px] text-slate-500 font-medium">
-          {f.prov.length ? `${f.prov.length} Provinsi dipilih` : 'Skala Nasional'}
-        </span>
+      {/* Prominent Action Button: "Terapkan Filter" */}
+      <div className="border-t border-slate-100 p-4 bg-slate-50/70 space-y-2">
         <button
           type="button"
-          onClick={() => set(defaultSkdrFilter())}
-          className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+          onClick={handleApply}
+          className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-sm transition ${
+            isDirty
+              ? 'bg-primary hover:bg-primary-dark ring-2 ring-primary/30 animate-pulse'
+              : 'bg-primary hover:bg-primary-dark'
+          }`}
+          data-testid="filter-apply-btn"
         >
-          <RotateCcw className="h-3 w-3" />
-          Atur Ulang
+          <Check className="h-4 w-4" />
+          <span>Terapkan Filter</span>
+          {isDirty && (
+            <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+              Belum disimpan
+            </span>
+          )}
         </button>
+
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+          <span>{draft.prov.length ? `${draft.prov.length} Provinsi` : 'Skala Nasional'}</span>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="font-bold text-slate-500 hover:text-primary transition"
+          >
+            Reset Default
+          </button>
+        </div>
       </div>
     </aside>
   )

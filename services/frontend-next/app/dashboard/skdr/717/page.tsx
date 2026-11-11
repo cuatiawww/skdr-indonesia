@@ -4,3 +4,4 @@ import DasborSkdrClient from '@/components/dasbor-skdr/DasborSkdrClient'
 export default function Skdr717Page() {
   return <DasborSkdrClient page="717" />
 }
+

@@ -164,3 +164,4 @@ export async function fetchMasterDiseases(): Promise<MasterDiseaseItem[]> {
   } catch {}
   return MASTER_36_DISEASES
 }
+
