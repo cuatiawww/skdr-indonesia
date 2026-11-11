@@ -8,10 +8,14 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
+  Layers,
   MapPin,
   RefreshCw,
   ShieldCheck,
+  SlidersHorizontal,
   Stethoscope,
   Users,
 } from 'lucide-react'
@@ -32,9 +36,8 @@ import dynamic from 'next/dynamic'
 import type { SkdrFilter } from '@/lib/dasbor-skdr-filter'
 import { peFetch } from '@/lib/pe-api'
 import { SkeletonChart } from '@/components/ui/Skeleton'
-import SpasialPanel from '@/components/spasial/SpasialPanel'
-import { DEFAULT_LAYERS, type Focus, type Layers } from '@/components/spasial/SpasialMap'
-import { defaultFilter, useAnalisa, type AFilter } from '@/lib/analisa-api'
+import { DEFAULT_LAYERS, type Focus, type Layers as MapLayers } from '@/components/spasial/SpasialMap'
+import { defaultFilter, fetchAnalisa, useAnalisa, type AFilter } from '@/lib/analisa-api'
 import { decodeTitik, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
 import { useChoroConfig } from '@/lib/choropleth-classes'
 
@@ -47,6 +50,60 @@ const SpasialMap = dynamic(() => import('@/components/spasial/SpasialMap'), {
   ),
 })
 
+const INTEGRATED_APIS = [
+  {
+    id: 'flights',
+    name: 'Penerbangan Domestik',
+    icon: '✈️',
+    source: '/map-layers/flight-routes',
+    desc: 'Mobilitas antarbandara & rute domestik',
+  },
+  {
+    id: 'fires',
+    name: 'NASA FIRMS Hotspots',
+    icon: '🔥',
+    source: '/map-layers/fires',
+    desc: 'Thermal anomaly kebakaran hutan vs ISPA',
+  },
+  {
+    id: 'hazards',
+    name: 'BNPB InaRISK Bencana',
+    icon: '🌧️',
+    source: '/map-layers/hazards',
+    desc: 'Banjir, tanah longsor & bahaya alam',
+  },
+  {
+    id: 'wildlife',
+    name: 'Satwa Liar GBIF',
+    icon: '🦅',
+    source: '/map-layers/wildlife',
+    desc: 'Pemantauan burung liar / Avian Influenza',
+  },
+  {
+    id: 'vectors',
+    name: 'Vektor Nyamuk iNat',
+    icon: '🦟',
+    source: '/map-layers/vectors',
+    desc: 'Surveilans entomologi Aedes & Anopheles',
+  },
+]
+
+const UNIT_TYPES = [
+  { label: 'Puskesmas', count: '128.406' },
+  { label: 'Rumah Sakit', count: '52.913' },
+  { label: 'Dinas Kesehatan Kab/Kota', count: '7.546' },
+  { label: 'BKK / KKP', count: '1.892' },
+  { label: 'Klinik Pratama/Utama', count: '1.393' },
+  { label: 'Laboratorium Kesehatan', count: '397' },
+  { label: 'PHEOC Nasional', count: '5' },
+]
+
+const REPORT_STATUSES = [
+  { label: 'Terverifikasi (Respon ≤24 Jam)', count: '181.700' },
+  { label: 'Dalam Investigasi TGC', count: '7.050' },
+  { label: 'False Alarm / Discarded', count: '3.420' },
+]
+
 export default function SkdrRingkasanView({
   f,
   onApply,
@@ -56,10 +113,29 @@ export default function SkdrRingkasanView({
 }) {
   const [loading, setLoading] = useState(true)
   const [metric, setMetric] = useState<Metric>('kasus')
-  const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS)
-  const [rightOpen, setRightOpen] = useState(false)
+  const [layers, setLayers] = useState<MapLayers>(DEFAULT_LAYERS)
   const [sel, setSel] = useState<Area | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
+
+  // Layout docks & tabs
+  const [leftDockOpen, setLeftDockOpen] = useState(true)
+  const [leftDockTab, setLeftDockTab] = useState<'api' | 'faskes'>('api')
+  const [rightTab, setRightTab] = useState<'alert' | 'detail' | 'hotspot'>('alert')
+
+  // Integrated layer toggles & filters
+  const [intelLayers, setIntelLayers] = useState({
+    flights: false,
+    fires: false,
+    hazards: false,
+    wildlife: false,
+    vectors: false,
+  })
+  const [selectedUnits, setSelectedUnits] = useState<string[]>([])
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+
+  // Detailed selected area data
+  const [det, setDet] = useState<any>(null)
+  const [detLoading, setDetLoading] = useState(false)
 
   const [kpiData, setKpiData] = useState({
     totalIbs: 48920,
@@ -69,6 +145,14 @@ export default function SkdrRingkasanView({
     verifikasiRate: 91.5,
     cfr: 0.84,
   })
+
+  // Simulated alert breakdown by status (Kemenkes standard)
+  const alertStatusData = [
+    { label: 'Terverifikasi (Respon ≤24 Jam)', count: 2840, pct: 72.2, color: '#10b981' },
+    { label: 'Dalam Investigasi / TGC', count: 412, pct: 10.5, color: '#f59e0b' },
+    { label: 'Sinyal Baru (Belum Verifikasi)', count: 160, pct: 4.1, color: '#ef4444' },
+    { label: 'False Alarm / Discarded', count: 520, pct: 13.2, color: '#94a3b8' },
+  ]
 
   // Convert Dasbor SKDR Filter to AFilter for Spatial API
   const aFilter = useMemo<AFilter>(() => {
@@ -107,7 +191,7 @@ export default function SkdrRingkasanView({
 
   const pickArea = (a: Area, fromMap = false) => {
     setSel(a)
-    setRightOpen(true)
+    setRightTab('detail')
     if (!fromMap && a.lat != null && a.lon != null) {
       setFocus({
         lat: a.lat,
@@ -122,6 +206,37 @@ export default function SkdrRingkasanView({
   const pickTitik = (t: Titik) => {
     setFocus({ lat: t.lat, lon: t.lon, titik: t, nonce: Date.now() })
   }
+
+  // Fetch detailed area data when an area is selected
+  useEffect(() => {
+    setDet(null)
+    if (!sel) return
+    let alive = true
+    setDetLoading(true)
+    const lv = data?.level === 'kabkota' ? 'kab' : 'prov'
+    fetchAnalisa('spasial/wilayah', aFilter, { wlv: lv, wid: sel.id })
+      .then((d) => {
+        if (alive) setDet(d)
+      })
+      .catch(() => {
+        if (alive) setDet({ error: true })
+      })
+      .finally(() => {
+        if (alive) setDetLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [sel?.id, data?.level, aFilter])
+
+  // Ranked areas for Hotspot tab
+  const rankedAreas = useMemo(() => {
+    if (!data?.wilayah) return []
+    return [...data.wilayah]
+      .filter((a) => (a.kasus || 0) > 0)
+      .sort((a, b) => (b.kasus || 0) - (a.kasus || 0))
+      .slice(0, 10)
+  }, [data?.wilayah])
 
   const onDrill = (a: Area) => {
     if (onApply) {
@@ -291,72 +406,480 @@ export default function SkdrRingkasanView({
         </div>
       </div>
 
-      {/* Full-width Spatial Map Section with Epiweek Player & Detail Wilayah */}
-      <div className="skdr-card p-5 w-full flex flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
-              <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
+      {/* Main Grid: Spatial Map (with Collapsible Left API & Settings Dock) & Right Management / Detail Analysis Card */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left / Center Map Card (8 cols) */}
+        <div className="skdr-card p-5 lg:col-span-8 flex flex-col">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
+              </div>
+              <h3 className="text-base font-black text-slate-900 mt-0.5">
+                Sebaran Sinyal Alert IBS & EBS per Fasyankes
+              </h3>
             </div>
-            <h3 className="text-base font-black text-slate-900 mt-0.5">
-              Sebaran Sinyal Alert IBS & EBS per Fasyankes
-            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Quick Metric Pills */}
+              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
+                {METRIC_TABS.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setMetric(m.key)}
+                    className={`rounded-lg px-2.5 py-1 transition ${
+                      metric === m.key
+                        ? 'bg-white text-primary shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                Tahun {f.ey} · M{f.sw}–M{f.ew}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Quick Metric Pills */}
-            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
-              {METRIC_TABS.map((m) => (
+
+          {/* Map Container with Collapsible Left API & Settings Dock */}
+          <div className="mt-4 flex min-h-[600px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
+            {/* Left Collapsible Dock: Integrated APIs & Fasyankes Unit Filters */}
+            <aside
+              className={`shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
+                leftDockOpen ? 'w-[250px]' : 'w-10'
+              }`}
+              data-testid="peta-left-dock"
+            >
+              <button
+                type="button"
+                onClick={() => setLeftDockOpen(!leftDockOpen)}
+                className="flex w-full items-center justify-between border-b border-slate-100 px-2.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                title={leftDockOpen ? 'Ciutkan panel' : 'Buka panel pengaturan & API'}
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <SlidersHorizontal className="h-4 w-4 shrink-0 text-primary" />
+                  {leftDockOpen && <span className="truncate">Lapisan & API Intelijen</span>}
+                </div>
+                {leftDockOpen ? (
+                  <ChevronLeft className="h-4 w-4 text-slate-400" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                )}
+              </button>
+
+              {leftDockOpen && (
+                <div className="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
+                  {/* Dock Internal Tab Switch */}
+                  <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setLeftDockTab('api')}
+                      className={`flex-1 rounded-md py-1 transition ${
+                        leftDockTab === 'api'
+                          ? 'bg-white text-primary shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      API Terintegrasi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeftDockTab('faskes')}
+                      className={`flex-1 rounded-md py-1 transition ${
+                        leftDockTab === 'faskes'
+                          ? 'bg-white text-primary shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Unit & Status
+                    </button>
+                  </div>
+
+                  {leftDockTab === 'api' ? (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Lapisan Intelijen Eksternal
+                      </div>
+                      {INTEGRATED_APIS.map((api) => {
+                        const active = Boolean((intelLayers as any)[api.id])
+                        return (
+                          <div
+                            key={api.id}
+                            className={`rounded-xl border p-2.5 transition cursor-pointer ${
+                              active
+                                ? 'border-primary/40 bg-blue-50/60'
+                                : 'border-slate-100 bg-white hover:border-slate-200'
+                            }`}
+                            onClick={() =>
+                              setIntelLayers((prev) => ({
+                                ...prev,
+                                [api.id]: !(prev as any)[api.id],
+                              }))
+                            }
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                                <span>{api.icon}</span>
+                                <span>{api.name}</span>
+                              </span>
+                              <span
+                                className={`h-2 w-2 rounded-full ${
+                                  active ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-300'
+                                }`}
+                              />
+                            </div>
+                            <p className="mt-1 text-[10px] text-slate-500 leading-tight">
+                              {api.desc}
+                            </p>
+                            <div className="mt-1.5 flex items-center justify-between text-[9px] font-mono text-slate-400">
+                              <span>{api.source}</span>
+                              <span
+                                className={`font-sans font-bold text-[10px] ${
+                                  active ? 'text-primary' : 'text-slate-400'
+                                }`}
+                              >
+                                {active ? 'Aktif' : 'Nonaktif'}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Jenis Unit */}
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                          Jenis Unit Pelapor
+                        </div>
+                        <div className="space-y-1">
+                          {UNIT_TYPES.map((u) => {
+                            const isSel = selectedUnits.includes(u.label)
+                            return (
+                              <button
+                                key={u.label}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedUnits((prev) =>
+                                    isSel ? prev.filter((x) => x !== u.label) : [...prev, u.label]
+                                  )
+                                }
+                                className={`w-full flex items-center justify-between rounded-lg px-2 py-1 text-left text-[11px] transition ${
+                                  isSel
+                                    ? 'bg-primary text-white font-bold'
+                                    : 'hover:bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                <span className="truncate">{u.label}</span>
+                                <span className="tabular-nums text-[10px] opacity-80">{u.count}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Status Laporan */}
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                          Status Laporan SKDR
+                        </div>
+                        <div className="space-y-1">
+                          {REPORT_STATUSES.map((s) => {
+                            const isSel = selectedStatuses.includes(s.label)
+                            return (
+                              <button
+                                key={s.label}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedStatuses((prev) =>
+                                    isSel ? prev.filter((x) => x !== s.label) : [...prev, s.label]
+                                  )
+                                }
+                                className={`w-full flex items-center justify-between rounded-lg px-2 py-1 text-left text-[11px] transition ${
+                                  isSel
+                                    ? 'bg-primary text-white font-bold'
+                                    : 'hover:bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                <span className="truncate">{s.label}</span>
+                                <span className="tabular-nums text-[10px] opacity-80">{s.count}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </aside>
+
+            {/* Map Canvas with Bottom Epiweek Replay Bar */}
+            <div className="min-w-0 flex-1 relative h-full">
+              <SpasialMap
+                data={data}
+                titik={titik}
+                metric={metric}
+                setMetric={setMetric}
+                layers={layers}
+                setLayers={setLayers}
+                choroCfg={choroCfg}
+                sumber={f.sumber}
+                selectedId={sel?.id ?? null}
+                onSelectArea={(a) => (a ? pickArea(a, true) : setSel(null))}
+                onDrill={onDrill}
+                onUp={onUp}
+                focus={focus}
+                panelOpen={false}
+                setPanelOpen={() => {}}
+                height={600}
+                rightPanel={null}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Management & Detailed Analysis Card (4 cols) */}
+        <div className="skdr-card p-5 lg:col-span-4 flex flex-col justify-between min-h-[600px]">
+          <div>
+            {/* Header Tabs on Right Card */}
+            <div className="border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  Analisa & Tindak Lanjut
+                </span>
+                {sel && (
+                  <button
+                    type="button"
+                    onClick={() => setSel(null)}
+                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    Reset Pilihan
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-bold">
                 <button
-                  key={m.key}
                   type="button"
-                  onClick={() => setMetric(m.key)}
-                  className={`rounded-lg px-2.5 py-1 transition ${
-                    metric === m.key
+                  onClick={() => setRightTab('alert')}
+                  className={`flex-1 rounded-md py-1.5 transition ${
+                    rightTab === 'alert'
                       ? 'bg-white text-primary shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {m.label}
+                  Status Respon
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setRightTab('detail')}
+                  className={`flex-1 rounded-md py-1.5 transition ${
+                    rightTab === 'detail'
+                      ? 'bg-white text-primary shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Detail Wilayah
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRightTab('hotspot')}
+                  className={`flex-1 rounded-md py-1.5 transition ${
+                    rightTab === 'hotspot'
+                      ? 'bg-white text-primary shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Hotspot
+                </button>
+              </div>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-              Tahun {f.ey} · M{f.sw}–M{f.ew}
-            </span>
+
+            {/* Tab 1: Manajemen Alert / Status Respon Sinyal SKDR */}
+            {rightTab === 'alert' && (
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-slate-900">
+                    Status Respon Sinyal SKDR
+                  </h4>
+                  <span className="text-xs font-bold text-slate-500">
+                    Total: 3.932 Sinyal
+                  </span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {alertStatusData.map((s) => (
+                    <div
+                      key={s.label}
+                      className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-800">{s.label}</span>
+                        <span className="font-black text-slate-900">
+                          {s.count.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${s.pct}%`, backgroundColor: s.color }}
+                        />
+                      </div>
+                      <div className="mt-1 text-right text-[10px] font-bold text-slate-500">
+                        {s.pct}% dari total sinyal
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Detail Wilayah Terpilih */}
+            {rightTab === 'detail' && (
+              <div className="mt-4 space-y-3">
+                {!sel ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs text-slate-500">
+                    <MapPin className="mx-auto h-8 w-8 text-slate-400 mb-2" />
+                    <p className="font-bold text-slate-700">Belum ada wilayah yang dipilih</p>
+                    <p className="mt-1 leading-relaxed">
+                      Klik salah satu provinsi atau kab/kota pada peta untuk melihat rincian kasus,
+                      kurva mingguan, dan unit pelapor.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-primary tracking-wide">
+                            Wilayah Terpilih
+                          </span>
+                          <h4 className="text-base font-black text-slate-900">{sel.nama}</h4>
+                        </div>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
+                          {data?.level === 'kabkota' ? 'Kab/Kota' : 'Provinsi'}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="bg-white rounded-lg p-1.5 shadow-2xs">
+                          <p className="text-[10px] text-slate-400">Kasus</p>
+                          <b className="text-sm font-black text-slate-900">
+                            {sel.kasus.toLocaleString('id-ID')}
+                          </b>
+                        </div>
+                        <div className="bg-white rounded-lg p-1.5 shadow-2xs">
+                          <p className="text-[10px] text-slate-400">Kematian</p>
+                          <b className="text-sm font-black text-slate-900">
+                            {sel.kematian.toLocaleString('id-ID')}
+                          </b>
+                        </div>
+                        <div className="bg-white rounded-lg p-1.5 shadow-2xs">
+                          <p className="text-[10px] text-slate-400">CFR</p>
+                          <b className="text-sm font-black text-slate-900">
+                            {sel.kasus ? `${((sel.kematian / sel.kasus) * 100).toFixed(2)}%` : '–'}
+                          </b>
+                        </div>
+                      </div>
+                    </div>
+
+                    {detLoading ? (
+                      <div className="py-4 text-center text-xs text-slate-500">
+                        Memuat rincian epidemiologi...
+                      </div>
+                    ) : (
+                      <>
+                        {det?.kurva && (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+                              Kurva Kasus Mingguan
+                            </span>
+                            <div className="h-24 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={det.kurva} margin={{ top: 2, right: 2, left: -20, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                  <XAxis dataKey="label" tick={{ fontSize: 8 }} />
+                                  <YAxis tick={{ fontSize: 8 }} allowDecimals={false} />
+                                  <Bar dataKey="kasus" fill="#0f766e" isAnimationActive={false} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        )}
+
+                        {det?.penyakit && det.penyakit.length > 0 && (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <span className="text-[10px] font-black uppercase text-slate-500 block mb-1.5">
+                              Penyakit Teratas di Wilayah Ini
+                            </span>
+                            <div className="space-y-1 text-xs">
+                              {det.penyakit.slice(0, 4).map((p: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between border-b border-slate-50 py-1 last:border-0">
+                                  <span className="font-semibold text-slate-800 truncate max-w-[170px]">{p.nama}</span>
+                                  <span className="font-bold text-slate-900 tabular-nums">
+                                    {Number(p.kasus).toLocaleString('id-ID')} kasus
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Hotspot Peringkat Wilayah */}
+            {rightTab === 'hotspot' && (
+              <div className="mt-4 space-y-3">
+                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  10 Wilayah Beban Kasus Tertinggi
+                </div>
+                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                  {rankedAreas.map((w: any, i: number) => {
+                    const maxKasus = Math.max(1, ...rankedAreas.map((x: any) => x.kasus || 0))
+                    const pctBar = Math.min(100, Math.round(((w.kasus || 0) / maxKasus) * 100))
+                    return (
+                      <div
+                        key={w.id}
+                        onClick={() => pickArea(w)}
+                        className={`rounded-lg border p-2 text-xs transition cursor-pointer ${
+                          sel?.id === w.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-slate-100 bg-white hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                            <span className="text-slate-400 font-black text-[10px] w-3">{i + 1}</span>
+                            <span className="truncate">{w.nama}</span>
+                          </span>
+                          <span className="font-black text-slate-900 tabular-nums">
+                            {Number(w.kasus || 0).toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${pctBar}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-        <div className="mt-4 min-h-[600px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
-          <SpasialMap
-            data={data}
-            titik={titik}
-            metric={metric}
-            setMetric={setMetric}
-            layers={layers}
-            setLayers={setLayers}
-            choroCfg={choroCfg}
-            sumber={f.sumber}
-            selectedId={sel?.id ?? null}
-            onSelectArea={(a) => (a ? pickArea(a, true) : setSel(null))}
-            onDrill={onDrill}
-            onUp={onUp}
-            focus={focus}
-            panelOpen={rightOpen}
-            setPanelOpen={setRightOpen}
-            height={600}
-            rightPanel={
-              <SpasialPanel
-                f={aFilter}
-                data={data}
-                titik={titik}
-                metric={metric}
-                selected={sel}
-                onPickArea={(a) => pickArea(a)}
-                onPickTitik={pickTitik}
-                onClose={() => setRightOpen(false)}
-                onClear={() => setSel(null)}
-              />
-            }
-          />
+
+          {/* Footer Card */}
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-slate-700">
+            <span className="font-black text-primary block mb-1">Standar Prosedur Kemenkes</span>
+            Alert berstatus <strong>SIAGA KLB</strong> wajib diverifikasi oleh Tim TGC Puskesmas /
+            Dinkes dalam waktu maksimal <strong>24 jam</strong> pasca sinyal muncul.
+          </div>
         </div>
       </div>
 

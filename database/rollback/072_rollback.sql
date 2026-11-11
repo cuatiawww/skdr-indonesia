@@ -10,3 +10,4 @@ WHERE key = 'navigation_menu'
 DROP TABLE IF EXISTS app_settings_bak_072;
 
 COMMIT;
+
