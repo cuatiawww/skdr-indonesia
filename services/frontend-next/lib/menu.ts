@@ -184,9 +184,14 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
     it('mod_main_dashboard', 'Dasbor SKDR', '/main-dashboard', 'LayoutDashboard', 1),
     it('mod_dasbor_ebs_ibs', 'Dasbor SKDR EBS & IBS', '/dasbor/ebs-ibs', 'BarChart3', 1.8, { enabled: false, description: 'Dasbor analitik dari Transaksi Form Laporan EBS, Entri Data Agregat IBS, dan Form Individu IBS' }),
-    it('mod_dasbor_mbg', 'Dasbor MBG', '/dasbor/mbg', 'Utensils', 1.9, { description: 'Dasbor Program Makan Bergizi Gratis: pengawasan standar gizi SPPG dan kejadian keracunan pangan MBG' }),
     it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),
     it('mod_tv', 'Mode TV', '/tv', 'Tv', 3),
+  ] },
+  // PR 052b (migrasi 068): "Dasbor MBG" jadi kategori sidebar sendiri dengan 3 halaman (sebelumnya 1 item + tab)
+  { id: 'grp_dasbor_mbg', title: 'Dasbor MBG', order: 2.5, enabled: true, area: 'dashboard', items: [
+    it('mod_dasbor_mbg_ringkasan', 'Ringkasan', '/dashboard/mbg/ringkasan', 'LayoutDashboard', 1, { description: 'Ringkasan Keracunan Pangan MBG × Pengawasan Gizi MBG, peta 2 kolom, tautan risiko SPPG' }),
+    it('mod_dasbor_mbg_keracunan', 'Keracunan', '/dashboard/mbg/keracunan', 'AlertTriangle', 2, { description: 'Dasbor Keracunan Pangan MBG: angka utama, peta, kurva epidemi, wilayah terdampak, daftar kejadian' }),
+    it('mod_dasbor_mbg_pengawasan', 'Pengawasan', '/dashboard/mbg/pengawasan', 'ClipboardCheck', 3, { description: 'Dasbor Pengawasan Gizi MBG: cakupan, skor, aspek lemah F1–F13, SPPG perlu tindak lanjut' }),
   ] },
   { id: 'grp_dasbor_limited', title: 'Dasbor Limited', order: 3, enabled: true, area: 'dashboard', requiresAuth: true, items: [
     it('mod_spasial', 'Spasial', '/dashboard/spasial', 'MapPin', 1),
@@ -204,7 +209,7 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_laporan_individu', 'Laporan Individu IBS', '/ibs/individu', 'Stethoscope', 4, { description: 'Data satu pasien per laporan — diagnosa, pemeriksaan, dan status akhir pasien' }), // PR 031, label PR 035
     // PR 034: satu menu "Program MBG" — Pengawasan Gizi (PR 033) + Keracunan Pangan
     it('mod_program_mbg', 'Program MBG', '#', 'Utensils', 5, { description: 'Program Makan Bergizi Gratis — pengawasan standar gizi SPPG dan laporan keracunan pangan', subItems: [
-      { id: 'mod_dasbor_mbg_program', label: 'Dasbor MBG', href: '/dasbor/mbg', icon: 'LayoutDashboard', order: 0, enabled: true, description: 'Ringkasan & tautan risiko: Keracunan Pangan MBG (kejadian) × Pengawasan Gizi MBG (pencegahan)' }, // PR 052
+      { id: 'mod_dasbor_mbg_program', label: 'Dasbor MBG', href: '/dashboard/mbg/ringkasan', icon: 'LayoutDashboard', order: 0, enabled: true, description: 'Ringkasan & tautan risiko: Keracunan Pangan MBG (kejadian) × Pengawasan Gizi MBG (pencegahan)' }, // PR 052
       { id: 'mod_pengawasan_gizi', label: 'Pengawasan Gizi MBG', href: '/pengawasan-gizi', icon: 'ClipboardCheck', order: 1, enabled: true, description: 'Kunjungan pengawasan standar gizi MBG ke SPPG — Formulir 1–13 (ketenagaan, SOP, daya terima, rekap)' },
       { id: 'mod_keracunan_mbg', label: 'Keracunan Pangan MBG', href: '/keracunan-mbg', icon: 'AlertTriangle', order: 2, enabled: true, description: 'Laporan cepat & penyelidikan kejadian keracunan pangan MBG — kasus harian, lingkungan, laboratorium' },
     ] }),

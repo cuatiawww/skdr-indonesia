@@ -4,7 +4,10 @@
 // PR 052: revamp — satu panel filter samping bersama (gaya Matriks Analisa: 280 px, sticky, buka/tutup diingat di
 // localStorage, laci di layar sempit), 3 tab (Ringkasan · Keracunan Pangan · Pengawasan Gizi), filter & tab di URL,
 // ekspor Excel. Mempertahankan seluruh panel PR 036 dan opsi panel "KERACUNAN MAKAN MBG" dasbor Kemkes.
+// PR 052b: tab → rute /dashboard/mbg/{ringkasan,keracunan,pengawasan} (menu kategori sidebar); panel filter tetap di tiap
+// halaman, filter dibawa lewat query string + sessionStorage; peta 2 kolom (Keracunan | Pengawasan) dalam satu bagian.
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ClipboardCheck, ExternalLink, LayoutDashboard, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import PageHeader from '@/components/PageHeader'
@@ -12,6 +15,7 @@ import { ExportButton } from '@/components/analisa/ui'
 import GiziDashboardView, { temuanLabel } from '@/components/dasbor-mbg/GiziDashboardView'
 import KeracunanDashboardView from '@/components/dasbor-mbg/KeracunanDashboardView'
 import MbgFilterPanel from '@/components/dasbor-mbg/MbgFilterPanel'
+import MbgMapSection from '@/components/dasbor-mbg/MbgSections'
 import MbgRingkasan, { pencegahanRows, RISIKO_LABEL, riskRows } from '@/components/dasbor-mbg/MbgRingkasan'
 import { fetchGiziDash, fetchKeracunanDash, type GiziDashData, type KeracunanDashData } from '@/lib/dasbor-mbg-api'
 import {
@@ -20,11 +24,14 @@ import {
 } from '@/lib/dasbor-mbg-filter'
 import type { Sheet } from '@/lib/xlsx-lite'
 
-const TABS: { key: MbgTab; label: string; icon: any; desc: string }[] = [
-  { key: 'ringkasan', label: 'Ringkasan & Tautan Risiko', icon: LayoutDashboard, desc: 'Kartu ringkas Kerpang & SLHS/IKL, grafik wilayah, kurva epidemi, SPPG berisiko' },
-  { key: 'keracunan', label: 'Keracunan Pangan', icon: AlertTriangle, desc: 'KPI epidemiologis, kurva epidemi, peta, ketepatan lapor, lab, pangan, daftar kejadian' },
-  { key: 'gizi', label: 'Pengawasan Gizi', icon: ClipboardCheck, desc: 'Kunjungan, skor SOP, kesimpulan F1–F13, temuan, SPPG skor terendah, peta' },
+/** PR 052b: tiap halaman kini rute tersendiri (menu kategori "Dasbor MBG" di sidebar), bukan tab. Kunci internal `gizi` ↔ slug `pengawasan`. */
+export const MBG_PAGES: { key: MbgTab; slug: string; label: string; icon: any; desc: string }[] = [
+  { key: 'ringkasan', slug: 'ringkasan', label: 'Ringkasan & Tautan Risiko', icon: LayoutDashboard, desc: 'Kartu ringkas Kerpang & SLHS/IKL, peta 2 kolom, grafik wilayah, kurva epidemi, SPPG berisiko' },
+  { key: 'keracunan', slug: 'keracunan', label: 'Keracunan Pangan', icon: AlertTriangle, desc: 'Angka utama, peta, kurva epidemi, wilayah terdampak, respons & penyebab, daftar kejadian' },
+  { key: 'gizi', slug: 'pengawasan', label: 'Pengawasan Gizi', icon: ClipboardCheck, desc: 'Cakupan, sebaran skor, aspek lemah F1–F13, temuan, SPPG perlu tindak lanjut, tren' },
 ]
+export const mbgHref = (t: MbgTab) => `/dashboard/mbg/${MBG_PAGES.find((x) => x.key === t)?.slug || 'ringkasan'}`
+const FILTER_KEY = 'skdr-dasbor-mbg-filter'
 const PANEL_KEY = 'skdr-dasbor-mbg-filter-panel'
 const PROV_MAP: MapState = { level: 'prov', parent: null }
 
@@ -51,9 +58,10 @@ function useDash<T>(fetcher: (p: any) => Promise<T>, params: any, ready: boolean
   return { data, loading, error, reload: () => setTick((x) => x + 1) }
 }
 
-export default function DasborMbgClient() {
+export default function DasborMbgClient({ page: tab }: { page: MbgTab }) {
+  const router = useRouter()
   const [f, setF] = useState<MbgFilter>(defaultMbgFilter())
-  const [tab, setTab] = useState<MbgTab>('ringkasan')
+  const [qs, setQs] = useState('')
   const [ready, setReady] = useState(false)
   const [kMap, setKMap] = useState<MapState>(PROV_MAP)
   const [gMap, setGMap] = useState<MapState>(PROV_MAP)
@@ -72,24 +80,39 @@ export default function DasborMbgClient() {
   }, [])
   const togglePanel = (open: boolean) => { setPanel(open); if (wide) { try { localStorage.setItem(PANEL_KEY, open ? '1' : '0') } catch {} } }
   useEffect(() => {
-    const sp = new URLSearchParams(window.location.search)
-    setF(readMbgFilter(sp))
-    const t = sp.get('tab')
-    // PR 036 links used ?tab=gizi / ?tab=keracunan — still valid
-    if (t && TABS.some((x) => x.key === t)) setTab(t as MbgTab)
+    // Filter dibaca dari URL; bila URL tanpa parameter filter (mis. dibuka dari menu sidebar), pakai filter terakhir di
+    // sessionStorage agar filter tetap sama saat berpindah halaman Ringkasan/Keracunan/Pengawasan.
+    let sp = new URLSearchParams(window.location.search)
+    if (![...sp.keys()].length) {
+      try {
+        const saved = sessionStorage.getItem(FILTER_KEY)
+        if (saved) {
+          sp = new URLSearchParams(saved)
+          const url = new URL(window.location.href)
+          writeMbgFilter(url, readMbgFilter(sp))
+          window.history.replaceState(window.history.state, '', url.toString())
+        }
+      } catch {}
+    }
+    const nf0 = readMbgFilter(sp)
+    setF(nf0)
+    const u = new URL('http://x/'); writeMbgFilter(u, nf0); setQs(u.search)
     setReady(true)
   }, [])
-  const sync = useCallback((nf: MbgFilter, nt: MbgTab) => {
+  const sync = useCallback((nf: MbgFilter) => {
     const url = new URL(window.location.href)
     writeMbgFilter(url, nf)
-    url.searchParams.set('tab', nt)
+    url.searchParams.delete('tab')
     window.history.replaceState(window.history.state, '', url.toString())
+    const u = new URL('http://x/'); writeMbgFilter(u, nf)
+    setQs(u.search)
+    try { sessionStorage.setItem(FILTER_KEY, u.search.replace(/^\?/, '')) } catch {}
   }, [])
   const set = useCallback((p: Partial<MbgFilter>) => {
-    setF((old) => { const n = { ...old, ...p }; sync(n, tab); return n })
+    setF((old) => { const n = { ...old, ...p }; sync(n); return n })
     if (p.prov || p.kab) { setKMap(PROV_MAP); setGMap(PROV_MAP) }
-  }, [sync, tab])
-  const go = (t: MbgTab) => { setTab(t); sync(f, t); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  }, [sync])
+  const go = (t: MbgTab) => { router.push(`${mbgHref(t)}${qs}`) }
 
   const ker = useDash<KeracunanDashData>(fetchKeracunanDash, keracunanParams(f, kMap), ready)
   const gizi = useDash<GiziDashData>(fetchGiziDash, giziParams(f, gMap), ready)
@@ -113,12 +136,13 @@ export default function DasborMbgClient() {
   )
   const filterPanel = <MbgFilterPanel f={f} set={set} tab={tab} kerOpts={ker.data?.filter_options} giziOpts={gizi.data?.filter_options} onClose={() => togglePanel(false)} />
   const kd = ker.data?.kpis
+  const mapSection = <MbgMapSection ker={ker.data} gizi={gizi.data} kMap={kMap} setKMap={setKMap} gMap={gMap} setGMap={setGMap} />
   const gd = gizi.data?.kpis
   const periode = f.from || f.to ? `${f.from || 'awal'} s.d. ${f.to || 'sekarang'}` : 'Seluruh periode'
   return (
     <div className="w-full space-y-4 px-4 pb-10 sm:px-6 lg:px-8" data-testid="dasbor-mbg-page">
-      <PageHeader eyebrow="Program MBG" title="Dasbor MBG" actions={actions}
-        subtitle="Keracunan Pangan MBG (kejadian) dan Pengawasan Gizi MBG (pencegahan) dalam satu dasbor: kurva epidemi, wilayah, SPPG berisiko, temuan pengawasan. Data langsung dari transaksi form, tanpa data dummy." />
+      <PageHeader eyebrow="Dasbor MBG" title={tab === 'ringkasan' ? 'Dasbor MBG — Ringkasan' : tab === 'keracunan' ? 'Dasbor MBG — Keracunan Pangan' : 'Dasbor MBG — Pengawasan Gizi'} actions={actions}
+        subtitle="Keracunan Pangan MBG (kejadian) dan Pengawasan Gizi MBG (pencegahan) dalam satu dasbor: kurva epidemi, wilayah, SPPG berisiko, temuan pengawasan. Data langsung dari transaksi form." />
       <div className="flex items-start gap-4">
         {panel && wide ? (
           <aside id="mbg-filter-panel" className="sticky top-4 w-[280px] shrink-0 self-start" style={{ maxHeight: 'calc(100vh - 2rem)' }} data-testid="filter-panel">{filterPanel}</aside>
@@ -135,29 +159,29 @@ export default function DasborMbgClient() {
             <span>Data Keracunan: <b className="text-slate-700">{kd?.date_min ? `${kd.date_min} s.d. ${kd.date_max}` : '–'}</b></span>
             <span>Data Pengawasan: <b className="text-slate-700">{gd?.date_min ? `${gd.date_min} s.d. ${gd.date_max}` : '–'}</b></span>
           </div>
-          <div className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-2xs" role="tablist" aria-label="Tab Dasbor MBG">
-            {TABS.map((t) => {
+          <nav className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-2xs" aria-label="Halaman Dasbor MBG">
+            {MBG_PAGES.map((t) => {
               const I = t.icon
               const on = t.key === tab
               const count = t.key === 'keracunan' ? kd?.total_kejadian : t.key === 'gizi' ? gd?.total_kunjungan : undefined
               return (
-                <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => go(t.key)} title={t.desc} data-testid={`page-tab-${t.key}`}
+                <Link key={t.key} href={`${mbgHref(t.key)}${qs}`} aria-current={on ? 'page' : undefined} title={t.desc} data-testid={`page-tab-${t.key}`}
                   className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition ${on ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
                   <I className="h-3.5 w-3.5" /> {t.label}
                   {count !== undefined ? <span className={`rounded-full px-1.5 py-px text-[10px] tabular-nums ${on ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>{count.toLocaleString('id-ID')}</span> : null}
-                </button>
+                </Link>
               )
             })}
-          </div>
+          </nav>
           {ready ? (
-            <div role="tabpanel" data-testid={`panel-${tab}`}>
+            <div data-testid={`panel-${tab}`}>
               {tab === 'ringkasan' ? (
                 ker.error || gizi.error ? <KeracunanDashboardView data={null} loading={false} error={ker.error || gizi.error} reload={() => { ker.reload(); gizi.reload() }} f={f} map={kMap} setMap={setKMap} />
                   : (ker.loading && !ker.data) || (gizi.loading && !gizi.data) ? <KeracunanDashboardView data={null} loading error={null} reload={ker.reload} f={f} map={kMap} setMap={setKMap} />
-                  : <div className={ker.loading || gizi.loading ? 'opacity-60 transition' : 'transition'}><MbgRingkasan ker={ker.data} gizi={gizi.data} f={f} go={go} /></div>
+                  : <div className={ker.loading || gizi.loading ? 'opacity-60 transition' : 'transition'}><MbgRingkasan ker={ker.data} gizi={gizi.data} f={f} go={go} mapSection={mapSection} /></div>
               ) : null}
-              {tab === 'keracunan' ? <div className={ker.loading && ker.data ? 'opacity-60 transition' : 'transition'}><KeracunanDashboardView data={ker.data} loading={ker.loading} error={ker.error} reload={ker.reload} f={f} map={kMap} setMap={setKMap} /></div> : null}
-              {tab === 'gizi' ? <div className={gizi.loading && gizi.data ? 'opacity-60 transition' : 'transition'}><GiziDashboardView data={gizi.data} loading={gizi.loading} error={gizi.error} reload={gizi.reload} f={f} map={gMap} setMap={setGMap} /></div> : null}
+              {tab === 'keracunan' ? <div className={ker.loading && ker.data ? 'opacity-60 transition' : 'transition'}><KeracunanDashboardView data={ker.data} loading={ker.loading} error={ker.error} reload={ker.reload} f={f} map={kMap} setMap={setKMap} gizi={gizi.data} gMap={gMap} setGMap={setGMap} /></div> : null}
+              {tab === 'gizi' ? <div className={gizi.loading && gizi.data ? 'opacity-60 transition' : 'transition'}><GiziDashboardView data={gizi.data} loading={gizi.loading} error={gizi.error} reload={gizi.reload} f={f} map={gMap} setMap={setGMap} ker={ker.data} kMap={kMap} setKMap={setKMap} /></div> : null}
             </div>
           ) : null}
         </div>

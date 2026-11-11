@@ -3,7 +3,7 @@
 // * Kartu ringkas ala dasbor Kemkes: "Kerpang MBG" (provinsi, kab/kota, kejadian, kasus, kematian) & "Rekap SLHS/IKL"
 // * Grafik wilayah ala panel "KERACUNAN MAKAN MBG" + kurva epidemi
 // * Tautan risiko: SPPG yang mengalami kejadian keracunan dibandingkan dengan hasil pengawasannya
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, ArrowRight, ClipboardCheck, ShieldCheck } from 'lucide-react'
 import { Empty, Interpretasi, Kpi, Panel, Seg } from '@/components/analisa/ui'
 import { EmptyBox, RekapBadge, nf, pf } from '@/components/dasbor-mbg/MbgUi'
@@ -41,7 +41,7 @@ export function pencegahanRows(gizi: GiziDashData | null, ker: KeracunanDashData
     .sort((a, b) => (a.avg_skor ?? 100) - (b.avg_skor ?? 100))
 }
 
-export default function MbgRingkasan({ ker, gizi, f, go }: { ker: KeracunanDashData | null; gizi: GiziDashData | null; f: MbgFilter; go: (t: MbgTab) => void }) {
+export default function MbgRingkasan({ ker, gizi, f, go, mapSection }: { ker: KeracunanDashData | null; gizi: GiziDashData | null; f: MbgFilter; go: (t: MbgTab) => void; /** PR 052b: bagian peta 2 kolom (Keracunan | Pengawasan) */ mapSection?: ReactNode }) {
   const [riskFilter, setRiskFilter] = useState<'utama' | 'semua'>('utama')
   const k = ker?.kpis
   const g = gizi?.kpis
@@ -113,6 +113,8 @@ export default function MbgRingkasan({ ker, gizi, f, go }: { ker: KeracunanDashD
         cegah.length ? `${nf(cegah.length)} SPPG berskor rendah belum mengalami kejadian — target pembinaan pencegahan sebelum terjadi KLB.` : null,
         'Catatan: pencocokan SPPG antar-modul berdasarkan nama SPPG (belum ada kode SPPG bersama), sehingga perbedaan penulisan nama dapat membuat SPPG tidak terhubung.',
       ]} />
+
+      {mapSection}
 
       <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
         <Panel title={`${jenisLabel(f.jenis)} Keracunan Pangan MBG per Wilayah`} testId="ringkas-wilayah"

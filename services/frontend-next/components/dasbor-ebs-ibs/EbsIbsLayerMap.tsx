@@ -100,10 +100,10 @@ const MODE_CFG: Record<MapMode, {
     normalFill: 'rgba(5, 150, 105, 0.88)',
     alertFill: 'rgba(217, 119, 6, 0.90)',
     normalLabel: 'SPPG Baik / Terpantau',
-    alertLabel: 'Ada F12 BELUM BAIK',
+    alertLabel: 'Skor < 80 / F12 BELUM BAIK',
     normalDotCls: 'bg-emerald-600',
     alertDotCls: 'bg-amber-600',
-    isAlert: (p) => Number((p as MbgMapPoint).rekap12_belum_baik || 0) > 0,
+    isAlert: (p) => Number((p as MbgMapPoint).rekap12_belum_baik || 0) > 0 || ((p as MbgMapPoint).avg_skor ?? 100) < 80,
   },
   keracunan: {
     title: 'Keracunan Pangan MBG',
@@ -156,6 +156,9 @@ export default function EbsIbsLayerMap({
   points,
   onDrillDown,
   onResetLevel,
+  compact = false,
+  initialMetric,
+  title,
 }: {
   mode: MapMode
   level: 'prov' | 'kab'
@@ -164,20 +167,24 @@ export default function EbsIbsLayerMap({
   points: AnyPoint[]
   onDrillDown: (provId: number, provName: string) => void
   onResetLevel: () => void
+  /** PR 052b: tampilan ringkas untuk grid 2 kolom (panel layer tertutup, heatmap mati, tinggi 420 px) */
+  compact?: boolean
+  initialMetric?: MetricKey
+  title?: string
 }) {
   const cfg = MODE_CFG[mode]
   const palette = cfg.palette
   const metricOptions = cfg.metrics
 
-  const [metric, setMetric] = useState<MetricKey>(cfg.defaultMetric)
+  const [metric, setMetric] = useState<MetricKey>(initialMetric || cfg.defaultMetric)
   useEffect(() => {
-    setMetric(MODE_CFG[mode].defaultMetric)
-  }, [mode])
+    setMetric(initialMetric || MODE_CFG[mode].defaultMetric)
+  }, [mode, initialMetric])
 
-  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(!compact)
   const [baseMap, setBaseMap] = useState<BaseMap>('light')
   const [showChoro, setShowChoro] = useState(true)
-  const [showHeat, setShowHeat] = useState(true)
+  const [showHeat, setShowHeat] = useState(!compact)
   const [showMarkers, setShowMarkers] = useState(true)
   const [opChoro, setOpChoro] = useState(0.75)
   const [opHeat, setOpHeat] = useState(0.7)
@@ -376,7 +383,7 @@ export default function EbsIbsLayerMap({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-            <span>Peta Spasial &amp; Layering Wilayah ({cfg.title})</span>
+            <span>{title || <>Peta Spasial &amp; Layering Wilayah ({cfg.title})</>}</span>
             <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-700">
               {nf(points.length)} titik · {nf(regions.length)} wilayah
             </span>
@@ -420,7 +427,7 @@ export default function EbsIbsLayerMap({
       </div>
 
       {/* Body: Left layer panel + OpenLayers Map */}
-      <div className={`relative flex min-h-[460px] flex-1 ${fs ? 'h-full' : 'h-[480px]'}`}>
+      <div className={`relative flex flex-1 ${fs ? 'h-full min-h-[460px]' : compact ? 'h-[420px] min-h-[420px] shrink-0' : 'h-[480px] min-h-[460px]'}`}>
         <aside className={`z-10 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50/90 transition-all ${panelOpen ? 'w-[252px]' : 'w-10'}`}>
           <button
             type="button"
@@ -584,7 +591,7 @@ export default function EbsIbsLayerMap({
                     ) : mode === 'gizi' ? (
                       <div className="mt-1.5 space-y-0.5 text-slate-700">
                         <div><b>{nf(ptMbg.kunjungan)}</b> kunjungan · F12 BAIK: <b>{nf(ptMbg.rekap12_baik)}</b> · BELUM BAIK: <b>{nf(ptMbg.rekap12_belum_baik)}</b></div>
-                        <div>Terakhir: {ptMbg.last_date || '—'}</div>
+                        <div>Skor SOP rata-rata: <b>{ptMbg.avg_skor != null ? ptMbg.avg_skor.toFixed(1) : '—'}</b> · Terakhir: {ptMbg.last_date || '—'}</div>
                       </div>
                     ) : (
                       <div className="mt-1.5 space-y-0.5 text-slate-700">

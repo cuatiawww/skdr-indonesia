@@ -135,7 +135,7 @@ export default function LandingFooter() {
                 </Link>
               </li>
               <li>
-                <Link href={authOrLogin('/dasbor/mbg')} className="flex items-center gap-1.5 transition-colors hover:text-white">
+                <Link href={authOrLogin('/dashboard/mbg/ringkasan')} className="flex items-center gap-1.5 transition-colors hover:text-white">
                   <span className="text-[#b6d31e]">▸</span> Dasbor Program MBG
                 </Link>
               </li>

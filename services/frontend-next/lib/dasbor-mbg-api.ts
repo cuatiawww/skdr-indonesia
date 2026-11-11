@@ -44,6 +44,8 @@ export type MbgMapPoint = {
   kasus?: number
   meninggal?: number
   lab_hasil?: number
+  /** PR 052b: rata-rata skor SOP F3–F11 titik SPPG (Pengawasan) */
+  avg_skor?: number | null
 }
 
 export type MbgFilterOptions = {
@@ -130,6 +132,18 @@ export type GiziDashData = {
   daily_series?: { tanggal: string; kunjungan: number; rekap12_baik: number; rekap12_belum_baik: number; skor_sum: number; skor_n: number }[]
   /** PR 052: butir "Tidak Sesuai" per formulir (formulir dikirim) */
   temuan?: { form_no: number; kode: string; label: string | null; jumlah: number; dinilai: number; pct: number | null }[]
+  /** PR 052b: sebaran skor SOP rata-rata per kunjungan */
+  skor_distribusi?: { bin: string; kunjungan: number }[]
+  /** PR 052b: matriks SPPG × Formulir (formulir dikirim), urut kepatuhan terendah, maks. 60 SPPG */
+  sppg_form?: {
+    nama_sppg: string
+    kabkota_name: string | null
+    province_name: string | null
+    kunjungan: number
+    pct: number | null
+    avg_skor: number | null
+    forms: { form_no: number; n: number; ok: number; fail: number; pct: number | null; skor: number | null }[]
+  }[]
   heatmap: {
     weeks: EpiWeekPoint[]
     by_province: {

@@ -175,6 +175,9 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
     let map_level = q.level.clone().filter(|x| x == "kab").unwrap_or_else(|| "prov".into());
     let map_parent = q.parent;
 
+    // PR 052b: sebaran skor SOP rata-rata per kunjungan (<60, 60–69, 70–79, 80–89, ≥90) + kunjungan tanpa skor
+    let mut skor_bins = [0i64; 5];
+    let mut skor_bin_none = 0i64;
     for r in &visit_rows {
         let kid: i64 = r.get(0);
         let no_k: String = r.get(1);
@@ -220,7 +223,7 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
         if r13.as_deref() == Some("BAIK") { r13_baik += 1; } else if r13.as_deref() == Some("BELUM BAIK") { r13_belum += 1; }
         forms_saved_sum += f_saved;
         forms_sent_sum += f_sent;
-        if let Some(s) = avg_s { skor_sum += s; skor_cnt += 1; }
+        if let Some(s) = avg_s { skor_sum += s; skor_cnt += 1; skor_bins[skor_bin(s)] += 1; } else { skor_bin_none += 1; }
         if is_3t { cnt_3t += 1; }
         if has_alergi { cnt_alergi += 1; }
         if let Some(d) = tgl {
@@ -411,23 +414,26 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
                     COALESCE(NULLIF(trim(MAX(k.puskesmas)),''), MAX(mk.name), MAX(ml.name), 'Puskesmas'),
                     MAX(k.nama_sppg),
                     MAX(ml.name), MAX(mk.name),
-                    COALESCE(MAX(f.latitude), MAX(mk.latitude), MAX(ml.latitude))::float8,
-                    COALESCE(MAX(f.longitude), MAX(mk.longitude), MAX(ml.longitude))::float8,
-                    CASE WHEN MAX(f.latitude) IS NOT NULL THEN 'fasyankes'
+                    COALESCE(AVG(CASE WHEN k.data->>'lat' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lat')::float8 END), MAX(f.latitude), MAX(mk.latitude), MAX(ml.latitude))::float8,
+                    COALESCE(AVG(CASE WHEN k.data->>'lng' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lng')::float8 END), MAX(f.longitude), MAX(mk.longitude), MAX(ml.longitude))::float8,
+                    CASE WHEN AVG(CASE WHEN k.data->>'lat' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lat')::float8 END) IS NOT NULL THEN 'sppg'
+                         WHEN MAX(f.latitude) IS NOT NULL THEN 'fasyankes'
                          WHEN MAX(mk.latitude) IS NOT NULL THEN 'kabkota'
                          WHEN MAX(ml.latitude) IS NOT NULL THEN 'provinsi' ELSE NULL END,
                     COUNT(DISTINCT k.id)::bigint,
                     COUNT(DISTINCT k.id) FILTER (WHERE EXISTS (SELECT 1 FROM mbg_form mf WHERE mf.kunjungan_id = k.id AND mf.form_no = 12 AND mf.status = 'dikirim' AND mf.kesimpulan = 'BAIK'))::bigint,
                     COUNT(DISTINCT k.id) FILTER (WHERE EXISTS (SELECT 1 FROM mbg_form mf WHERE mf.kunjungan_id = k.id AND mf.form_no = 12 AND mf.status = 'dikirim' AND mf.kesimpulan = 'BELUM BAIK'))::bigint,
-                    MAX(k.tanggal)::text
+                    MAX(k.tanggal)::text,
+                    AVG(sf.skor)::float8
                  FROM mbg_kunjungan k
+                 LEFT JOIN mbg_form sf ON sf.kunjungan_id = k.id AND sf.form_no BETWEEN 3 AND 11 AND sf.status = 'dikirim' AND sf.skor IS NOT NULL
                  LEFT JOIN master_fasyankes f ON f.kode_satusehat = NULLIF(trim(k.data->>'unit_kode'),'')
                  LEFT JOIN master_kabkota mk ON mk.id = k.kabkota_id
                  LEFT JOIN master_locations ml ON ml.id = k.province_id
                  WHERE k.id = ANY($1)
                  GROUP BY lower(trim(COALESCE(k.nama_sppg,''))), k.kabkota_id, k.province_id
-                 HAVING COALESCE(MAX(f.latitude), MAX(mk.latitude), MAX(ml.latitude)) IS NOT NULL
-                    AND COALESCE(MAX(f.longitude), MAX(mk.longitude), MAX(ml.longitude)) IS NOT NULL
+                 HAVING COALESCE(AVG(CASE WHEN k.data->>'lat' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lat')::float8 END), MAX(f.latitude), MAX(mk.latitude), MAX(ml.latitude)) IS NOT NULL
+                    AND COALESCE(AVG(CASE WHEN k.data->>'lng' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lng')::float8 END), MAX(f.longitude), MAX(mk.longitude), MAX(ml.longitude)) IS NOT NULL
                  LIMIT 500",
                 &[&kept_vec],
             )
@@ -446,6 +452,7 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
                 "rekap12_baik": n(r, 8),
                 "rekap12_belum_baik": n(r, 9),
                 "last_date": r.get::<_, Option<String>>(10),
+                "avg_skor": r.get::<_, Option<f64>>(11).map(|x| (x * 10.0).round() / 10.0),
             }));
         }
     }
@@ -510,6 +517,33 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
     })).collect();
     temuan_out.sort_by(|a, b| b["jumlah"].as_i64().cmp(&a["jumlah"].as_i64()).then_with(|| a["form_no"].as_i64().cmp(&b["form_no"].as_i64())).then_with(|| a["kode"].as_str().cmp(&b["kode"].as_str())));
 
+    // PR 052b: matriks SPPG × Formulir (formulir dikirim) untuk heatmap kepatuhan per aspek
+    let mut sppg_form_out: Vec<Value> = vec![];
+    if !kept_vec.is_empty() {
+        let rows = c
+            .query(
+                "SELECT lower(trim(k.nama_sppg)), MAX(trim(k.nama_sppg)), MAX(mk.name), MAX(ml.name), f.form_no,
+                        COUNT(*)::bigint,
+                        COUNT(*) FILTER (WHERE f.kesimpulan IN ('Sesuai','BAIK'))::bigint,
+                        COUNT(*) FILTER (WHERE f.kesimpulan IN ('Tidak Sesuai','BELUM BAIK'))::bigint,
+                        AVG(f.skor)::float8,
+                        COUNT(DISTINCT k.id)::bigint
+                 FROM mbg_form f
+                 JOIN mbg_kunjungan k ON k.id = f.kunjungan_id
+                 LEFT JOIN master_kabkota mk ON mk.id = k.kabkota_id
+                 LEFT JOIN master_locations ml ON ml.id = k.province_id
+                 WHERE f.kunjungan_id = ANY($1) AND f.status = 'dikirim' AND NULLIF(trim(k.nama_sppg),'') IS NOT NULL
+                 GROUP BY 1, f.form_no",
+                &[&kept_vec],
+            )
+            .await
+            .map_err(internal)?;
+        sppg_form_out = sppg_form_matrix(&rows.iter().map(|r| SppgFormCell {
+            key: r.get(0), nama: r.get(1), kab: r.get(2), prov: r.get(3), form_no: r.get(4),
+            n: r.get(5), ok: r.get(6), fail: r.get(7), skor: r.get(8), kunjungan: r.get(9),
+        }).collect::<Vec<_>>());
+    }
+
     // Dynamic filter options
     let opt_prov = c.query("SELECT DISTINCT ml.id, ml.name FROM mbg_kunjungan k JOIN master_locations ml ON ml.id = k.province_id WHERE k.deleted_at IS NULL ORDER BY ml.name", &[]).await.map_err(internal)?;
     let opt_kab = c.query("SELECT DISTINCT mk.id, mk.province_id, mk.name FROM mbg_kunjungan k JOIN master_kabkota mk ON mk.id = k.kabkota_id WHERE k.deleted_at IS NULL ORDER BY mk.name", &[]).await.map_err(internal)?;
@@ -569,6 +603,9 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
                 "skor_sum": (ss * 10.0).round() / 10.0, "skor_n": sc
             })).collect::<Vec<_>>(),
             "temuan": temuan_out,
+            "skor_distribusi": SKOR_BIN_LABEL.iter().enumerate().map(|(i, l)| json!({ "bin": l, "kunjungan": skor_bins[i] }))
+                .chain(std::iter::once(json!({ "bin": "Belum ada skor", "kunjungan": skor_bin_none }))).collect::<Vec<_>>(),
+            "sppg_form": sppg_form_out,
             "heatmap": {
                 "weeks": axis.iter().map(|(y, w, s, l)| json!({ "year": y, "week": w, "start": s, "label": l })).collect::<Vec<_>>(),
                 "by_province": hp_rows,
@@ -1091,9 +1128,10 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                     COALESCE(NULLIF(trim(MAX(k.nama_sppg)),''), MAX(mk.name), MAX(ml.name), 'Kejadian MBG'),
                     MAX(k.nama_sppg),
                     MAX(ml.name), MAX(mk.name),
-                    COALESCE(MAX(mk.latitude), MAX(ml.latitude))::float8,
-                    COALESCE(MAX(mk.longitude), MAX(ml.longitude))::float8,
-                    CASE WHEN MAX(mk.latitude) IS NOT NULL THEN 'kabkota'
+                    COALESCE(AVG(CASE WHEN k.data->>'lat' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lat')::float8 END), MAX(mk.latitude), MAX(ml.latitude))::float8,
+                    COALESCE(AVG(CASE WHEN k.data->>'lng' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lng')::float8 END), MAX(mk.longitude), MAX(ml.longitude))::float8,
+                    CASE WHEN AVG(CASE WHEN k.data->>'lat' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lat')::float8 END) IS NOT NULL THEN 'sppg'
+                         WHEN MAX(mk.latitude) IS NOT NULL THEN 'kabkota'
                          WHEN MAX(ml.latitude) IS NOT NULL THEN 'provinsi' ELSE NULL END,
                     COUNT(*)::bigint,
                     COALESCE(SUM(COALESCE(k.jumlah_kasus,0)),0)::bigint,
@@ -1105,8 +1143,8 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                  LEFT JOIN master_locations ml ON ml.id = k.province_id
                  WHERE k.id = ANY($1)
                  GROUP BY lower(trim(COALESCE(k.nama_sppg,''))), k.kabkota_id, k.province_id
-                 HAVING COALESCE(MAX(mk.latitude), MAX(ml.latitude)) IS NOT NULL
-                    AND COALESCE(MAX(mk.longitude), MAX(ml.longitude)) IS NOT NULL
+                 HAVING COALESCE(AVG(CASE WHEN k.data->>'lat' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lat')::float8 END), MAX(mk.latitude), MAX(ml.latitude)) IS NOT NULL
+                    AND COALESCE(AVG(CASE WHEN k.data->>'lng' ~ '^-?[0-9]{1,3}(\\.[0-9]+)?$' THEN (k.data->>'lng')::float8 END), MAX(mk.longitude), MAX(ml.longitude)) IS NOT NULL
                  LIMIT 500",
                 &[&kept_ids],
             )
@@ -1416,6 +1454,47 @@ fn median(v: &[f64]) -> Option<f64> {
 
 /// Butir "Tidak Sesuai" satu formulir dari `data._hasil` (kode butir, label bila diketahui backend).
 /// F1: A/B.1/B.2 · F2: A.n ketersediaan & B.n kesesuaian SOP · F3–F11: nomor butir (label di klien dari naskah formulir).
+const SKOR_BIN_LABEL: [&str; 5] = ["< 60", "60–69", "70–79", "80–89", "≥ 90"];
+fn skor_bin(s: f64) -> usize {
+    if s < 60.0 { 0 } else if s < 70.0 { 1 } else if s < 80.0 { 2 } else if s < 90.0 { 3 } else { 4 }
+}
+
+struct SppgFormCell {
+    key: String,
+    nama: String,
+    kab: Option<String>,
+    prov: Option<String>,
+    form_no: i16,
+    n: i64,
+    ok: i64,
+    fail: i64,
+    skor: Option<f64>,
+    kunjungan: i64,
+}
+
+/// PR 052b: kelompokkan sel (SPPG, formulir) → baris SPPG; `pct` = Sesuai/BAIK ÷ (Sesuai + Tidak Sesuai) per formulir,
+/// `skor` = rata-rata skor F3–F11; urut dari kepatuhan keseluruhan terendah (maks. 60 SPPG).
+fn sppg_form_matrix(cells: &[SppgFormCell]) -> Vec<Value> {
+    let mut by: BTreeMap<String, (String, Option<String>, Option<String>, i64, Vec<Value>, i64, i64, f64, i64)> = BTreeMap::new();
+    for c in cells {
+        let e = by.entry(c.key.clone()).or_insert_with(|| (c.nama.clone(), c.kab.clone(), c.prov.clone(), 0, vec![], 0, 0, 0.0, 0));
+        e.3 = e.3.max(c.kunjungan);
+        e.4.push(json!({ "form_no": c.form_no, "n": c.n, "ok": c.ok, "fail": c.fail, "pct": pct(c.ok, c.ok + c.fail), "skor": c.skor.map(|x| (x * 10.0).round() / 10.0) }));
+        e.5 += c.ok;
+        e.6 += c.ok + c.fail;
+        if (3..=11).contains(&c.form_no) { if let Some(s) = c.skor { e.7 += s; e.8 += 1; } }
+    }
+    let mut out: Vec<Value> = by.into_values().map(|(nama, kab, prov, kj, mut forms, ok, tot, ss, sn)| {
+        forms.sort_by_key(|f| f["form_no"].as_i64());
+        json!({ "nama_sppg": nama, "kabkota_name": kab, "province_name": prov, "kunjungan": kj, "forms": forms,
+                "pct": pct(ok, tot), "avg_skor": if sn > 0 { Some((ss / sn as f64 * 10.0).round() / 10.0) } else { None } })
+    }).collect();
+    out.sort_by(|a, b| a["pct"].as_f64().unwrap_or(101.0).partial_cmp(&b["pct"].as_f64().unwrap_or(101.0)).unwrap_or(std::cmp::Ordering::Equal)
+        .then_with(|| a["nama_sppg"].as_str().cmp(&b["nama_sppg"].as_str())));
+    out.truncate(60);
+    out
+}
+
 fn temuan_form(fno: i16, d: &Value) -> Vec<(String, Option<String>)> {
     let h = d.get("_hasil");
     let mut out = vec![];
@@ -1465,6 +1544,19 @@ mod tests {
         assert_eq!(GIZI_FORMS_META.len(), 13);
         assert_eq!(F2_SOP_NAMES.len(), 8);
         assert_eq!(KERACUNAN_USIA.len(), 5);
+    }
+
+    #[test]
+    fn pr052b_skor_bin_and_matrix() {
+        assert_eq!(skor_bin(59.9), 0);
+        assert_eq!(skor_bin(80.0), 3);
+        assert_eq!(skor_bin(100.0), 4);
+        let cell = |key: &str, f: i16, ok: i64, fail: i64| SppgFormCell { key: key.into(), nama: key.to_uppercase(), kab: None, prov: None, form_no: f, n: ok + fail, ok, fail, skor: Some(70.0), kunjungan: 1 };
+        let m = sppg_form_matrix(&[cell("b", 3, 1, 0), cell("a", 3, 0, 1), cell("a", 12, 1, 0)]);
+        assert_eq!(m[0]["nama_sppg"], "A");
+        assert_eq!(m[0]["pct"], json!(50.0));
+        assert_eq!(m[0]["forms"][1]["form_no"], 12);
+        assert_eq!(m[1]["pct"], json!(100.0));
     }
 
     #[test]

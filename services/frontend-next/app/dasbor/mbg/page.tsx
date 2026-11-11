@@ -1,6 +1,7 @@
-// PR 036: Dasbor MBG (Pengawasan Gizi MBG & Keracunan Pangan MBG dari transaksi Form Program MBG).
-import DasborMbgClient from '@/components/dasbor-mbg/DasborMbgClient'
+// PR 036: Dasbor MBG. PR 052b: halaman dipecah menjadi rute /dashboard/mbg/{ringkasan,keracunan,pengawasan};
+// alamat lama ini (termasuk ?tab=gizi / ?tab=keracunan) dialihkan ke rute yang sesuai.
+import MbgLegacyRedirect from '@/components/dasbor-mbg/MbgLegacyRedirect'
 
-export default function DasborMbgPage() {
-  return <DasborMbgClient />
+export default function DasborMbgLegacyPage() {
+  return <MbgLegacyRedirect />
 }
