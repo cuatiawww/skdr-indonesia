@@ -37,7 +37,7 @@ import type { SkdrFilter } from '@/lib/dasbor-skdr-filter'
 import { peFetch } from '@/lib/pe-api'
 import { SkeletonChart } from '@/components/ui/Skeleton'
 import { DEFAULT_LAYERS, type Focus, type Layers as MapLayers } from '@/components/spasial/SpasialMap'
-import { defaultFilter, fetchAnalisa, useAnalisa, type AFilter } from '@/lib/analisa-api'
+import { defaultFilter, useAnalisa, type AFilter } from '@/lib/analisa-api'
 import { decodeTitik, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
 import { useChoroConfig } from '@/lib/choropleth-classes'
 
@@ -117,10 +117,10 @@ export default function SkdrRingkasanView({
   const [sel, setSel] = useState<Area | null>(null)
   const [focus, setFocus] = useState<Focus | null>(null)
 
-  // Layout docks & tabs
+  // Layout docks
   const [leftDockOpen, setLeftDockOpen] = useState(true)
   const [leftDockTab, setLeftDockTab] = useState<'api' | 'faskes'>('api')
-  const [rightTab, setRightTab] = useState<'alert' | 'detail' | 'hotspot'>('alert')
+  const [rightDockOpen, setRightDockOpen] = useState(true)
 
   // Integrated layer toggles & filters
   const [intelLayers, setIntelLayers] = useState({
@@ -132,10 +132,6 @@ export default function SkdrRingkasanView({
   })
   const [selectedUnits, setSelectedUnits] = useState<string[]>([])
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
-
-  // Detailed selected area data
-  const [det, setDet] = useState<any>(null)
-  const [detLoading, setDetLoading] = useState(false)
 
   const [kpiData, setKpiData] = useState({
     totalIbs: 48920,
@@ -191,7 +187,6 @@ export default function SkdrRingkasanView({
 
   const pickArea = (a: Area, fromMap = false) => {
     setSel(a)
-    setRightTab('detail')
     if (!fromMap && a.lat != null && a.lon != null) {
       setFocus({
         lat: a.lat,
@@ -206,37 +201,6 @@ export default function SkdrRingkasanView({
   const pickTitik = (t: Titik) => {
     setFocus({ lat: t.lat, lon: t.lon, titik: t, nonce: Date.now() })
   }
-
-  // Fetch detailed area data when an area is selected
-  useEffect(() => {
-    setDet(null)
-    if (!sel) return
-    let alive = true
-    setDetLoading(true)
-    const lv = data?.level === 'kabkota' ? 'kab' : 'prov'
-    fetchAnalisa('spasial/wilayah', aFilter, { wlv: lv, wid: sel.id })
-      .then((d) => {
-        if (alive) setDet(d)
-      })
-      .catch(() => {
-        if (alive) setDet({ error: true })
-      })
-      .finally(() => {
-        if (alive) setDetLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [sel?.id, data?.level, aFilter])
-
-  // Ranked areas for Hotspot tab
-  const rankedAreas = useMemo(() => {
-    if (!data?.wilayah) return []
-    return [...data.wilayah]
-      .filter((a) => (a.kasus || 0) > 0)
-      .sort((a, b) => (b.kasus || 0) - (a.kasus || 0))
-      .slice(0, 10)
-  }, [data?.wilayah])
 
   const onDrill = (a: Area) => {
     if (onApply) {
@@ -406,52 +370,78 @@ export default function SkdrRingkasanView({
         </div>
       </div>
 
-      {/* Main Grid: Spatial Map (with Collapsible Left API & Settings Dock) & Right Management / Detail Analysis Card */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left / Center Map Card (8 cols) */}
-        <div className="skdr-card p-5 lg:col-span-8 flex flex-col">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
-              </div>
-              <h3 className="text-base font-black text-slate-900 mt-0.5">
-                Sebaran Sinyal Alert IBS & EBS per Fasyankes
-              </h3>
+      {/* Peta Spasial Klaster Surveilans Nasional: 1 Section Penuh dengan Dock Kiri (API Intelijen) dan Dock Kanan (Manajemen Alert) */}
+      <div className="skdr-card p-5 w-full flex flex-col" data-testid="peta-skdr-terpadu">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Quick Metric Pills */}
-              <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
-                {METRIC_TABS.map((m) => (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => setMetric(m.key)}
-                    className={`rounded-lg px-2.5 py-1 transition ${
-                      metric === m.key
-                        ? 'bg-white text-primary shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                Tahun {f.ey} · M{f.sw}–M{f.ew}
-              </span>
+            <h3 className="text-base font-black text-slate-900 mt-0.5">
+              Sebaran Sinyal Alert IBS & EBS per Fasyankes
+            </h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Metric Pills */}
+            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
+              {METRIC_TABS.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setMetric(m.key)}
+                  className={`rounded-lg px-2.5 py-1 transition ${
+                    metric === m.key
+                      ? 'bg-white text-primary shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              Tahun {f.ey} · M{f.sw}–M{f.ew}
+            </span>
+            <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+              <button
+                type="button"
+                onClick={() => setLeftDockOpen(!leftDockOpen)}
+                className={`rounded-lg px-2 py-1 text-xs font-bold border transition flex items-center gap-1 ${
+                  leftDockOpen
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Buka / Ciutkan Lapisan & API Intelijen"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">API & Unit</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightDockOpen(!rightDockOpen)}
+                className={`rounded-lg px-2 py-1 text-xs font-bold border transition flex items-center gap-1 ${
+                  rightDockOpen
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Buka / Ciutkan Status Respon Sinyal"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Status Respon</span>
+              </button>
             </div>
           </div>
+        </div>
 
-          {/* Map Container with Collapsible Left API & Settings Dock */}
-          <div className="mt-4 flex min-h-[600px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
-            {/* Left Collapsible Dock: Integrated APIs & Fasyankes Unit Filters */}
-            <aside
-              className={`shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
-                leftDockOpen ? 'w-[250px]' : 'w-10'
-              }`}
-              data-testid="peta-left-dock"
-            >
+        {/* Map Container with Collapsible Left API & Right Alert Docks */}
+        <div className="mt-4 flex min-h-[640px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
+          {/* Left Collapsible Dock: Integrated APIs & Fasyankes Unit Filters */}
+          <aside
+            className={`shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
+              leftDockOpen ? 'w-[260px]' : 'w-10'
+            }`}
+            data-testid="peta-left-dock"
+          >
               <button
                 type="button"
                 onClick={() => setLeftDockOpen(!leftDockOpen)}
@@ -634,254 +624,102 @@ export default function SkdrRingkasanView({
                 focus={focus}
                 panelOpen={false}
                 setPanelOpen={() => {}}
-                height={600}
+                height={640}
                 rightPanel={null}
               />
             </div>
-          </div>
-        </div>
 
-        {/* Right: Management & Detailed Analysis Card (4 cols) */}
-        <div className="skdr-card p-5 lg:col-span-4 flex flex-col justify-between min-h-[600px]">
-          <div>
-            {/* Header Tabs on Right Card */}
-            <div className="border-b border-slate-100 pb-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-                  Analisa & Tindak Lanjut
-                </span>
-                {sel && (
-                  <button
-                    type="button"
-                    onClick={() => setSel(null)}
-                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                  >
-                    Reset Pilihan
-                  </button>
-                )}
-              </div>
-              <div className="mt-2 flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setRightTab('alert')}
-                  className={`flex-1 rounded-md py-1.5 transition ${
-                    rightTab === 'alert'
-                      ? 'bg-white text-primary shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Status Respon
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightTab('detail')}
-                  className={`flex-1 rounded-md py-1.5 transition ${
-                    rightTab === 'detail'
-                      ? 'bg-white text-primary shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Detail Wilayah
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightTab('hotspot')}
-                  className={`flex-1 rounded-md py-1.5 transition ${
-                    rightTab === 'hotspot'
-                      ? 'bg-white text-primary shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Hotspot
-                </button>
-              </div>
-            </div>
-
-            {/* Tab 1: Manajemen Alert / Status Respon Sinyal SKDR */}
-            {rightTab === 'alert' && (
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-black text-slate-900">
-                    Status Respon Sinyal SKDR
-                  </h4>
-                  <span className="text-xs font-bold text-slate-500">
-                    Total: 3.932 Sinyal
-                  </span>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {alertStatusData.map((s) => (
-                    <div
-                      key={s.label}
-                      className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-800">{s.label}</span>
-                        <span className="font-black text-slate-900">
-                          {s.count.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${s.pct}%`, backgroundColor: s.color }}
-                        />
-                      </div>
-                      <div className="mt-1 text-right text-[10px] font-bold text-slate-500">
-                        {s.pct}% dari total sinyal
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Tab 2: Detail Wilayah Terpilih */}
-            {rightTab === 'detail' && (
-              <div className="mt-4 space-y-3">
-                {!sel ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs text-slate-500">
-                    <MapPin className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                    <p className="font-bold text-slate-700">Belum ada wilayah yang dipilih</p>
-                    <p className="mt-1 leading-relaxed">
-                      Klik salah satu provinsi atau kab/kota pada peta untuk melihat rincian kasus,
-                      kurva mingguan, dan unit pelapor.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-primary tracking-wide">
-                            Wilayah Terpilih
-                          </span>
-                          <h4 className="text-base font-black text-slate-900">{sel.nama}</h4>
+            {/* Right Collapsible Dock: Manajemen Alert (Status Respon Sinyal SKDR) */}
+            <aside
+              className={`shrink-0 border-l border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
+                rightDockOpen ? 'w-[320px]' : 'w-10'
+              }`}
+              data-testid="peta-right-dock"
+            >
+              {rightDockOpen ? (
+                <div className="flex h-full flex-col justify-between p-4 overflow-y-auto">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Manajemen Alert</span>
                         </div>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
-                          {data?.level === 'kabkota' ? 'Kab/Kota' : 'Provinsi'}
-                        </span>
+                        <h4 className="text-sm font-black text-slate-900 mt-0.5 truncate">
+                          Status Respon Sinyal SKDR
+                        </h4>
                       </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                        <div className="bg-white rounded-lg p-1.5 shadow-2xs">
-                          <p className="text-[10px] text-slate-400">Kasus</p>
-                          <b className="text-sm font-black text-slate-900">
-                            {sel.kasus.toLocaleString('id-ID')}
-                          </b>
-                        </div>
-                        <div className="bg-white rounded-lg p-1.5 shadow-2xs">
-                          <p className="text-[10px] text-slate-400">Kematian</p>
-                          <b className="text-sm font-black text-slate-900">
-                            {sel.kematian.toLocaleString('id-ID')}
-                          </b>
-                        </div>
-                        <div className="bg-white rounded-lg p-1.5 shadow-2xs">
-                          <p className="text-[10px] text-slate-400">CFR</p>
-                          <b className="text-sm font-black text-slate-900">
-                            {sel.kasus ? `${((sel.kematian / sel.kasus) * 100).toFixed(2)}%` : '–'}
-                          </b>
-                        </div>
-                      </div>
-                    </div>
-
-                    {detLoading ? (
-                      <div className="py-4 text-center text-xs text-slate-500">
-                        Memuat rincian epidemiologi...
-                      </div>
-                    ) : (
-                      <>
-                        {det?.kurva && (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3">
-                            <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">
-                              Kurva Kasus Mingguan
-                            </span>
-                            <div className="h-24 w-full">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={det.kurva} margin={{ top: 2, right: 2, left: -20, bottom: 0 }}>
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                  <XAxis dataKey="label" tick={{ fontSize: 8 }} />
-                                  <YAxis tick={{ fontSize: 8 }} allowDecimals={false} />
-                                  <Bar dataKey="kasus" fill="#0f766e" isAnimationActive={false} />
-                                </BarChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-                        )}
-
-                        {det?.penyakit && det.penyakit.length > 0 && (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3">
-                            <span className="text-[10px] font-black uppercase text-slate-500 block mb-1.5">
-                              Penyakit Teratas di Wilayah Ini
-                            </span>
-                            <div className="space-y-1 text-xs">
-                              {det.penyakit.slice(0, 4).map((p: any, i: number) => (
-                                <div key={i} className="flex items-center justify-between border-b border-slate-50 py-1 last:border-0">
-                                  <span className="font-semibold text-slate-800 truncate max-w-[170px]">{p.nama}</span>
-                                  <span className="font-bold text-slate-900 tabular-nums">
-                                    {Number(p.kasus).toLocaleString('id-ID')} kasus
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Tab 3: Hotspot Peringkat Wilayah */}
-            {rightTab === 'hotspot' && (
-              <div className="mt-4 space-y-3">
-                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  10 Wilayah Beban Kasus Tertinggi
-                </div>
-                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                  {rankedAreas.map((w: any, i: number) => {
-                    const maxKasus = Math.max(1, ...rankedAreas.map((x: any) => x.kasus || 0))
-                    const pctBar = Math.min(100, Math.round(((w.kasus || 0) / maxKasus) * 100))
-                    return (
-                      <div
-                        key={w.id}
-                        onClick={() => pickArea(w)}
-                        className={`rounded-lg border p-2 text-xs transition cursor-pointer ${
-                          sel?.id === w.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-slate-100 bg-white hover:border-slate-200'
-                        }`}
+                      <button
+                        type="button"
+                        onClick={() => setRightDockOpen(false)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        title="Ciutkan panel Manajemen Alert"
+                        aria-label="Ciutkan panel Manajemen Alert"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                            <span className="text-slate-400 font-black text-[10px] w-3">{i + 1}</span>
-                            <span className="truncate">{w.nama}</span>
-                          </span>
-                          <span className="font-black text-slate-900 tabular-nums">
-                            {Number(w.kasus || 0).toLocaleString('id-ID')}
-                          </span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${pctBar}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
 
-          {/* Footer Card */}
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-slate-700">
-            <span className="font-black text-primary block mb-1">Standar Prosedur Kemenkes</span>
-            Alert berstatus <strong>SIAGA KLB</strong> wajib diverifikasi oleh Tim TGC Puskesmas /
-            Dinkes dalam waktu maksimal <strong>24 jam</strong> pasca sinyal muncul.
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600">Total Akumulasi</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-800">
+                        3.932 Sinyal
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-3">
+                      {alertStatusData.map((s) => (
+                        <div
+                          key={s.label}
+                          className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-slate-800 leading-tight">{s.label}</span>
+                            <span className="font-black text-slate-900 tabular-nums">
+                              {s.count.toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${s.pct}%`, backgroundColor: s.color }}
+                            />
+                          </div>
+                          <div className="mt-1 text-right text-[10px] font-bold text-slate-500">
+                            {s.pct}% dari total sinyal
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-slate-700">
+                    <span className="font-black text-primary block mb-1">Standar Prosedur Kemenkes</span>
+                    Alert berstatus <strong>SIAGA KLB</strong> wajib diverifikasi oleh Tim TGC Puskesmas /
+                    Dinkes dalam waktu maksimal <strong>24 jam</strong> pasca sinyal muncul.
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRightDockOpen(true)}
+                  className="flex h-full w-full flex-col items-center justify-start gap-3 py-3 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  title="Buka panel Manajemen Alert"
+                  aria-label="Buka panel Manajemen Alert"
+                >
+                  <ChevronLeft className="h-4 w-4 text-slate-400" />
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    Manajemen Alert (3.932)
+                  </span>
+                </button>
+              )}
+            </aside>
           </div>
         </div>
-      </div>
 
       {/* Second Row: Weekly Compliance & Top 10 Alerts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">

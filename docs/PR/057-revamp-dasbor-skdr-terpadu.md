@@ -37,10 +37,12 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
      - **Epiweek Play / Replay Slider**: Bilah putar ulang melayang (*floating playback bar*) di bawah peta dengan tombol Play/Pause dan slider minggu epid 1–52 animasi berkala 1,3 detik per minggu.
      - **Bilah Metrik Cepat**: Tombol pill metrik (*Kasus*, *Alert/Sinyal*, *KLB*, *CFR*, *Kematian*) di header seksi peta untuk pengubahan choropleth instan.
      - **Konsistensi Hierarki Wilayah**: Aksi drilldown (`onDrill`) pada provinsi di peta langsung menyelaraskan filter global Dasbor SKDR, dan tombol `Kembali` (`onUp`) menavigasi kembali ke tingkat nasional.
-8. **Penyelarasan Tata Letak Peta Spasial (Dock Kiri API Intelijen + Panel Kanan Manajemen Alert & Detail Wilayah)**:
-   - Sesuai arahan pengguna untuk mengembalikan integrasi API dan visualisasi panel kiri/kanan sebelumnya dengan engine peta modern:
-     - **Dock Kiri Peta (API Terintegrasi & Filter Cepat)**: Panel lipat (*collapsible drawer*, `w-[250px]` / `w-10`) di sisi kiri kanvas peta yang memuat integrasi 5 API eksternal (Penerbangan Domestik, NASA FIRMS Karhutla, BNPB InaRISK, Satwa Liar GBIF, Vektor iNaturalist) serta filter unit fasyankes dan status laporan.
-     - **Panel Kanan (Manajemen Alert & Analisa Wilayah)**: Mengembalikan kartu *"MANAJEMEN ALERT - Status Respon Sinyal SKDR"* (Terverifikasi $\le$24 Jam, TGC, Sinyal Baru, Discarded, Standar Kemenkes 24 Jam) yang dipadukan dengan 3 tab interaktif (*Status Respon*, *Detail Wilayah Terpilih* dengan kurva mingguan mini & top penyakit, serta *Hotspot 10 Wilayah*).
+8. **Penyelarasan Tata Letak Peta Spasial (Peta 1 Section Penuh dengan Dock Kiri API Intelijen + Dock Kanan Manajemen Alert Murni Tanpa Tab Analisa)**:
+   - Sesuai arahan pengguna agar seksi peta tampil 1 section penuh utuh (100% width) tanpa terbagi menjadi dua kartu terpisah di grid kolom:
+     - **Dock Kiri Peta (API Terintegrasi & Filter Cepat)**: Panel lipat (*collapsible drawer*, `w-[260px]` / `w-10`) di sisi kiri kanvas peta yang memuat integrasi 5 API eksternal (Penerbangan Domestik, NASA FIRMS Karhutla, BNPB InaRISK, Satwa Liar GBIF, Vektor iNaturalist) serta filter unit fasyankes dan status laporan.
+     - **Bawah Peta (Epiweek Replay Player)**: Bilah putar ulang melayang (*floating playback bar*) dengan tombol Play/Pause dan slider scrubber minggu epid 1–52.
+     - **Dock Kanan Peta (Manajemen Alert Murni)**: Panel lipat (*collapsible drawer*, `w-[320px]` / `w-10`) di sisi kanan kanvas peta khusus menampilkan *"MANAJEMEN ALERT - Status Respon Sinyal SKDR"* (Terverifikasi $\le$24 Jam, TGC, Sinyal Baru, Discarded, Standar Kemenkes 24 Jam) tanpa tab analisa ekstra (*Detail Wilayah* & *Hotspot* dilepas agar tidak membebani tampilan dan sesuai instruksi pengguna).
+     - **Quick Toggles di Header Seksi**: Tombol pintas di bilah atas untuk membuka/menutup Dock Kiri (Lapisan & API) dan Dock Kanan (Manajemen Alert) secara instan.
 
 ## Berkas yang Diubah / Dibuat
 - `database/init/071_dasbor_skdr_unified_submenus.sql`: Migrasi SQL idempoten mendaftarkan 6 subItems di bawah `mod_main_dashboard` pada `app_settings.navigation_menu`.
