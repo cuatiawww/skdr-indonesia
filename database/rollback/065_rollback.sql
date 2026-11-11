@@ -8,3 +8,4 @@ DROP TABLE IF EXISTS app_settings_bak_065;
 DELETE FROM schema_migrations WHERE filename = '065_hide_ebs_ibs_menu_rename_dasbor_skdr.sql';
 
 COMMIT;
+

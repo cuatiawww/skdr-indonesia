@@ -36,3 +36,4 @@
   4. Dasbor MBG (`/dasbor/mbg`)
   5. Penyakit (`/penyakit`)
   6. Mode TV (`/tv`)
+

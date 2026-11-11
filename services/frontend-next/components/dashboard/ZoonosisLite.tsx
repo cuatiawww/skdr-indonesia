@@ -196,7 +196,9 @@ export default function ZoonosisLite() {
   useEffect(() => { if (sel.length === 1 && sel[0] === 'AVIAN_INFLUENZA') setLayers((l) => ({ ...l, birds: true })) }, [sel])
 
   const selNames = useMemo(() => new Set(LITE_DISEASES.filter((d) => sel.includes(d.code)).map((d) => d.name as string)), [sel])
+  // PR 049: exclude IBS aggregate alerts from Zoonosis Lite map; keep strictly to EBS and Form PE (Kasus PE)
   const locations = useMemo(() => (map?.locations ?? []).filter((l) => selNames.has(l.disease)
+    && String((l as { source_type?: string | null }).source_type ?? '').toLowerCase() !== 'ibs'
     && (src === 'all' || String((l as { source_type?: string | null }).source_type ?? '').toLowerCase() === src)), [map?.locations, selNames, src])
   const locSplit = useMemo(() => {
     let ebs = 0, pe = 0, cases = 0

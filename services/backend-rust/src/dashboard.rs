@@ -152,8 +152,9 @@ pub(crate) async fn resolve(c: &Object, q: &DashQuery) -> Result<Resolved, ApiEr
     };
     // PR 012: "pe" = Kasus PE (individual reports); "form" = legacy case_reports (hidden menu, data kept)
     // PR 039: the second source of the dashboard is now Laporan Agregat IBS; "pe" (old links / other pages) is read as "ibs".
-    let source = q.source.clone().map(|s| s.trim().to_lowercase()).map(|s| if s == "pe" { "ibs".to_string() } else { s })
-        .filter(|s| s == "form" || s == "ebs" || s == "ibs");
+    // PR 049: keep "pe" distinct for Dasbor Zoonosis Lite so it queries Form PE (pe_cases) without mixing in IBS.
+    let source = q.source.clone().map(|s| s.trim().to_lowercase())
+        .filter(|s| s == "form" || s == "ebs" || s == "ibs" || s == "pe");
     // PR 019: Unit pelapor — always (re)set on this pooled connection so a previous request's units never leak.
     let unit: Vec<String> = q.unit.as_deref().unwrap_or("").split('|').map(|u| u.trim().to_lowercase()).filter(|u| !u.is_empty() && !u.contains('\u{1f}')).collect();
     c.execute("SELECT set_config('skdr.units', $1, false)", &[&unit.join("\u{1f}")]).await.map_err(internal)?;
