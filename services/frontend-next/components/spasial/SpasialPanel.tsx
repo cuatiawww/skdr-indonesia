@@ -3,7 +3,7 @@
 // hotspot ranking (wilayah / unit pelapor), and detail of the clicked wilayah.
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Loader2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { apiQuery, fetchAnalisa, nf, type AFilter } from '@/lib/analisa-api'
 import { areaVal, fmtPct, METRICS, STATUS, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
@@ -29,9 +29,9 @@ function Curve({ rows, h = 120 }: { rows: { label: string; kasus: number; alert?
 
 const chgCls = (v: number | null) => (v === null ? 'text-slate-400' : v > 0 ? 'text-red-600' : v < 0 ? 'text-emerald-600' : 'text-slate-500')
 
-export default function SpasialPanel({ f, data, titik, metric, selected, onPickArea, onPickTitik, onClose, onClear }: {
+export default function SpasialPanel({ f, data, titik, metric, selected, onPickArea, onPickTitik, onClose, onClear, className, closeIcon = 'right' }: {
   f: AFilter; data: SpasialResp | null; titik: Titik[]; metric: Metric; selected: Area | null
-  onPickArea: (a: Area) => void; onPickTitik: (t: Titik) => void; onClose: () => void; onClear: () => void
+  onPickArea: (a: Area) => void; onPickTitik: (t: Titik) => void; onClose: () => void; onClear: () => void; className?: string; closeIcon?: 'left' | 'right'
 }) {
   const [tab, setTab] = useState<Tab>('ringkasan')
   const [hs, setHs] = useState<'wilayah' | 'unit'>('wilayah')
@@ -70,7 +70,8 @@ export default function SpasialPanel({ f, data, titik, metric, selected, onPickA
   })()
 
   return (
-    <aside className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/95 shadow-xl backdrop-blur">
+    <aside className={`flex h-full flex-col overflow-hidden ${className || "rounded-2xl border border-slate-200 bg-slate-50/95 shadow-xl backdrop-blur"}`}>
+
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2.5">
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-slate-800">{selected ? selected.nama : (data?.meta?.breadcrumb || []).map((c: any) => c.label).slice(-1)[0] || 'Indonesia'}</p>
@@ -78,7 +79,7 @@ export default function SpasialPanel({ f, data, titik, metric, selected, onPickA
         </div>
         <div className="flex items-center gap-1">
           {selected ? <button type="button" onClick={onClear} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100"><X className="mr-0.5 inline h-3 w-3" />Wilayah</button> : null}
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup panel"><ChevronRight className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup panel">{closeIcon === "left" ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
         </div>
       </div>
       <div role="tablist" className="flex gap-1 border-b border-slate-200 bg-white px-2 py-1.5">

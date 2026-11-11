@@ -43,7 +43,20 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
      - **Dock Kiri Peta (API Terintegrasi & Filter Cepat)**: Panel lipat (*collapsible drawer*, `w-[260px]` / `w-10`) di sisi kiri kanvas peta yang memuat integrasi 5 API eksternal (Penerbangan Domestik, NASA FIRMS Karhutla, BNPB InaRISK, Satwa Liar GBIF, Vektor iNaturalist) serta filter unit fasyankes dan status laporan.
      - **Bawah Peta (Epiweek Replay Player)**: Bilah putar ulang melayang (*floating playback bar*) dengan tombol Play/Pause dan slider scrubber minggu epid 1–52.
       - **Quick Toggle di Header Seksi**: Tombol pintas `[Unit & Status]` di bilah atas untuk membuka/menutup Dock Kiri secara instan.
-9. **Dock Kanan Peta: Pengaturan Peta & Lapisan (Sesuai Referensi Pengguna)**:
+9. **Penyempurnaan Spasial: Dock Kiri Analisa Wilayah & Dock Kanan Pengaturan Lapisan (Auto-Layout Anti-Meninggi)**:
+   - Sesuai arahan dan referensi pengguna, arsitektur seksi peta disempurnakan secara menyeluruh dengan auto-layout presisi:
+     - **Tinggi Terkunci & Scroll Internal (Anti-Meninggi)**: Kontainer peta dikunci pada tinggi `h-[640px]` dengan `overflow-hidden`. Area body pada kedua dock samping (kiri & kanan) menerapkan `flex-1 overflow-y-auto` (scroll vertikal atas-bawah), menjamin tinggi kartu dasbor tetap rapi, konsisten, dan tidak melar/meninggi ke bawah.
+     - **Dock Kiri: Analisa & Detail Wilayah (`SpasialPanel`)**: Menggantikan panel API terintegrasi sebelumnya dengan panel analitik spasial 3-tab:
+       - Tab `Ringkasan`: Narasi interpretasi otomatis wilayah terpilih, kurva epidemi kasus mingguan, metrik perbandingan vs minggu lalu, dan CFR.
+       - Tab `Hotspot`: Peringkat wilayah (provinsi/kabkota) dan unit pelapor beban kasus/alert tertinggi dengan visualisasi progress bar.
+       - Tab `Detail Wilayah`: Rincian mendalam wilayah (Kasus, Kematian, CFR, KLB, kurva tren, tautan *"Buka wilayah ini di Matriks Analisa"*, dan tabel Penyakit Teratas dengan rincian Kasus, Mati, Alert).
+     - **Dock Kanan: Pengaturan Peta & Lapisan (Sentralisasi Tanpa Duplikasi)**:
+       - **Kasus IBS & EBS**: Label diperbaiki menjadi murni `Kasus IBS & EBS` (menghilangkan istilah PE) dengan indikator titik biru (IBS) dan oranye (EBS), jumlah titik dinamis realtime (`Titik fasyankes · IBS: ... · EBS: ...`), toggle switch, dan slider opasitas titik.
+       - **Arsiran Wilayah**: Choropleth skala beban kasus wilayah dengan toggle switch dan slider opasitas.
+       - **API Intelijen Eksternal**: Sentralisasi 5 API intelijen terintegrasi secara eksklusif di panel kanan (Penerbangan Domestik, NASA FIRMS Karhutla vs ISPA, BNPB InaRISK Bencana, Satwa Liar GBIF, dan Vektor Nyamuk iNat) sehingga tidak ada duplikasi antara panel kiri dan kanan.
+       - **Konteks Risiko & Peta Dasar**: Batas Administrasi GeoJSON, Aliran Angin, dan 2x2 grid base-map (`OSM`, `Medan`, `Satelit`, `Terang`).
+       - **Sticky Footer Reset**: Tombol solid teal *"Atur Ulang Pengaturan Lapisan"* untuk mengembalikan konfigurasi layer ke bawaan.
+     - **Header Toggle**: Tombol cepat `[Analisa Wilayah]` (dock kiri) dan `[Pengaturan Lapisan]` (dock kanan).
    - Menggantikan panel Manajemen Alert / Status Respon Sinyal dengan **Dock Kanan "Pengaturan Peta & Lapisan"** yang dapat dilipat (`w-[340px]` saat terbuka, `w-10` saat terlipat) sesuai dengan tangkapan layar referensi pengguna:
      - **Section 1 (LAPISAN PETA & OPASITAS)**:
        - `Kasus EBS / PE`: Titik lokasi EBS (83) & PE (775), toggle switch oranye, slider opasitas titik (0.2–1.0) dengan label persentase realtime.

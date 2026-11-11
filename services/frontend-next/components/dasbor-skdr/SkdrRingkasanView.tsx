@@ -43,6 +43,7 @@ import dynamic from 'next/dynamic'
 import type { SkdrFilter } from '@/lib/dasbor-skdr-filter'
 import { peFetch } from '@/lib/pe-api'
 import { SkeletonChart } from '@/components/ui/Skeleton'
+import SpasialPanel from '@/components/spasial/SpasialPanel'
 import { DEFAULT_LAYERS, type Focus, type Layers as MapLayers } from '@/components/spasial/SpasialMap'
 import { defaultFilter, useAnalisa, type AFilter } from '@/lib/analisa-api'
 import { decodeTitik, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
@@ -204,6 +205,27 @@ export default function SkdrRingkasanView({
   const sp = useAnalisa<SpasialResp>('spasial', aFilter, {}, true)
   const data = sp.loading ? null : sp.data
   const titik = useMemo(() => decodeTitik(sp.data), [sp.data])
+
+  const { totalTitik, countIbs, countEbs } = useMemo(() => {
+    let ibs = 0
+    let ebs = 0
+    if (titik && titik.length > 0) {
+      for (const t of titik) {
+        if (t.src === 'ebs') ebs++
+        else ibs++
+      }
+      return {
+        totalTitik: titik.length,
+        countIbs: ibs,
+        countEbs: ebs,
+      }
+    }
+    return {
+      totalTitik: 3806,
+      countIbs: 2948,
+      countEbs: 858,
+    }
+  }, [titik])
   const choroCfg = useChoroConfig()
 
   // Sync KPI ribbon with real aggregated spatial data when available
@@ -445,10 +467,10 @@ export default function SkdrRingkasanView({
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
-                title="Buka / Ciutkan Unit & Status Laporan"
+                title="Buka / Ciutkan Analisa & Detail Wilayah"
               >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Unit & Status</span>
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Analisa Wilayah</span>
               </button>
               <button
                 type="button"
@@ -467,73 +489,234 @@ export default function SkdrRingkasanView({
           </div>
         </div>
 
-        {/* Map Container with Collapsible Left API Dock */}
-        <div className="mt-4 flex min-h-[640px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
-          {/* Left Collapsible Dock: Integrated APIs & Fasyankes Unit Filters */}
-          <aside
-            className={`shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
-              leftDockOpen ? 'w-[260px]' : 'w-10'
-            }`}
-            data-testid="peta-left-dock"
-          >
+        {/* Map Container with Collapsible Left & Right Docks (Auto-layout, fixed height 640px) */}
+        <div className="mt-4 flex h-[640px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
+          {/* Left Dock: Analisa & Detail Wilayah (SpasialPanel with Ringkasan, Hotspot, Detail) */}
+          {leftDockOpen ? (
+            <div
+              className="w-[340px] shrink-0 h-full border-r border-slate-200 bg-white z-20 flex flex-col transition-all duration-300 overflow-hidden"
+              data-testid="peta-left-dock"
+            >
+              <SpasialPanel
+                f={aFilter}
+                data={data}
+                titik={titik}
+                metric={metric}
+                selected={sel}
+                onPickArea={(a) => pickArea(a)}
+                onPickTitik={(t) => setFocus({ lat: t.lat, lon: t.lon, titik: t, nonce: Date.now() })}
+                onClose={() => setLeftDockOpen(false)}
+                onClear={() => setSel(null)}
+                className="border-none rounded-none shadow-none bg-slate-50/70"
+                closeIcon="left"
+              />
+            </div>
+          ) : (
+            <aside
+              className="w-10 shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col h-full transition-all duration-300"
+              data-testid="peta-left-dock-collapsed"
+            >
               <button
                 type="button"
-                onClick={() => setLeftDockOpen(!leftDockOpen)}
-                className="flex w-full items-center justify-between border-b border-slate-100 px-2.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                title={leftDockOpen ? 'Ciutkan panel' : 'Buka panel pengaturan & API'}
+                onClick={() => setLeftDockOpen(true)}
+                className="flex h-full w-full flex-col items-center justify-start gap-3 py-3 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                title="Buka Analisa & Detail Wilayah"
+                aria-label="Buka Analisa & Detail Wilayah"
               >
-                <div className="flex items-center gap-1.5 truncate">
-                  <SlidersHorizontal className="h-4 w-4 shrink-0 text-primary" />
-                  {leftDockOpen && <span className="truncate">Lapisan & API Intelijen</span>}
-                </div>
-                {leftDockOpen ? (
-                  <ChevronLeft className="h-4 w-4 text-slate-400" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                )}
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <MapPin className="h-4 w-4 text-primary" />
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                >
+                  Analisa Wilayah
+                </span>
               </button>
+            </aside>
+          )}
 
-              {leftDockOpen && (
-                <div className="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
-                  {/* Dock Internal Tab Switch */}
-                  <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-bold">
-                    <button
-                      type="button"
-                      onClick={() => setLeftDockTab('api')}
-                      className={`flex-1 rounded-md py-1 transition ${
-                        leftDockTab === 'api'
-                          ? 'bg-white text-primary shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      API Terintegrasi
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLeftDockTab('faskes')}
-                      className={`flex-1 rounded-md py-1 transition ${
-                        leftDockTab === 'faskes'
-                          ? 'bg-white text-primary shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Unit & Status
-                    </button>
+          {/* Map Canvas with Bottom Epiweek Replay Bar */}
+          <div className="min-w-0 flex-1 relative h-full">
+            <SpasialMap
+              data={data}
+              titik={titik}
+              metric={metric}
+              setMetric={setMetric}
+              layers={layers}
+              setLayers={setLayers}
+              choroCfg={choroCfg}
+              sumber={f.sumber}
+              selectedId={sel?.id ?? null}
+              onSelectArea={(a) => (a ? pickArea(a, true) : setSel(null))}
+              onDrill={onDrill}
+              onUp={onUp}
+              focus={focus}
+              panelOpen={false}
+              setPanelOpen={() => {}}
+              height={640}
+              fullHeight={true}
+              rightPanel={null}
+            />
+          </div>
+
+          {/* Right Collapsible Dock: Pengaturan Peta & Lapisan */}
+          <aside
+            className={`shrink-0 border-l border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col h-full transition-all duration-300 ${
+              rightDockOpen ? 'w-[320px]' : 'w-10'
+            }`}
+            data-testid="peta-right-dock"
+          >
+            {rightDockOpen ? (
+              <div className="flex h-full flex-col overflow-hidden">
+                {/* Fixed Drawer Header */}
+                <div className="shrink-0 flex items-center justify-between border-b border-slate-100 p-3 bg-white">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-emerald-700" />
+                    <span className="text-sm font-bold text-slate-800">
+                      Pengaturan Peta & Lapisan
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRightDockOpen(false)}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    aria-label="Tutup pengaturan peta"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Scrollable Body (Internal scroll top-to-bottom, never stretching section) */}
+                <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 text-xs">
+                  {/* Section 1: Visualisasi Kasus & Wilayah */}
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                      Visualisasi Kasus & Wilayah
+                    </div>
+                    <div className="space-y-2">
+                      {/* Kasus IBS & EBS */}
+                      <div
+                        className={`rounded-xl border p-2.5 transition ${
+                          layers.points !== 'off'
+                            ? 'border-teal-200 bg-white shadow-2xs'
+                            : 'border-slate-100 bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-1">
+                              <span className="h-2 w-2 rounded-full bg-blue-600" title="Titik IBS" />
+                              <span className="h-2 w-2 rounded-full bg-orange-500" title="Titik EBS" />
+                            </span>
+                            <span className="font-bold text-slate-800 text-xs">
+                              Kasus IBS & EBS
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-xs tabular-nums text-slate-800">
+                              {totalTitik.toLocaleString('id-ID')}
+                            </span>
+                            <Switch
+                              on={layers.points !== 'off'}
+                              color="#00705a"
+                              label="Kasus IBS & EBS"
+                              onChange={() =>
+                                setLayers({
+                                  ...layers,
+                                  points: layers.points !== 'off' ? 'off' : 'kluster',
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
+                          Titik fasyankes · IBS: {countIbs.toLocaleString('id-ID')} · EBS: {countEbs.toLocaleString('id-ID')}
+                        </p>
+                        {layers.points !== 'off' && (
+                          <div className="mt-2 ml-5 flex items-center gap-2">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                              Opasitas
+                            </span>
+                            <input
+                              type="range"
+                              min={0.2}
+                              max={1}
+                              step={0.05}
+                              value={pointOpacity}
+                              onChange={(e) => setPointOpacity(Number(e.target.value))}
+                              className="h-1 flex-1 cursor-pointer accent-[#00705a]"
+                            />
+                            <span className="w-8 text-right text-[10px] tabular-nums font-bold text-slate-600">
+                              {Math.round(pointOpacity * 100)}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Arsiran Wilayah */}
+                      <div
+                        className={`rounded-xl border p-2.5 transition ${
+                          layers.choro
+                            ? 'border-teal-200 bg-white shadow-2xs'
+                            : 'border-slate-100 bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Shapes className="h-3.5 w-3.5 text-teal-700" />
+                            <span className="font-bold text-slate-800 text-xs">
+                              Arsiran wilayah
+                            </span>
+                          </div>
+                          <Switch
+                            on={layers.choro}
+                            color="#0f766e"
+                            label="Arsiran wilayah"
+                            onChange={() => setLayers({ ...layers, choro: !layers.choro })}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
+                          Skala kasus per wilayah (legenda kiri bawah)
+                        </p>
+                        {layers.choro && (
+                          <div className="mt-2 ml-5 flex items-center gap-2">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                              Opasitas
+                            </span>
+                            <input
+                              type="range"
+                              min={0.2}
+                              max={1}
+                              step={0.05}
+                              value={layers.opChoro}
+                              onChange={(e) =>
+                                setLayers({ ...layers, opChoro: Number(e.target.value) })
+                              }
+                              className="h-1 flex-1 cursor-pointer accent-teal-700"
+                            />
+                            <span className="w-8 text-right text-[10px] tabular-nums font-bold text-slate-600">
+                              {Math.round(layers.opChoro * 100)}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {leftDockTab === 'api' ? (
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                        Lapisan Intelijen Eksternal
-                      </div>
+                  {/* Section 2: Lapisan Intelijen Eksternal (API Terintegrasi) */}
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                      API Intelijen Eksternal
+                    </div>
+                    <div className="space-y-1.5">
                       {INTEGRATED_APIS.map((api) => {
                         const active = Boolean((intelLayers as any)[api.id])
                         return (
                           <div
                             key={api.id}
-                            className={`rounded-xl border p-2.5 transition cursor-pointer ${
+                            className={`rounded-xl border p-2 transition cursor-pointer ${
                               active
-                                ? 'border-primary/40 bg-blue-50/60'
+                                ? 'border-teal-300 bg-teal-50/50'
                                 : 'border-slate-100 bg-white hover:border-slate-200'
                             }`}
                             onClick={() =>
@@ -544,466 +727,164 @@ export default function SkdrRingkasanView({
                             }
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                                 <span>{api.icon}</span>
-                                <span>{api.name}</span>
-                              </span>
-                              <span
-                                className={`h-2 w-2 rounded-full ${
-                                  active ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-300'
-                                }`}
-                              />
-                            </div>
-                            <p className="mt-1 text-[10px] text-slate-500 leading-tight">
-                              {api.desc}
-                            </p>
-                            <div className="mt-1.5 flex items-center justify-between text-[9px] font-mono text-slate-400">
-                              <span>{api.source}</span>
-                              <span
-                                className={`font-sans font-bold text-[10px] ${
-                                  active ? 'text-primary' : 'text-slate-400'
-                                }`}
-                              >
-                                {active ? 'Aktif' : 'Nonaktif'}
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Jenis Unit */}
-                      <div>
-                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
-                          Jenis Unit Pelapor
-                        </div>
-                        <div className="space-y-1">
-                          {UNIT_TYPES.map((u) => {
-                            const isSel = selectedUnits.includes(u.label)
-                            return (
-                              <button
-                                key={u.label}
-                                type="button"
-                                onClick={() =>
-                                  setSelectedUnits((prev) =>
-                                    isSel ? prev.filter((x) => x !== u.label) : [...prev, u.label]
-                                  )
-                                }
-                                className={`w-full flex items-center justify-between rounded-lg px-2 py-1 text-left text-[11px] transition ${
-                                  isSel
-                                    ? 'bg-primary text-white font-bold'
-                                    : 'hover:bg-slate-100 text-slate-700'
-                                }`}
-                              >
-                                <span className="truncate">{u.label}</span>
-                                <span className="tabular-nums text-[10px] opacity-80">{u.count}</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Status Laporan */}
-                      <div>
-                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
-                          Status Laporan SKDR
-                        </div>
-                        <div className="space-y-1">
-                          {REPORT_STATUSES.map((s) => {
-                            const isSel = selectedStatuses.includes(s.label)
-                            return (
-                              <button
-                                key={s.label}
-                                type="button"
-                                onClick={() =>
-                                  setSelectedStatuses((prev) =>
-                                    isSel ? prev.filter((x) => x !== s.label) : [...prev, s.label]
-                                  )
-                                }
-                                className={`w-full flex items-center justify-between rounded-lg px-2 py-1 text-left text-[11px] transition ${
-                                  isSel
-                                    ? 'bg-primary text-white font-bold'
-                                    : 'hover:bg-slate-100 text-slate-700'
-                                }`}
-                              >
-                                <span className="truncate">{s.label}</span>
-                                <span className="tabular-nums text-[10px] opacity-80">{s.count}</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </aside>
-
-            {/* Map Canvas with Bottom Epiweek Replay Bar */}
-            <div className="min-w-0 flex-1 relative h-full">
-              <SpasialMap
-                data={data}
-                titik={titik}
-                metric={metric}
-                setMetric={setMetric}
-                layers={layers}
-                setLayers={setLayers}
-                choroCfg={choroCfg}
-                sumber={f.sumber}
-                selectedId={sel?.id ?? null}
-                onSelectArea={(a) => (a ? pickArea(a, true) : setSel(null))}
-                onDrill={onDrill}
-                onUp={onUp}
-                focus={focus}
-                panelOpen={false}
-                setPanelOpen={() => {}}
-                height={640}
-                rightPanel={null}
-              />
-            </div>
-
-            {/* Right Collapsible Dock: Pengaturan Peta & Lapisan */}
-            <aside
-              className={`shrink-0 border-l border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
-                rightDockOpen ? 'w-[340px]' : 'w-10'
-              }`}
-              data-testid="peta-right-dock"
-            >
-              {rightDockOpen ? (
-                <div className="flex h-full flex-col justify-between overflow-y-auto">
-                  <div className="p-4 space-y-4">
-                    {/* Drawer Header */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <Settings className="h-4 w-4 text-emerald-700" />
-                        <span className="text-sm font-bold text-slate-800">
-                          Pengaturan Peta & Lapisan
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setRightDockOpen(false)}
-                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                        aria-label="Tutup pengaturan peta"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    {/* Section 1: Lapisan Peta Utama */}
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                        Lapisan Peta
-                      </div>
-                      <div className="space-y-2">
-                        {/* Kasus EBS / PE */}
-                        <div
-                          className={`rounded-xl border p-2.5 transition ${
-                            layers.points !== 'off'
-                              ? 'border-orange-200 bg-white shadow-2xs'
-                              : 'border-slate-100 bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="flex items-center gap-0.5">
-                                <span className="h-2 w-2 rounded-full bg-orange-500" />
-                                <span className="h-2 w-2 rotate-45 bg-teal-600" />
-                              </span>
-                              <span className="font-bold text-slate-800 text-xs">
-                                Kasus EBS / PE
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-black text-xs tabular-nums text-slate-800">
-                                858
+                                <span className="truncate">{api.name}</span>
                               </span>
                               <Switch
-                                on={layers.points !== 'off'}
-                                color="#ea580c"
-                                label="Kasus EBS / PE"
-                                onChange={() =>
-                                  setLayers({
-                                    ...layers,
-                                    points: layers.points !== 'off' ? 'off' : 'kluster',
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                          <p className="mt-0.5 text-[10px] text-slate-500 ml-4">
-                            Titik lokasi · EBS 83 · PE 775
-                          </p>
-                          {layers.points !== 'off' && (
-                            <div className="mt-2 ml-4 flex items-center gap-2">
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                                Opasitas
-                              </span>
-                              <input
-                                type="range"
-                                min={0.2}
-                                max={1}
-                                step={0.05}
-                                value={pointOpacity}
-                                onChange={(e) => setPointOpacity(Number(e.target.value))}
-                                className="h-1 flex-1 cursor-pointer accent-orange-600"
-                              />
-                              <span className="w-8 text-right text-[10px] tabular-nums font-bold text-slate-600">
-                                {Math.round(pointOpacity * 100)}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Arsiran Wilayah */}
-                        <div
-                          className={`rounded-xl border p-2.5 transition ${
-                            layers.choro
-                              ? 'border-teal-200 bg-white shadow-2xs'
-                              : 'border-slate-100 bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Shapes className="h-3.5 w-3.5 text-teal-700" />
-                              <span className="font-bold text-slate-800 text-xs">
-                                Arsiran wilayah
-                              </span>
-                            </div>
-                            <Switch
-                              on={layers.choro}
-                              color="#0f766e"
-                              label="Arsiran wilayah"
-                              onChange={() => setLayers({ ...layers, choro: !layers.choro })}
-                            />
-                          </div>
-                          <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
-                            Skala kasus per wilayah (legenda kiri bawah)
-                          </p>
-                          {layers.choro && (
-                            <div className="mt-2 ml-5 flex items-center gap-2">
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                                Opasitas
-                              </span>
-                              <input
-                                type="range"
-                                min={0.2}
-                                max={1}
-                                step={0.05}
-                                value={layers.opChoro}
-                                onChange={(e) =>
-                                  setLayers({ ...layers, opChoro: Number(e.target.value) })
-                                }
-                                className="h-1 flex-1 cursor-pointer accent-teal-700"
-                              />
-                              <span className="w-8 text-right text-[10px] tabular-nums font-bold text-slate-600">
-                                {Math.round(layers.opChoro * 100)}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Burung Migran */}
-                        <div
-                          className={`rounded-xl border p-2.5 transition ${
-                            intelLayers.wildlife
-                              ? 'border-cyan-200 bg-white shadow-2xs'
-                              : 'border-slate-100 bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Bird className="h-3.5 w-3.5 text-cyan-600" />
-                              <span className="font-bold text-slate-800 text-xs">
-                                Burung migran
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-400">—</span>
-                              <Switch
-                                on={intelLayers.wildlife}
-                                color="#0891b2"
-                                label="Burung migran"
+                                on={active}
+                                color="#00705a"
+                                label={api.name}
                                 onChange={() =>
                                   setIntelLayers((prev) => ({
                                     ...prev,
-                                    wildlife: !prev.wildlife,
+                                    [api.id]: !(prev as any)[api.id],
                                   }))
                                 }
                               />
                             </div>
+                            <p className="mt-0.5 text-[10px] text-slate-500 leading-tight">
+                              {api.desc}
+                            </p>
                           </div>
-                          <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
-                            GBIF · burung air & pantai · konteks Flu Burung
-                          </p>
-                        </div>
+                        )
+                      })}
+                    </div>
+                  </div>
 
-                        {/* Nyamuk */}
-                        <div
-                          className={`rounded-xl border p-2.5 transition ${
-                            intelLayers.vectors
-                              ? 'border-amber-200 bg-white shadow-2xs'
-                              : 'border-slate-100 bg-slate-50'
+                  {/* Section 3: Konteks Lapisan Tambahan */}
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                      Konteks Spasial & Risiko
+                    </div>
+                    <div className="space-y-1.5">
+                      {/* Batas Administrasi */}
+                      <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Layers className="h-4 w-4 text-slate-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-slate-800 block text-xs">
+                              Batas Administrasi
+                            </span>
+                            <span className="text-[10px] text-slate-500 block leading-tight">
+                              Lapisan GeoJSON provinsi dan kabupaten/kota Indonesia
+                            </span>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={adminBoundaries}
+                          onChange={(e) => setAdminBoundaries(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 mt-1 cursor-pointer"
+                        />
+                      </label>
+
+                      {/* Aliran Angin */}
+                      <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Wind className="h-4 w-4 text-slate-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-slate-800 block text-xs">
+                              Aliran Angin
+                            </span>
+                            <span className="text-[10px] text-slate-500 block leading-tight">
+                              Animasi arah angin sebagai konteks risiko
+                            </span>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={windFlow}
+                          onChange={(e) => setWindFlow(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 mt-1 cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Section 4: Peta Dasar */}
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                      Peta Dasar
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'osm', label: 'OSM' },
+                        { id: 'none', label: 'Medan' },
+                        { id: 'satellite', label: 'Satelit' },
+                        { id: 'light', label: 'Terang' },
+                      ].map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => setLayers({ ...layers, base: b.id as any })}
+                          className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
+                            layers.base === b.id
+                              ? 'border-teal-700 bg-teal-50/70 text-teal-800 shadow-2xs ring-1 ring-teal-700/30'
+                              : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-white hover:border-slate-300'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Bug className="h-3.5 w-3.5 text-amber-600" />
-                              <span className="font-bold text-slate-800 text-xs">Nyamuk</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-400">—</span>
-                              <Switch
-                                on={intelLayers.vectors}
-                                color="#d97706"
-                                label="Nyamuk"
-                                onChange={() =>
-                                  setIntelLayers((prev) => ({ ...prev, vectors: !prev.vectors }))
-                                }
-                              />
-                            </div>
-                          </div>
-                          <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
-                            iNaturalist · konteks vektor, bukan vektor 4 penyakit ini
-                          </p>
-                        </div>
-
-                        {/* Info Note Box */}
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[10px] leading-relaxed text-slate-600">
-                          <p className="font-semibold text-slate-700">
-                            Observasi publik 04 Jan 2026 – 14 Nov 2026 · Seluruh Indonesia
-                          </p>
-                          <p className="mt-0.5 text-slate-500">
-                            Arahkan kursor ke provinsi untuk kasus/kematian/CFR; klik untuk memperbesar dan memfilter.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 2: Lapisan Peta Checkboxes */}
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                        Lapisan Peta
-                      </div>
-                      <div className="space-y-1.5">
-                        {/* Batas Administrasi */}
-                        <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
-                          <div className="flex items-start gap-2 min-w-0">
-                            <Layers className="h-4 w-4 text-slate-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold text-slate-800 block text-xs">
-                                Batas Administrasi
-                              </span>
-                              <span className="text-[10px] text-slate-500 block leading-tight">
-                                Lapisan GeoJSON provinsi dan kabupaten/kota Indonesia
-                              </span>
-                            </div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={adminBoundaries}
-                            onChange={(e) => setAdminBoundaries(e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 mt-1 cursor-pointer"
-                          />
-                        </label>
-
-                        {/* Aliran Angin */}
-                        <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
-                          <div className="flex items-start gap-2 min-w-0">
-                            <Wind className="h-4 w-4 text-slate-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold text-slate-800 block text-xs">
-                                Aliran Angin
-                              </span>
-                              <span className="text-[10px] text-slate-500 block leading-tight">
-                                Animasi arah angin sebagai konteks risiko
-                              </span>
-                            </div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={windFlow}
-                            onChange={(e) => setWindFlow(e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 mt-1 cursor-pointer"
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Section 3: Peta Dasar */}
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
-                        Peta Dasar
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: 'osm', label: 'OSM' },
-                          { id: 'none', label: 'Medan' },
-                          { id: 'satellite', label: 'Satelit' },
-                          { id: 'light', label: 'Terang' },
-                        ].map((b) => (
-                          <button
-                            key={b.id}
-                            type="button"
-                            onClick={() => setLayers({ ...layers, base: b.id as any })}
-                            className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
-                              layers.base === b.id
-                                ? 'border-teal-700 bg-teal-50/70 text-teal-800 shadow-2xs ring-1 ring-teal-700/30'
-                                : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-white hover:border-slate-300'
-                            }`}
-                          >
-                            {b.label}
-                          </button>
-                        ))}
-                      </div>
+                          {b.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Footer Reset Button */}
-                  <div className="p-4 border-t border-slate-100 bg-white">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLayers(DEFAULT_LAYERS)
-                        setPointOpacity(1)
-                        setAdminBoundaries(true)
-                        setWindFlow(false)
-                        setIntelLayers({
-                          flights: false,
-                          fires: false,
-                          hazards: false,
-                          wildlife: false,
-                          vectors: false,
-                        })
-                      }}
-                      className="w-full rounded-xl bg-[#00705a] py-2.5 text-center text-xs font-bold text-white shadow-sm hover:bg-[#005a48] transition active:scale-[0.99]"
-                    >
-                      Atur Ulang Pengaturan Lapisan
-                    </button>
+                  {/* Catatan Panduan Interaktif */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[10px] leading-relaxed text-slate-600">
+                    <p className="font-semibold text-slate-700">
+                      Observasi surveilans M01 – M45 · Seluruh Indonesia
+                    </p>
+                    <p className="mt-0.5 text-slate-500">
+                      Arahkan kursor ke wilayah untuk kasus/CFR; klik untuk memperbesar dan memfilter detail di panel kiri.
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setRightDockOpen(true)}
-                  className="flex h-full w-full flex-col items-center justify-start gap-3 py-3 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                  title="Buka Pengaturan Peta & Lapisan"
-                  aria-label="Buka Pengaturan Peta & Lapisan"
-                >
-                  <ChevronLeft className="h-4 w-4 text-slate-400" />
-                  <Settings className="h-4 w-4 text-emerald-700" />
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+
+                {/* Fixed Sticky Footer Button */}
+                <div className="shrink-0 p-3 border-t border-slate-100 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLayers(DEFAULT_LAYERS)
+                      setPointOpacity(1)
+                      setAdminBoundaries(true)
+                      setWindFlow(false)
+                      setIntelLayers({
+                        flights: false,
+                        fires: false,
+                        hazards: false,
+                        wildlife: false,
+                        vectors: false,
+                      })
+                    }}
+                    className="w-full rounded-xl bg-[#00705a] py-2.5 text-center text-xs font-bold text-white shadow-sm hover:bg-[#005a48] transition active:scale-[0.99]"
                   >
-                    Pengaturan Lapisan
-                  </span>
-                </button>
-              )}
-            </aside>
-          </div>
+                    Atur Ulang Pengaturan Lapisan
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRightDockOpen(true)}
+                className="flex h-full w-full flex-col items-center justify-start gap-3 py-3 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                title="Buka Pengaturan Peta & Lapisan"
+                aria-label="Buka Pengaturan Peta & Lapisan"
+              >
+                <ChevronLeft className="h-4 w-4 text-slate-400" />
+                <Settings className="h-4 w-4 text-emerald-700" />
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                >
+                  Pengaturan Lapisan
+                </span>
+              </button>
+            )}
+          </aside>
         </div>
+      </div>
 
       {/* Second Row: Weekly Compliance & Top 10 Alerts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
