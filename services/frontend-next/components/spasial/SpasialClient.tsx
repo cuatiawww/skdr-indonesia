@@ -102,7 +102,7 @@ export default function SpasialClient() {
   const filterPanel = <FilterBar f={f} set={set} tab={TAB} opsi={opsi.data} opsiLoading={opsi.loading} onClose={() => togglePanel(false)} />
   const alertLabel = f.sumber === 'ebs' ? 'Sinyal EBS' : 'Alert / sinyal'
   return (
-    <div className="mx-auto w-full max-w-[1760px] space-y-4 px-4 pb-10 sm:px-6 lg:px-8" data-testid="spasial-page">
+    <div className="w-full space-y-4 px-4 pb-10 sm:px-6 lg:px-8" data-testid="spasial-page">
       <PageHeader eyebrow="Dasbor Limited" title="Spasial" actions={toggleBtn}
         subtitle="Peta analisa SKDR IBS & EBS: choropleth provinsi/kab-kota dengan drilldown, titik unit pelapor (kluster/heatmap) berstatus KLB, verifikasi dan respons, hotspot, serta putar ulang per minggu epid. Sumber: Laporan EBS, Laporan Agregat IBS, dan Laporan Individu IBS." />
       <div className="flex items-start gap-4">

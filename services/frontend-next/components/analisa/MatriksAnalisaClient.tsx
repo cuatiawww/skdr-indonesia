@@ -76,7 +76,7 @@ export default function MatriksAnalisaClient() {
   )
   const filterPanel = <FilterBar f={f} set={set} tab={tab} opsi={opsi.data} opsiLoading={opsi.loading} onClose={() => togglePanel(false)} />
   return (
-    <div className="mx-auto w-full max-w-[1760px] space-y-4 px-4 pb-10 sm:px-6 lg:px-8" data-testid="matriks-analisa-page">
+    <div className="w-full space-y-4 px-4 pb-10 sm:px-6 lg:px-8" data-testid="matriks-analisa-page">
       <PageHeader eyebrow="Dasbor Limited" title="Matriks Analisa" actions={toggleBtn}
         subtitle="Analisa SKDR IBS & EBS dalam satu halaman: tren minggu epid, matriks penyakit × wilayah, morbiditas, kinerja pelaporan, alert & sinyal, serta profil kasus. Sumber: Laporan EBS, Laporan Agregat IBS, dan Laporan Individu IBS." />
       <div className="flex items-start gap-4">
