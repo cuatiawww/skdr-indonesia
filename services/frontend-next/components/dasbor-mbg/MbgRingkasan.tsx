@@ -55,16 +55,15 @@ export default function MbgRingkasan({ ker, gizi, f, go, mapSection }: { ker: Ke
   const iklDiperiksa = ls ? ls.ikl.memenuhi + ls.ikl.tidak_memenuhi : 0
   const granLabel = GRAN_OPTS.find((x) => x.value === f.gran)?.label
 
-  if (k && g && !k.total_kejadian && !g.total_kunjungan) {
-    return (
-      <Empty title="Belum ada data Program MBG untuk filter ini">
-        Dasbor membaca langsung transaksi <b>Keracunan Pangan MBG</b> dan <b>Pengawasan Gizi MBG</b>. Ubah periode/wilayah di panel filter,
-        atau mulai input laporan melalui menu Program MBG → Keracunan Pangan MBG / Pengawasan Gizi MBG.
-      </Empty>
-    )
-  }
+  const isEmptyAll = Boolean(k && g && !k.total_kejadian && !g.total_kunjungan)
   return (
     <div className="space-y-4" data-testid="mbg-ringkasan">
+      {isEmptyAll ? (
+        <Empty title="Belum ada data Program MBG untuk filter ini">
+          Dasbor membaca langsung transaksi <b>Keracunan Pangan MBG</b> dan <b>Pengawasan Gizi MBG</b>. Ubah periode/wilayah di panel filter,
+          atau mulai input laporan melalui menu Program MBG → Keracunan Pangan MBG / Pengawasan Gizi MBG.
+        </Empty>
+      ) : null}
       {/* Alur: pencegahan → kejadian */}
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-2xs" data-testid="alur-mbg">
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-800"><ClipboardCheck className="h-3.5 w-3.5" /> Pengawasan Gizi = pencegahan (skor SOP, F12/F13)</span>

@@ -1608,13 +1608,13 @@ export default function AseanMap({
           crossOrigin: "anonymous",
         }),
       light: () =>
-        new XYZ({
-          url: "https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        new OSM({
+          url: `${PUBLIC_BASE_PATH}/osm-tiles/{z}/{x}/{y}.png`,
           crossOrigin: "anonymous",
         }),
       dark: () =>
-        new XYZ({
-          url: "https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        new OSM({
+          url: `${PUBLIC_BASE_PATH}/osm-tiles/{z}/{x}/{y}.png`,
           crossOrigin: "anonymous",
         }),
     };

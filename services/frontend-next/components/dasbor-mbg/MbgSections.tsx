@@ -60,13 +60,11 @@ export default function MbgMapSection({ ker, gizi, kMap, setKMap, gMap, setGMap 
   gMap: MapState
   setGMap: (m: MapState) => void
 }) {
-  const kHas = !!ker && (ker.map.regions.length > 0 || ker.map.points.length > 0)
-  const gHas = !!gizi && (gizi.map.regions.length > 0 || gizi.map.points.length > 0)
   return (
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-2" data-testid="mbg-map-section">
       <MapCol tone="red" testId="map-keracunan" title="Peta Keracunan Pangan MBG"
         desc={`Warna wilayah = jumlah kasus; titik = SPPG dengan kejadian (merah tua = ada kematian).${ker ? ` ${nf(ker.kpis.total_kejadian)} kejadian di ${nf(ker.map.regions.length)} wilayah.` : ''}`}>
-        {ker == null ? <SkeletonMap /> : !kHas ? <EmptyBox msg="Belum ada kejadian keracunan pada filter ini." /> : (
+        {ker == null ? <SkeletonMap /> : (
           <EbsIbsLayerMap compact mode="keracunan" title="Kejadian & kasus per wilayah" level={ker.map.level} parentName={kMap.parent?.name}
             regions={ker.map.regions} points={ker.map.points}
             onDrillDown={(id, name) => setKMap({ level: 'kab', parent: { id, name } })} onResetLevel={() => setKMap({ level: 'prov', parent: null })} />
@@ -74,7 +72,7 @@ export default function MbgMapSection({ ker, gizi, kMap, setKMap, gMap, setGMap 
       </MapCol>
       <MapCol tone="emerald" testId="map-pengawasan" title="Peta Pengawasan Gizi MBG"
         desc={`Warna wilayah = rata-rata skor SOP (F3–F11); titik = SPPG diawasi (oranye = skor < 80 atau F12 BELUM BAIK).${gizi ? ` ${nf(gizi.kpis.sppg_unik)} SPPG diawasi.` : ''}`}>
-        {gizi == null ? <SkeletonMap /> : !gHas ? <EmptyBox msg="Belum ada kunjungan pengawasan pada filter ini." /> : (
+        {gizi == null ? <SkeletonMap /> : (
           <EbsIbsLayerMap compact mode="gizi" initialMetric="avg_skor" title="Skor & kesimpulan pengawasan" level={gizi.map.level} parentName={gMap.parent?.name}
             regions={gizi.map.regions} points={gizi.map.points}
             onDrillDown={(id, name) => setGMap({ level: 'kab', parent: { id, name } })} onResetLevel={() => setGMap({ level: 'prov', parent: null })} />
