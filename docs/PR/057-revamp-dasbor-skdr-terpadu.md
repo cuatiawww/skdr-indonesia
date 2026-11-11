@@ -42,7 +42,24 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
      - **Pelepasan Manajemen Alert**: Panel *"MANAJEMEN ALERT - Status Respon Sinyal SKDR"* beserta tab analisa dan tombol toggle-nya telah dilepas seluruhnya dari seksi peta agar tampilan fokus penuh pada sebaran spasial fasyankes dan choropleth.
      - **Dock Kiri Peta (API Terintegrasi & Filter Cepat)**: Panel lipat (*collapsible drawer*, `w-[260px]` / `w-10`) di sisi kiri kanvas peta yang memuat integrasi 5 API eksternal (Penerbangan Domestik, NASA FIRMS Karhutla, BNPB InaRISK, Satwa Liar GBIF, Vektor iNaturalist) serta filter unit fasyankes dan status laporan.
      - **Bawah Peta (Epiweek Replay Player)**: Bilah putar ulang melayang (*floating playback bar*) dengan tombol Play/Pause dan slider scrubber minggu epid 1–52.
-     - **Quick Toggle di Header Seksi**: Tombol pintas `[Lapisan & API Intelijen]` di bilah atas untuk membuka/menutup Dock Kiri secara instan.
+      - **Quick Toggle di Header Seksi**: Tombol pintas `[Unit & Status]` di bilah atas untuk membuka/menutup Dock Kiri secara instan.
+9. **Dock Kanan Peta: Pengaturan Peta & Lapisan (Sesuai Referensi Pengguna)**:
+   - Menggantikan panel Manajemen Alert / Status Respon Sinyal dengan **Dock Kanan "Pengaturan Peta & Lapisan"** yang dapat dilipat (`w-[340px]` saat terbuka, `w-10` saat terlipat) sesuai dengan tangkapan layar referensi pengguna:
+     - **Section 1 (LAPISAN PETA & OPASITAS)**:
+       - `Kasus EBS / PE`: Titik lokasi EBS (83) & PE (775), toggle switch oranye, slider opasitas titik (0.2–1.0) dengan label persentase realtime.
+       - `Arsiran wilayah`: Skala kasus per wilayah (choropleth), toggle switch hijau teal, slider opasitas wilayah (0.2–1.0).
+       - `Burung migran`: Lapisan satwa liar GBIF burung air & pantai (konteks Flu Burung), toggle switch.
+       - `Nyamuk`: Lapisan iNaturalist observasi vektor penyakit, toggle switch.
+       - Kotak catatan panduan observasi publik (04 Jan – 14 Nov 2026, arahan kursor & klik wilayah).
+     - **Section 2 (LAPISAN PETA & ANOMALI RISIKO)**:
+       - `Batas Administrasi`: Lapisan GeoJSON batas provinsi dan kabupaten/kota Indonesia dengan checkbox.
+       - `Aliran Angin`: Animasi arah angin sebagai konteks risiko dengan checkbox.
+     - **Section 3 (PETA DASAR)**:
+       - 2x2 grid tombol pilihan peta dasar: `OSM`, `Medan`, `Satelit`, `Terang`.
+     - **Tombol Reset Lapisan**:
+       - Tombol solid emerald/teal *"Atur Ulang Pengaturan Lapisan"* di bagian bawah drawer untuk mereset seluruh opsi ke konfigurasi bawaan.
+     - **Header Seksi Peta**:
+       - Tombol pintas ganda: `[Unit & Status]` (membuka/menutup dock kiri) dan `[Pengaturan Lapisan]` (membuka/menutup dock kanan).
 
 ## Berkas yang Diubah / Dibuat
 - `database/init/071_dasbor_skdr_unified_submenus.sql`: Migrasi SQL idempoten mendaftarkan 6 subItems di bawah `mod_main_dashboard` pada `app_settings.navigation_menu`.

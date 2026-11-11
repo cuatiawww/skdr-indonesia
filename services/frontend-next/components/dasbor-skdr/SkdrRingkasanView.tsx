@@ -7,17 +7,24 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  Bird,
+  Bug,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Flame,
   Layers,
   MapPin,
   RefreshCw,
+  Settings,
+  Shapes,
   ShieldCheck,
   SlidersHorizontal,
   Stethoscope,
   Users,
+  Wind,
+  X,
 } from 'lucide-react'
 import {
   Bar,
@@ -104,6 +111,36 @@ const REPORT_STATUSES = [
   { label: 'False Alarm / Discarded', count: '3.420' },
 ]
 
+function Switch({
+  on,
+  onChange,
+  color = '#0f766e',
+  label,
+}: {
+  on: boolean
+  onChange: () => void
+  color?: string
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onChange}
+      className="relative h-4 w-7 shrink-0 rounded-full transition cursor-pointer"
+      style={{ background: on ? color : '#cbd5e1' }}
+    >
+      <span
+        className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all ${
+          on ? 'left-3.5' : 'left-0.5'
+        }`}
+      />
+    </button>
+  )
+}
+
 export default function SkdrRingkasanView({
   f,
   onApply,
@@ -119,7 +156,13 @@ export default function SkdrRingkasanView({
 
   // Layout docks
   const [leftDockOpen, setLeftDockOpen] = useState(true)
-  const [leftDockTab, setLeftDockTab] = useState<'api' | 'faskes'>('api')
+  const [leftDockTab, setLeftDockTab] = useState<'api' | 'faskes'>('faskes')
+  const [rightDockOpen, setRightDockOpen] = useState(true)
+
+  // Map layer settings (matching "Pengaturan Peta & Lapisan" drawer)
+  const [pointOpacity, setPointOpacity] = useState(1)
+  const [adminBoundaries, setAdminBoundaries] = useState(true)
+  const [windFlow, setWindFlow] = useState(false)
 
   // Integrated layer toggles & filters
   const [intelLayers, setIntelLayers] = useState({
@@ -402,10 +445,23 @@ export default function SkdrRingkasanView({
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
-                title="Buka / Ciutkan Lapisan & API Intelijen"
+                title="Buka / Ciutkan Unit & Status Laporan"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Lapisan & API Intelijen</span>
+                <span className="hidden sm:inline">Unit & Status</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightDockOpen(!rightDockOpen)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition flex items-center gap-1.5 ${
+                  rightDockOpen
+                    ? 'border-teal-700 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Buka / Ciutkan Pengaturan Peta & Lapisan"
+              >
+                <Settings className="h-3.5 w-3.5 text-emerald-700" />
+                <span className="hidden sm:inline">Pengaturan Lapisan</span>
               </button>
             </div>
           </div>
@@ -606,6 +662,346 @@ export default function SkdrRingkasanView({
                 rightPanel={null}
               />
             </div>
+
+            {/* Right Collapsible Dock: Pengaturan Peta & Lapisan */}
+            <aside
+              className={`shrink-0 border-l border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
+                rightDockOpen ? 'w-[340px]' : 'w-10'
+              }`}
+              data-testid="peta-right-dock"
+            >
+              {rightDockOpen ? (
+                <div className="flex h-full flex-col justify-between overflow-y-auto">
+                  <div className="p-4 space-y-4">
+                    {/* Drawer Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Settings className="h-4 w-4 text-emerald-700" />
+                        <span className="text-sm font-bold text-slate-800">
+                          Pengaturan Peta & Lapisan
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRightDockOpen(false)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        aria-label="Tutup pengaturan peta"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* Section 1: Lapisan Peta Utama */}
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                        Lapisan Peta
+                      </div>
+                      <div className="space-y-2">
+                        {/* Kasus EBS / PE */}
+                        <div
+                          className={`rounded-xl border p-2.5 transition ${
+                            layers.points !== 'off'
+                              ? 'border-orange-200 bg-white shadow-2xs'
+                              : 'border-slate-100 bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-0.5">
+                                <span className="h-2 w-2 rounded-full bg-orange-500" />
+                                <span className="h-2 w-2 rotate-45 bg-teal-600" />
+                              </span>
+                              <span className="font-bold text-slate-800 text-xs">
+                                Kasus EBS / PE
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-xs tabular-nums text-slate-800">
+                                858
+                              </span>
+                              <Switch
+                                on={layers.points !== 'off'}
+                                color="#ea580c"
+                                label="Kasus EBS / PE"
+                                onChange={() =>
+                                  setLayers({
+                                    ...layers,
+                                    points: layers.points !== 'off' ? 'off' : 'kluster',
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-slate-500 ml-4">
+                            Titik lokasi · EBS 83 · PE 775
+                          </p>
+                          {layers.points !== 'off' && (
+                            <div className="mt-2 ml-4 flex items-center gap-2">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                Opasitas
+                              </span>
+                              <input
+                                type="range"
+                                min={0.2}
+                                max={1}
+                                step={0.05}
+                                value={pointOpacity}
+                                onChange={(e) => setPointOpacity(Number(e.target.value))}
+                                className="h-1 flex-1 cursor-pointer accent-orange-600"
+                              />
+                              <span className="w-8 text-right text-[10px] tabular-nums font-bold text-slate-600">
+                                {Math.round(pointOpacity * 100)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Arsiran Wilayah */}
+                        <div
+                          className={`rounded-xl border p-2.5 transition ${
+                            layers.choro
+                              ? 'border-teal-200 bg-white shadow-2xs'
+                              : 'border-slate-100 bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Shapes className="h-3.5 w-3.5 text-teal-700" />
+                              <span className="font-bold text-slate-800 text-xs">
+                                Arsiran wilayah
+                              </span>
+                            </div>
+                            <Switch
+                              on={layers.choro}
+                              color="#0f766e"
+                              label="Arsiran wilayah"
+                              onChange={() => setLayers({ ...layers, choro: !layers.choro })}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
+                            Skala kasus per wilayah (legenda kiri bawah)
+                          </p>
+                          {layers.choro && (
+                            <div className="mt-2 ml-5 flex items-center gap-2">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                Opasitas
+                              </span>
+                              <input
+                                type="range"
+                                min={0.2}
+                                max={1}
+                                step={0.05}
+                                value={layers.opChoro}
+                                onChange={(e) =>
+                                  setLayers({ ...layers, opChoro: Number(e.target.value) })
+                                }
+                                className="h-1 flex-1 cursor-pointer accent-teal-700"
+                              />
+                              <span className="w-8 text-right text-[10px] tabular-nums font-bold text-slate-600">
+                                {Math.round(layers.opChoro * 100)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Burung Migran */}
+                        <div
+                          className={`rounded-xl border p-2.5 transition ${
+                            intelLayers.wildlife
+                              ? 'border-cyan-200 bg-white shadow-2xs'
+                              : 'border-slate-100 bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Bird className="h-3.5 w-3.5 text-cyan-600" />
+                              <span className="font-bold text-slate-800 text-xs">
+                                Burung migran
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-400">—</span>
+                              <Switch
+                                on={intelLayers.wildlife}
+                                color="#0891b2"
+                                label="Burung migran"
+                                onChange={() =>
+                                  setIntelLayers((prev) => ({
+                                    ...prev,
+                                    wildlife: !prev.wildlife,
+                                  }))
+                                }
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
+                            GBIF · burung air & pantai · konteks Flu Burung
+                          </p>
+                        </div>
+
+                        {/* Nyamuk */}
+                        <div
+                          className={`rounded-xl border p-2.5 transition ${
+                            intelLayers.vectors
+                              ? 'border-amber-200 bg-white shadow-2xs'
+                              : 'border-slate-100 bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Bug className="h-3.5 w-3.5 text-amber-600" />
+                              <span className="font-bold text-slate-800 text-xs">Nyamuk</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-400">—</span>
+                              <Switch
+                                on={intelLayers.vectors}
+                                color="#d97706"
+                                label="Nyamuk"
+                                onChange={() =>
+                                  setIntelLayers((prev) => ({ ...prev, vectors: !prev.vectors }))
+                                }
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-slate-500 ml-5">
+                            iNaturalist · konteks vektor, bukan vektor 4 penyakit ini
+                          </p>
+                        </div>
+
+                        {/* Info Note Box */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[10px] leading-relaxed text-slate-600">
+                          <p className="font-semibold text-slate-700">
+                            Observasi publik 04 Jan 2026 – 14 Nov 2026 · Seluruh Indonesia
+                          </p>
+                          <p className="mt-0.5 text-slate-500">
+                            Arahkan kursor ke provinsi untuk kasus/kematian/CFR; klik untuk memperbesar dan memfilter.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Lapisan Peta Checkboxes */}
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                        Lapisan Peta
+                      </div>
+                      <div className="space-y-1.5">
+                        {/* Batas Administrasi */}
+                        <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <Layers className="h-4 w-4 text-slate-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold text-slate-800 block text-xs">
+                                Batas Administrasi
+                              </span>
+                              <span className="text-[10px] text-slate-500 block leading-tight">
+                                Lapisan GeoJSON provinsi dan kabupaten/kota Indonesia
+                              </span>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={adminBoundaries}
+                            onChange={(e) => setAdminBoundaries(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 mt-1 cursor-pointer"
+                          />
+                        </label>
+
+                        {/* Aliran Angin */}
+                        <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <Wind className="h-4 w-4 text-slate-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold text-slate-800 block text-xs">
+                                Aliran Angin
+                              </span>
+                              <span className="text-[10px] text-slate-500 block leading-tight">
+                                Animasi arah angin sebagai konteks risiko
+                              </span>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={windFlow}
+                            onChange={(e) => setWindFlow(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 mt-1 cursor-pointer"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Peta Dasar */}
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                        Peta Dasar
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'osm', label: 'OSM' },
+                          { id: 'none', label: 'Medan' },
+                          { id: 'satellite', label: 'Satelit' },
+                          { id: 'light', label: 'Terang' },
+                        ].map((b) => (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => setLayers({ ...layers, base: b.id as any })}
+                            className={`rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
+                              layers.base === b.id
+                                ? 'border-teal-700 bg-teal-50/70 text-teal-800 shadow-2xs ring-1 ring-teal-700/30'
+                                : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer Reset Button */}
+                  <div className="p-4 border-t border-slate-100 bg-white">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLayers(DEFAULT_LAYERS)
+                        setPointOpacity(1)
+                        setAdminBoundaries(true)
+                        setWindFlow(false)
+                        setIntelLayers({
+                          flights: false,
+                          fires: false,
+                          hazards: false,
+                          wildlife: false,
+                          vectors: false,
+                        })
+                      }}
+                      className="w-full rounded-xl bg-[#00705a] py-2.5 text-center text-xs font-bold text-white shadow-sm hover:bg-[#005a48] transition active:scale-[0.99]"
+                    >
+                      Atur Ulang Pengaturan Lapisan
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRightDockOpen(true)}
+                  className="flex h-full w-full flex-col items-center justify-start gap-3 py-3 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  title="Buka Pengaturan Peta & Lapisan"
+                  aria-label="Buka Pengaturan Peta & Lapisan"
+                >
+                  <ChevronLeft className="h-4 w-4 text-slate-400" />
+                  <Settings className="h-4 w-4 text-emerald-700" />
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    Pengaturan Lapisan
+                  </span>
+                </button>
+              )}
+            </aside>
           </div>
         </div>
 
