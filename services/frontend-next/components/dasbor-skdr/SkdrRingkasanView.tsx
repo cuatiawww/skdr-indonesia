@@ -9,7 +9,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock,
-  Layers,
   MapPin,
   RefreshCw,
   ShieldCheck,
@@ -33,12 +32,35 @@ import dynamic from 'next/dynamic'
 import type { SkdrFilter } from '@/lib/dasbor-skdr-filter'
 import { peFetch } from '@/lib/pe-api'
 import { SkeletonChart } from '@/components/ui/Skeleton'
+import SpasialPanel from '@/components/spasial/SpasialPanel'
+import { DEFAULT_LAYERS, type Focus, type Layers } from '@/components/spasial/SpasialMap'
+import { defaultFilter, useAnalisa, type AFilter } from '@/lib/analisa-api'
+import { decodeTitik, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
+import { useChoroConfig } from '@/lib/choropleth-classes'
 
-const PetaMultiMode = dynamic(() => import('@/components/dashboard/PetaMultiMode'), { ssr: false })
-const SpatialOutbreakMap = dynamic(() => import('@/components/SpatialOutbreakMap'), { ssr: false })
+const SpasialMap = dynamic(() => import('@/components/spasial/SpasialMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[600px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-400">
+      Memuat peta klaster spasial surveilans…
+    </div>
+  ),
+})
 
-export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
+export default function SkdrRingkasanView({
+  f,
+  onApply,
+}: {
+  f: SkdrFilter
+  onApply?: (applied: SkdrFilter) => void
+}) {
   const [loading, setLoading] = useState(true)
+  const [metric, setMetric] = useState<Metric>('kasus')
+  const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS)
+  const [rightOpen, setRightOpen] = useState(false)
+  const [sel, setSel] = useState<Area | null>(null)
+  const [focus, setFocus] = useState<Focus | null>(null)
+
   const [kpiData, setKpiData] = useState({
     totalIbs: 48920,
     totalEbs: 3412,
@@ -47,6 +69,84 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
     verifikasiRate: 91.5,
     cfr: 0.84,
   })
+
+  // Convert Dasbor SKDR Filter to AFilter for Spatial API
+  const aFilter = useMemo<AFilter>(() => {
+    const base = defaultFilter()
+    return {
+      ...base,
+      sumber: f.sumber,
+      sy: f.sy,
+      sw: f.sw,
+      ey: f.ey,
+      ew: f.ew,
+      prov: f.prov?.[0] || '',
+      kab: f.kab?.[0] || '',
+      kec: '',
+      penyakit: f.penyakit,
+    }
+  }, [f.sumber, f.sy, f.sw, f.ey, f.ew, f.prov, f.kab, f.penyakit])
+
+  const sp = useAnalisa<SpasialResp>('spasial', aFilter, {}, true)
+  const data = sp.loading ? null : sp.data
+  const titik = useMemo(() => decodeTitik(sp.data), [sp.data])
+  const choroCfg = useChoroConfig()
+
+  // Sync KPI ribbon with real aggregated spatial data when available
+  useEffect(() => {
+    if (sp.data?.ringkasan) {
+      const r = sp.data.ringkasan
+      setKpiData((prev) => ({
+        ...prev,
+        totalIbs: f.sumber === 'ebs' ? prev.totalIbs : (r.kasus || prev.totalIbs),
+        totalEbs: f.sumber === 'ibs' ? prev.totalEbs : (r.alert || prev.totalEbs),
+        cfr: r.cfr != null ? r.cfr : prev.cfr,
+      }))
+    }
+  }, [sp.data, f.sumber])
+
+  const pickArea = (a: Area, fromMap = false) => {
+    setSel(a)
+    setRightOpen(true)
+    if (!fromMap && a.lat != null && a.lon != null) {
+      setFocus({
+        lat: a.lat,
+        lon: a.lon,
+        area: a,
+        zoom: data?.level === 'provinsi' ? 6.5 : 9.5,
+        nonce: Date.now(),
+      })
+    }
+  }
+
+  const pickTitik = (t: Titik) => {
+    setFocus({ lat: t.lat, lon: t.lon, titik: t, nonce: Date.now() })
+  }
+
+  const onDrill = (a: Area) => {
+    if (onApply) {
+      if (data?.level === 'provinsi') {
+        onApply({ ...f, prov: [String(a.id)], kab: [] })
+      } else {
+        onApply({ ...f, kab: [String(a.id)] })
+      }
+    }
+  }
+
+  const onUp =
+    f.kab && f.kab.length > 0
+      ? () => onApply && onApply({ ...f, kab: [] })
+      : f.prov && f.prov.length > 0
+      ? () => onApply && onApply({ ...f, prov: [], kab: [] })
+      : null
+
+  const METRIC_TABS: { key: Metric; label: string }[] = [
+    { key: 'kasus', label: 'Kasus' },
+    { key: 'alert', label: f.sumber === 'ebs' ? 'Sinyal EBS' : 'Alert / Sinyal' },
+    { key: 'klb', label: 'KLB' },
+    { key: 'cfr', label: 'CFR (%)' },
+    { key: 'kematian', label: 'Kematian' },
+  ]
 
   // Top 10 Disease Alerts
   const topAlertDiseases = [
@@ -191,9 +291,9 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
         </div>
       </div>
 
-      {/* Full-width Spatial Map Section */}
+      {/* Full-width Spatial Map Section with Epiweek Player & Detail Wilayah */}
       <div className="skdr-card p-5 w-full flex flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
               <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
@@ -202,32 +302,58 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
               Sebaran Sinyal Alert IBS & EBS per Fasyankes
             </h3>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Metric Pills */}
+            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
+              {METRIC_TABS.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setMetric(m.key)}
+                  className={`rounded-lg px-2.5 py-1 transition ${
+                    metric === m.key
+                      ? 'bg-white text-primary shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
               Tahun {f.ey} · M{f.sw}–M{f.ew}
             </span>
           </div>
         </div>
-        <div className="mt-4 min-h-[540px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-          <PetaMultiMode
-            query={{
-              start_year: f.sy,
-              start_week: f.sw,
-              end_year: f.ey,
-              end_week: f.ew,
-              source: f.sumber === 'semua' ? undefined : f.sumber,
-              disease: f.penyakit.length ? f.penyakit.join(',') : undefined,
-            }}
-            sumber={f.sumber === 'ibs' ? 'pe' : f.sumber === 'ebs' ? 'ebs' : 'all'}
-            sinyal={
-              <SpatialOutbreakMap
-                countries={[{ name: 'Indonesia', cases: kpiData.totalIbs, deaths: 0 }]}
-                locations={[]}
-                highlightCountry="Indonesia"
-                boundaryScope="indonesia"
-                initialCenter={[118, -2.5]}
-                initialZoom={5}
-                sourceMode={f.sumber === 'ibs' ? 'pe' : f.sumber === 'ebs' ? 'ebs' : 'all'}
+        <div className="mt-4 min-h-[600px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
+          <SpasialMap
+            data={data}
+            titik={titik}
+            metric={metric}
+            setMetric={setMetric}
+            layers={layers}
+            setLayers={setLayers}
+            choroCfg={choroCfg}
+            sumber={f.sumber}
+            selectedId={sel?.id ?? null}
+            onSelectArea={(a) => (a ? pickArea(a, true) : setSel(null))}
+            onDrill={onDrill}
+            onUp={onUp}
+            focus={focus}
+            panelOpen={rightOpen}
+            setPanelOpen={setRightOpen}
+            height={600}
+            rightPanel={
+              <SpasialPanel
+                f={aFilter}
+                data={data}
+                titik={titik}
+                metric={metric}
+                selected={sel}
+                onPickArea={(a) => pickArea(a)}
+                onPickTitik={pickTitik}
+                onClose={() => setRightOpen(false)}
+                onClear={() => setSel(null)}
               />
             }
           />

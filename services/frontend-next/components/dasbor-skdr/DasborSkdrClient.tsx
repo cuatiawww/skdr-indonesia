@@ -169,7 +169,7 @@ export default function DasborSkdrClient({ page: tab }: { page: SkdrTab }) {
 
         {/* Right Active View Content (Clean, No Duplicate In-Card Filters) */}
         <div className="min-w-0 flex-1 w-full">
-          {tab === 'ringkasan' && <SkdrRingkasanView f={f} />}
+          {tab === 'ringkasan' && <SkdrRingkasanView f={f} onApply={handleApply} />}
           {tab === 'tren' && <SkdrTrenView f={f} />}
           {tab === 'distribusi' && <SkdrDistribusiView f={f} />}
           {tab === '717' && <Skdr717View f={f} />}
