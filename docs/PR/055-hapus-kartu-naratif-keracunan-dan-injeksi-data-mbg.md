@@ -19,3 +19,4 @@
 ## Verifikasi
 - `tsc --noEmit` pada `skdr-frontend-next`: **0 error**.
 - Uji migrasi `070_seed_mbg_demo_data.sql` → `070_rollback.sql` → `070_seed_mbg_demo_data.sql` di dalam `--single-transaction` pada `skdr-postgres`: sukses dengan hasil `52` keracunan, `72` kunjungan, dan `891` formulir.
+

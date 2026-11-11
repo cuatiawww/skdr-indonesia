@@ -49,3 +49,4 @@
 ## Verifikasi
 - Migrasi SQL `069_dasbor_mbg_submenu_under_dasbor.sql` dan rollback `069_rollback.sql` diuji pada container `skdr-postgres` (apply → rollback → apply → re-apply idempoten).
 - Pemeriksaan tipe TypeScript (`docker exec skdr-frontend-next npx tsc --noEmit`) menghasilkan **0 error**.
+

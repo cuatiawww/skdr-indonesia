@@ -179,6 +179,74 @@ export type SidebarGroup = {
 const it = (id: string, label: string, href: string, icon: string, order: number, extra: Partial<SidebarItemConfig> = {}): SidebarItemConfig =>
   ({ id, label, href, icon, order, enabled: true, ...extra })
 
+export const DASBOR_SKDR_SUB_ITEMS: SidebarSubItemConfig[] = [
+  {
+    id: 'mod_skdr_ringkasan',
+    label: 'Ringkasan Utama (IBS & EBS)',
+    href: '/dashboard/skdr/ringkasan',
+    icon: 'LayoutDashboard',
+    order: 1,
+    enabled: true,
+    description: 'Sintesis komando surveilans nasional: beban kasus IBS, rumor & sinyal EBS, kelengkapan & ketepatan faskes (target ≥80%), serta peta spasial klaster',
+  },
+  {
+    id: 'mod_skdr_tren',
+    label: 'Tren Penyakit (IBS)',
+    href: '/dashboard/skdr/tren',
+    icon: 'TrendingUp',
+    order: 2,
+    enabled: true,
+    description: 'Kurva epidemiologi mingguan (Minggu 1–52) per penyakit indikator dengan ambang batas (Mean + 2SD), komparasi multi-tahun, multi-wilayah, dan korelasi iklim ERA5',
+  },
+  {
+    id: 'mod_skdr_distribusi',
+    label: 'Distribusi & Demografi',
+    href: '/dashboard/skdr/distribusi',
+    icon: 'Users',
+    order: 3,
+    enabled: true,
+    description: 'Analisa distribusi orang (piramida golongan usia dan jenis kelamin), sebaran unit pelapor (Puskesmas, RS, Klinik, Lab), serta peringkat insidensi wilayah',
+  },
+  {
+    id: 'mod_skdr_717',
+    label: 'WHO 7-1-7 & Kinerja EBS',
+    href: '/dashboard/skdr/717',
+    icon: 'Clock',
+    order: 4,
+    enabled: true,
+    description: 'Pengukuran ketepatan respon standar internasional WHO: deteksi ≤7 hari, notifikasi ≤1 hari, respon ≤7 hari, kualitas sinyal, konversi KLB, dan AAR',
+  },
+  {
+    id: 'mod_skdr_deteksi',
+    label: 'Deteksi Outbreak & Iklim',
+    href: '/dashboard/skdr/deteksi',
+    icon: 'Activity',
+    order: 5,
+    enabled: true,
+    description: 'Algoritma statistik deteksi dini KLB (EARS C1–C3 & Farrington), korelasi titik panas karhutla (NASA FIRMS) vs lonjakan ISPA, serta radar kapasitas IHR/JEE',
+  },
+  {
+    id: 'mod_skdr_buletin',
+    label: 'Buletin & Infografis',
+    href: '/dashboard/skdr/buletin',
+    icon: 'FileText',
+    order: 6,
+    enabled: true,
+    description: 'Generator laporan buletin mingguan otomatis skala nasional/provinsi dan infografis digital responsif siap unduh (PNG) serta cetak PDF',
+  },
+]
+
+export const DASBOR_SKDR_MENU_ITEM: SidebarItemConfig = {
+  id: 'mod_main_dashboard',
+  label: 'Dasbor SKDR',
+  href: '#',
+  icon: 'LayoutDashboard',
+  order: 1,
+  enabled: true,
+  description: 'Dasbor komando surveilans terpadu SKDR: Ringkasan IBS & EBS, Tren Penyakit, Distribusi Demografi, Kinerja 7-1-7, Deteksi Outbreak, dan Buletin',
+  subItems: DASBOR_SKDR_SUB_ITEMS,
+}
+
 export const DASBOR_MBG_SUB_ITEMS: SidebarSubItemConfig[] = [
   {
     id: 'mod_dasbor_mbg_ringkasan',
@@ -224,7 +292,7 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   { id: 'grp_beranda', title: 'Beranda', order: 1, enabled: true, area: 'home', items: [it('mod_beranda', 'Beranda', '/beranda', 'Home', 1)] },
   { id: 'grp_dasbor', title: 'Dasbor', order: 2, enabled: true, area: 'dashboard', items: [
     it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
-    it('mod_main_dashboard', 'Dasbor SKDR', '/main-dashboard', 'LayoutDashboard', 1),
+    DASBOR_SKDR_MENU_ITEM,
     it('mod_dasbor_ebs_ibs', 'Dasbor SKDR EBS & IBS', '/dasbor/ebs-ibs', 'BarChart3', 1.8, { enabled: false, description: 'Dasbor analitik dari Transaksi Form Laporan EBS, Entri Data Agregat IBS, dan Form Individu IBS' }),
     DASBOR_MBG_MENU_ITEM,
     it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),

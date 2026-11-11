@@ -158,3 +158,4 @@ flowchart TD
    - Menggantikan pemanggilan AJAX lama yang mengembalikan potongan HTML (`ajax/get_kota`, `dashboard_tren/grafik-detail`) dengan endpoint API JSON terstandarisasi (`/api/v1/analisa/*`, `/api/v1/dasbor-mbg/*`).
 3. **Form Builder Berbasis Komponen**:
    - Memastikan form 36 penyakit IBS, form 4-tab EBS, dan form 6-tab MBG yang sudah kita miliki di transaksi lokal tetap 100% selaras dengan alur resmi Kemenkes ini, namun dengan antarmuka yang lebih cepat, interaktif, dan ramah pengguna di seluler.
+
