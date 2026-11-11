@@ -288,11 +288,23 @@ export const DASBOR_MBG_MENU_ITEM: SidebarItemConfig = {
   subItems: DASBOR_MBG_SUB_ITEMS,
 }
 
+export const DASBOR_ZOONOSIS_MENU_ITEM: SidebarItemConfig = {
+  id: 'mod_dasbor_kategori',
+  label: 'Dasbor Zoonosis',
+  href: '#',
+  icon: 'Bug',
+  order: 1.7,
+  enabled: true,
+  source: 'disease_categories',
+  description: 'Dasbor analitik penyakit zoonosis dan per kategori',
+}
+
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   { id: 'grp_beranda', title: 'Beranda', order: 1, enabled: true, area: 'home', items: [it('mod_beranda', 'Beranda', '/beranda', 'Home', 1)] },
   { id: 'grp_dasbor', title: 'Dasbor', order: 2, enabled: true, area: 'dashboard', items: [
     it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
     DASBOR_SKDR_MENU_ITEM,
+    DASBOR_ZOONOSIS_MENU_ITEM,
     it('mod_dasbor_ebs_ibs', 'Dasbor SKDR EBS & IBS', '/dasbor/ebs-ibs', 'BarChart3', 1.8, { enabled: false, description: 'Dasbor analitik dari Transaksi Form Laporan EBS, Entri Data Agregat IBS, dan Form Individu IBS' }),
     DASBOR_MBG_MENU_ITEM,
     it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),
@@ -433,30 +445,28 @@ export function ensureBorderCountriesMenu(menu: SidebarGroupConfig[]): SidebarGr
   })
 }
 
-// PR 027: "Dasbor Zoonosis Lite" sits directly under Dasbor Utama. Injected on the client (display only, never saved)
-// so no navigation_menu migration is needed; skipped when the DB menu already has the item.
+// PR 027 / PR 058: "Zoonosis Lite" is now a sub-item under "Dasbor Zoonosis" (mod_dasbor_kategori).
 export const ZOONOSIS_LITE_MENU_ITEM: SidebarItemConfig = {
-  id: 'mod_zoonosis_lite',
-  label: 'Dasbor Zoonosis Lite',
+  id: 'sub_zoonosis_lite',
+  label: 'Zoonosis Lite',
   labelKey: 'skdr.lite.menu',
   icon: 'Activity',
   href: '/dasbor/zoonosis-lite',
   description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
-  order: 1.5,
+  order: 1,
   enabled: true,
 }
 
 export function ensureZoonosisLiteMenu(menu: SidebarGroupConfig[]): SidebarGroupConfig[] {
-  if (menu.some((group) => (group.items || []).some((item) => item.id === ZOONOSIS_LITE_MENU_ITEM.id || item.href === ZOONOSIS_LITE_MENU_ITEM.href))) {
-    return menu
-  }
-  let inserted = false
+  // PR 058: Clean up any legacy loose root-level mod_zoonosis_lite from grp_dasbor
   return menu.map((group) => {
-    if (inserted) return group
-    const main = (group.items || []).find((item) => item.href === '/main-dashboard' || item.id === 'mod_main_dashboard')
-    if (!main) return group
-    inserted = true
-    return { ...group, items: [...(group.items || []), { ...ZOONOSIS_LITE_MENU_ITEM, order: (main.order || 0) + 0.5 }] }
+    if (group.id !== 'grp_dasbor') return group
+    return {
+      ...group,
+      items: (group.items || []).filter(
+        (item) => item.id !== 'mod_zoonosis_lite' && item.href !== '/dasbor/zoonosis-lite'
+      ),
+    }
   })
 }
 
