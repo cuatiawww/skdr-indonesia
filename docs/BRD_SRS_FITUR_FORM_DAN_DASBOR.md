@@ -1,6 +1,6 @@
 # DOKUMEN SPESIFIKASI KEBUTUHAN BISNIS & SISTEM (BRD / SRS)
 ## SISTEM KEWASPADAAN DINI DAN RESPON (SKDR) INDONESIA
-**Versi Dokumen:** 1.1 (Diperbarui sesuai Tampilan & Arsitektur Halaman Terbaru — PR 050)  
+**Versi Dokumen:** 1.1 (Diperbarui sesuai Tampilan & Arsitektur Halaman Terbaru — PR 052)  
 **Tanggal Rilis:** 11 November 2026  
 **Klasifikasi:** Dokumen Fungsional Teknis & Panduan Pengguna  
 **Target Pembaca:** Pemangku Kebijakan (Kemenkes RI, BGN, Dinas Kesehatan Provinsi & Kab/Kota), Ahli Epidemiologi Lapangan (PHEOC), Tim Pengembang, Verifikator Epidemiologi, Petugas Fasyankes & Pengawas SPPG.
@@ -91,7 +91,7 @@ Pada tampilan saat ini, navigasi aplikasi dibagi menjadi dua area melalui sakela
 | **DASBOR** | **Ringkasan Dasbor** | `/dashboard` | Sidebar + Header | Hub kartu pintasan menuju seluruh modul dasbor. |
 | **DASBOR** | **Dasbor SKDR** | `/main-dashboard` | Sidebar + Header | Dasbor eksekutif utama SKDR (sebelumnya bernama *Dasbor Utama*; mendukung sakelar Sumber `EBS` / `IBS`). |
 | **DASBOR** | **Dasbor Zoonosis Lite** | `/dasbor/zoonosis-lite` | Sidebar + Header Ringkas | Dasbor satu layar 4 penyakit zoonosis (EBS + Form PE, terisolasi dari agregat IBS). |
-| **DASBOR** | **Dasbor MBG** | `/dasbor/mbg` | Sidebar + Header | Dasbor 2 tab: *Pengawasan Gizi MBG* (Form 1–13) dan *Keracunan Pangan MBG*. |
+| **DASBOR** | **Dasbor MBG** | `/dasbor/mbg` | Sidebar + Header | Dasbor 3 tab (*Ringkasan & Tautan Risiko*, *Keracunan Pangan*, *Pengawasan Gizi*) + panel filter samping 280px & Ekspor Excel 12 sheet. |
 | **DASBOR** | **Penyakit** | `/penyakit` | Sidebar + Header | Direktori referensi klinis & epidemiologi penyakit terpantau. |
 | **DASBOR** | **Mode TV** | `/tv` | **Layar Penuh Mandiri (`100vw × 100vh`) Tanpa Header & Tanpa Sidebar** | Pusat Komando Spasial & Meja Analisa Epidemiologi penuh peta dengan tombol **`← Kembali ke Spasial`**. |
 | **DASBOR LIMITED** | **Spasial** | `/dashboard/spasial` | Sidebar + Header (*Fluid Auto-Layout*) | Peta analisa SKDR IBS & EBS dengan *filter* samping, KPI, *choropleth*, kluster titik, *playback* mingguan, dan daftar laporan. |
@@ -106,6 +106,7 @@ Pada tampilan saat ini, navigasi aplikasi dibagi menjadi dua area melalui sakela
 | **TRANSAKSI** | **Entri Data Agregat (IBS)** | `/ibs/laporan` | `tatakelola` (baca), `pe_input` (tulis) |
 | **TRANSAKSI** | **Form Individu (IBS)** | `/ibs/individu` | `tatakelola` (baca), `pe_input` (tulis) |
 | **TRANSAKSI** | **Form PE (4 Zoonosis)** | `/pe/cases` | `tatakelola` (baca), `pe_input` / `pe_verify` |
+| **PROGRAM MBG** | **Dasbor MBG** | `/dasbor/mbg` | `dashboard_limited` |
 | **PROGRAM MBG** | **Pengawasan Gizi MBG** | `/pengawasan-gizi` | `tatakelola` (baca), `pe_input` (tulis) |
 | **PROGRAM MBG** | **Keracunan Pangan MBG** | `/keracunan-mbg` | `tatakelola` (baca), `pe_input` (tulis) |
 | **MASTER DATA** | **Provinsi, Kab/Kota, Penyakit, Fasyankes** | `/master/*` | `master_data` |
@@ -310,14 +311,15 @@ Dasbor satu layar (*one-screen dashboard*) untuk pemantauan 4 penyakit zoonosis 
 ---
 
 ### 4.4. Dasbor MBG (`/dasbor/mbg`)
-Dasbor khusus program Makan Bergizi Gratis dengan 2 halaman (*pagination tabs*) yang membaca langsung dari transaksi database tanpa data *dummy*:
-1. **Halaman 1 — Pengawasan Gizi MBG (`mbg_kunjungan` & `mbg_form` F1–F13):**
-   - 6 kartu KPI eksekutif (Total Kunjungan SPPG, Rata-rata Skor Kepatuhan, % SPPG Memenuhi Syarat $\ge 80$, dll.).
-   - Peta Spasial Multi-Layer OpenLayers 10 (*Choropleth* Provinsi $\rightarrow$ *drill-down* Kab/Kota + *Spatial Density Heatmap* + Titik SPPG).
-   - Matriks Heatmap Mingguan (Provinsi $\times$ Minggu & Formulir F1–F13 $\times$ Minggu), profil ketenagaan, dan kepatuhan 8 SOP utama.
-2. **Halaman 2 — Keracunan Pangan MBG (`mbg_keracunan` & `mbg_keracunan_update`):**
-   - 6 kartu KPI insiden (Total Kejadian, Total Kasus Sakit, Rawat Inap, Kematian, Attack Rate rata-rata, dan CFR).
-   - Peta titik insiden keracunan, tren perkembangan harian, distribusi gejala/demografi, evaluasi gap 26 SOP dapur, hasil sampel laboratorium, serta **Korelasi Silang SPPG Keracunan $\times$ Skor Pengawasan Gizi**.
+Dasbor terpadu program Makan Bergizi Gratis (diperbarui pada PR 036 & PR 052) yang dilengkapi **Panel Filter Samping 280px** (Jenis Analisa *Kejadian/Kasus/Meninggal*, rentang tanggal & *preset*, granularitas *Tahun/Bulan/Minggu Epid/Harian*, filter wilayah bertingkat *Provinsi $\rightarrow$ Kab/Kota $\rightarrow$ Kecamatan*, SPPG, sekolah, serta tombol **Ekspor Excel 12 Sheet**) dan **3 Tab Utama**:
+1. **Tab 1 — Ringkasan & Tautan Risiko (*Pengawasan $\times$ Keracunan*):**
+   - Kartu ringkasan Keracunan Pangan, Rekap SLHS & IKL, dan Pengawasan Gizi.
+   - Grafik wilayah ala Kemenkes (*Column / Line / Bar* + pengurutan + label nilai) dan kurva epidemi.
+   - Tabel tautan risiko **SPPG Skor Rendah / Belum Diawasi $\times$ Kejadian Keracunan** serta matriks prioritas pencegahan.
+2. **Tab 2 — Keracunan Pangan MBG (`mbg_keracunan` & `mbg_keracunan_update`):**
+   - KPI insiden (Total Kejadian, Kasus Sakit, Rawat Inap, Kematian, *Attack Rate*, dan **CFR dengan Interval Kepercayaan Wilson 95%**), ketepatan waktu lapor, uji laboratorium & *Turnaround Time* (TAT), pangan yang dicurigai, peta titik insiden, evaluasi gap 26 SOP dapur, serta daftar kejadian interaktif.
+3. **Tab 3 — Pengawasan Gizi MBG (`mbg_kunjungan` & `mbg_form` F1–F13):**
+   - KPI kepatuhan SPPG (Total Kunjungan, Rata-rata Skor, % SPPG Memenuhi Syarat $\ge 80$), tren skor pengawasan, temuan ketidakpatuhan F1–F13, daftar SPPG skor terendah, Peta Spasial Multi-Layer OpenLayers 10 (*Choropleth* + *Heatmap* + Titik SPPG), serta matriks *heatmap* mingguan.
 
 ---
 
@@ -547,4 +549,4 @@ Untuk menjamin integritas data surveilans nasional, sistem menerapkan aturan val
    - Seluruh formulir wizard menyimpan draf otomatis (*autosave* + cadangan lokal peramban) serta dilindungi sesi *cookie* `HttpOnly` (`skdr_session`) dengan *guard* hak akses per endpoint di *backend*.
 
 ---
-*Dokumen ini merupakan panduan fungsional resmi dan acuan pengujian (User Acceptance Testing - UAT) yang telah diselaraskan dengan tampilan dan arsitektur halaman SKDR Indonesia saat ini (hingga PR 050).*
+*Dokumen ini merupakan panduan fungsional resmi dan acuan pengujian (User Acceptance Testing - UAT) yang telah diselaraskan dengan tampilan dan arsitektur halaman SKDR Indonesia saat ini (hingga PR 052).*
