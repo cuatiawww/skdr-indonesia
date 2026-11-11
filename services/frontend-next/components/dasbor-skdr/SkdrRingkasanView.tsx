@@ -120,7 +120,6 @@ export default function SkdrRingkasanView({
   // Layout docks
   const [leftDockOpen, setLeftDockOpen] = useState(true)
   const [leftDockTab, setLeftDockTab] = useState<'api' | 'faskes'>('api')
-  const [rightDockOpen, setRightDockOpen] = useState(true)
 
   // Integrated layer toggles & filters
   const [intelLayers, setIntelLayers] = useState({
@@ -141,14 +140,6 @@ export default function SkdrRingkasanView({
     verifikasiRate: 91.5,
     cfr: 0.84,
   })
-
-  // Simulated alert breakdown by status (Kemenkes standard)
-  const alertStatusData = [
-    { label: 'Terverifikasi (Respon ≤24 Jam)', count: 2840, pct: 72.2, color: '#10b981' },
-    { label: 'Dalam Investigasi / TGC', count: 412, pct: 10.5, color: '#f59e0b' },
-    { label: 'Sinyal Baru (Belum Verifikasi)', count: 160, pct: 4.1, color: '#ef4444' },
-    { label: 'False Alarm / Discarded', count: 520, pct: 13.2, color: '#94a3b8' },
-  ]
 
   // Convert Dasbor SKDR Filter to AFilter for Spatial API
   const aFilter = useMemo<AFilter>(() => {
@@ -370,7 +361,7 @@ export default function SkdrRingkasanView({
         </div>
       </div>
 
-      {/* Peta Spasial Klaster Surveilans Nasional: 1 Section Penuh dengan Dock Kiri (API Intelijen) dan Dock Kanan (Manajemen Alert) */}
+      {/* Peta Spasial Klaster Surveilans Nasional: 1 Section Penuh dengan Dock Kiri (API Intelijen) */}
       <div className="skdr-card p-5 w-full flex flex-col" data-testid="peta-skdr-terpadu">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
@@ -406,7 +397,7 @@ export default function SkdrRingkasanView({
               <button
                 type="button"
                 onClick={() => setLeftDockOpen(!leftDockOpen)}
-                className={`rounded-lg px-2 py-1 text-xs font-bold border transition flex items-center gap-1 ${
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition flex items-center gap-1.5 ${
                   leftDockOpen
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -414,26 +405,13 @@ export default function SkdrRingkasanView({
                 title="Buka / Ciutkan Lapisan & API Intelijen"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">API & Unit</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRightDockOpen(!rightDockOpen)}
-                className={`rounded-lg px-2 py-1 text-xs font-bold border transition flex items-center gap-1 ${
-                  rightDockOpen
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-                title="Buka / Ciutkan Status Respon Sinyal"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Status Respon</span>
+                <span className="hidden sm:inline">Lapisan & API Intelijen</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Map Container with Collapsible Left API & Right Alert Docks */}
+        {/* Map Container with Collapsible Left API Dock */}
         <div className="mt-4 flex min-h-[640px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 relative">
           {/* Left Collapsible Dock: Integrated APIs & Fasyankes Unit Filters */}
           <aside
@@ -628,96 +606,6 @@ export default function SkdrRingkasanView({
                 rightPanel={null}
               />
             </div>
-
-            {/* Right Collapsible Dock: Manajemen Alert (Status Respon Sinyal SKDR) */}
-            <aside
-              className={`shrink-0 border-l border-slate-200 bg-white/95 backdrop-blur z-20 flex flex-col transition-all duration-300 ${
-                rightDockOpen ? 'w-[320px]' : 'w-10'
-              }`}
-              data-testid="peta-right-dock"
-            >
-              {rightDockOpen ? (
-                <div className="flex h-full flex-col justify-between p-4 overflow-y-auto">
-                  <div>
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                          <span>Manajemen Alert</span>
-                        </div>
-                        <h4 className="text-sm font-black text-slate-900 mt-0.5 truncate">
-                          Status Respon Sinyal SKDR
-                        </h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setRightDockOpen(false)}
-                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                        title="Ciutkan panel Manajemen Alert"
-                        aria-label="Ciutkan panel Manajemen Alert"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-600">Total Akumulasi</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-800">
-                        3.932 Sinyal
-                      </span>
-                    </div>
-
-                    <div className="mt-3 space-y-3">
-                      {alertStatusData.map((s) => (
-                        <div
-                          key={s.label}
-                          className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 shadow-2xs"
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-slate-800 leading-tight">{s.label}</span>
-                            <span className="font-black text-slate-900 tabular-nums">
-                              {s.count.toLocaleString('id-ID')}
-                            </span>
-                          </div>
-                          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${s.pct}%`, backgroundColor: s.color }}
-                            />
-                          </div>
-                          <div className="mt-1 text-right text-[10px] font-bold text-slate-500">
-                            {s.pct}% dari total sinyal
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-slate-700">
-                    <span className="font-black text-primary block mb-1">Standar Prosedur Kemenkes</span>
-                    Alert berstatus <strong>SIAGA KLB</strong> wajib diverifikasi oleh Tim TGC Puskesmas /
-                    Dinkes dalam waktu maksimal <strong>24 jam</strong> pasca sinyal muncul.
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setRightDockOpen(true)}
-                  className="flex h-full w-full flex-col items-center justify-start gap-3 py-3 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                  title="Buka panel Manajemen Alert"
-                  aria-label="Buka panel Manajemen Alert"
-                >
-                  <ChevronLeft className="h-4 w-4 text-slate-400" />
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                  >
-                    Manajemen Alert (3.932)
-                  </span>
-                </button>
-              )}
-            </aside>
           </div>
         </div>
 
