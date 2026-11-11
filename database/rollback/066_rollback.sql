@@ -22,3 +22,4 @@ WHERE r.kasus > 0;
 DELETE FROM schema_migrations WHERE filename = '066_surveillance_reports_restore_pe.sql';
 
 COMMIT;
+

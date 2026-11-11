@@ -36,3 +36,4 @@ LEFT JOIN master_locations p ON p.id = r.province_id
 WHERE r.kasus > 0;
 
 COMMIT;
+

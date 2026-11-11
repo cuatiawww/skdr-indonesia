@@ -56,10 +56,21 @@ function baseSource(b: BaseMap) {
 
 type Popup = { kind: 'area'; area: Area } | { kind: 'titik'; t: Titik } | { kind: 'row'; row: any } | { kind: 'cluster'; items: Titik[] }
 
-export default function SpasialMap({ data, titik, metric, setMetric, layers, setLayers, choroCfg, sumber, selectedId, onSelectArea, onDrill, onUp, focus, rightPanel, panelOpen, setPanelOpen, height = 680 }: {
+export interface MapHudCtrl {
+  fitAll: () => void
+  toggleFs: () => void
+  fs: boolean
+  showLegend: boolean
+  setShowLegend: (v: boolean) => void
+  showLayers: boolean
+  setShowLayers: (v: boolean) => void
+}
+
+export default function SpasialMap({ data, titik, metric, setMetric, layers, setLayers, choroCfg, sumber, selectedId, onSelectArea, onDrill, onUp, focus, rightPanel, panelOpen, setPanelOpen, height = 680, fullHeight = false, topHud, leftDock, topOffset, hideDefaultToolbar = false }: {
   data: SpasialResp | null; titik: Titik[]; metric: Metric; setMetric: (m: Metric) => void; layers: Layers; setLayers: (l: Layers) => void
   choroCfg: ChoroConfig | null; sumber: string; selectedId: number | null; onSelectArea: (a: Area | null) => void; onDrill: (a: Area) => void; onUp: (() => void) | null
   focus: Focus | null; rightPanel: ReactNode; panelOpen: boolean; setPanelOpen: (v: boolean) => void; height?: number
+  fullHeight?: boolean; topHud?: ReactNode | ((ctrl: MapHudCtrl) => ReactNode); leftDock?: ReactNode; topOffset?: number; hideDefaultToolbar?: boolean
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const el = useRef<HTMLDivElement>(null)
@@ -228,8 +239,9 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
     const selA = kabSel ? areas.find((a) => a.id === kabSel) : null
     choroSrc.current.getFeatures().forEach((f) => { if (!selA || f.get('code') === selA.code) extend(ext, f.getGeometry()!.getExtent()) })
     if (isEmpty(ext)) return
-    const right = panelOpen && (wrap.current?.clientWidth || 0) > 900 ? 380 : 40
-    m.getView().fit(ext, { padding: [70, right, 70, 40], duration: 300, maxZoom: kabSel ? 11 : 9 })
+    const right = panelOpen && (wrap.current?.clientWidth || 0) > 900 ? (fullHeight ? 400 : 380) : 40
+    const topPad = topOffset ? topOffset + 16 : 70
+    m.getView().fit(ext, { padding: [topPad, right, 70, 40], duration: 300, maxZoom: kabSel ? 11 : 9 })
   }, [geoReady, kabSel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── choropleth style context ──
@@ -303,27 +315,43 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
   const crumbs: any[] = data?.meta?.breadcrumb || []
 
   return (
-    <div ref={wrap} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs" style={{ height: fs ? '100vh' : height }} data-testid="spasial-map" data-base={layers.base}>
+    <div ref={wrap} className={fullHeight ? "relative h-full w-full overflow-hidden bg-slate-100" : "relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs"} style={{ height: fs ? '100vh' : fullHeight ? '100%' : height }} data-testid="spasial-map" data-base={layers.base}>
       <style>{`[data-base="light"] .spasial-base canvas{filter:grayscale(1) brightness(1.08) contrast(0.88)}`}</style>
       <div ref={el} className="absolute inset-0" />
       {geoErr ? <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Batas wilayah gagal dimuat; titik tetap ditampilkan.</div> : null}
 
+      {/* custom top HUD (TV command center) */}
+      {topHud ? (
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-40">
+          {typeof topHud === 'function' ? topHud({ fitAll, toggleFs, fs, showLegend, setShowLegend, showLayers, setShowLayers }) : topHud}
+        </div>
+      ) : null}
+
+      {/* custom left dock (TV layer & triage dock) */}
+      {leftDock ? (
+        <div className="pointer-events-none absolute left-3 z-30 transition-all duration-200" style={{ top: topOffset ?? 64 }}>
+          {leftDock}
+        </div>
+      ) : null}
+
       {/* toolbar */}
-      <div className="absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 px-1.5 py-1 shadow-lg backdrop-blur" data-testid="spasial-toolbar">
-        {onUp ? <button type="button" onClick={onUp} className={btn(false)} title="Naik satu tingkat wilayah" data-testid="spasial-up"><ArrowLeft className="h-4 w-4" /><span className="hidden md:inline">Kembali</span></button> : null}
-        <span className="mx-1 hidden whitespace-nowrap text-[11px] font-black text-slate-800 lg:inline">{crumbs.map((c) => c.label).join(' › ') || 'Indonesia'}</span>
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button type="button" onClick={() => setShowLayers(!showLayers)} className={btn(showLayers)} aria-pressed={showLayers} data-testid="spasial-toggle-layers"><Layers className="h-4 w-4" /><span className="hidden xl:inline">Lapisan</span></button>
-        <button type="button" onClick={() => setShowLegend(!showLegend)} className={btn(showLegend)} aria-pressed={showLegend} data-testid="spasial-toggle-legend"><ListTree className="h-4 w-4" /><span className="hidden xl:inline">Legenda</span></button>
-        <button type="button" onClick={() => setPanelOpen(!panelOpen)} className={btn(panelOpen)} aria-pressed={panelOpen} data-testid="spasial-toggle-panel"><PanelRight className="h-4 w-4" /><span className="hidden xl:inline">Hotspot & detail</span></button>
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button type="button" onClick={fitAll} className={btn(false)} title="Tampilkan seluruh wilayah terpilih" data-testid="spasial-fit"><Crosshair className="h-4 w-4" /></button>
-        <button type="button" onClick={toggleFs} className={btn(fs)} title={fs ? 'Keluar layar penuh' : 'Layar penuh'}>{fs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
-      </div>
+      {!hideDefaultToolbar ? (
+        <div className="absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 px-1.5 py-1 shadow-lg backdrop-blur" data-testid="spasial-toolbar">
+          {onUp ? <button type="button" onClick={onUp} className={btn(false)} title="Naik satu tingkat wilayah" data-testid="spasial-up"><ArrowLeft className="h-4 w-4" /><span className="hidden md:inline">Kembali</span></button> : null}
+          <span className="mx-1 hidden whitespace-nowrap text-[11px] font-black text-slate-800 lg:inline">{crumbs.map((c) => c.label).join(' › ') || 'Indonesia'}</span>
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+          <button type="button" onClick={() => setShowLayers(!showLayers)} className={btn(showLayers)} aria-pressed={showLayers} data-testid="spasial-toggle-layers"><Layers className="h-4 w-4" /><span className="hidden xl:inline">Lapisan</span></button>
+          <button type="button" onClick={() => setShowLegend(!showLegend)} className={btn(showLegend)} aria-pressed={showLegend} data-testid="spasial-toggle-legend"><ListTree className="h-4 w-4" /><span className="hidden xl:inline">Legenda</span></button>
+          <button type="button" onClick={() => setPanelOpen(!panelOpen)} className={btn(panelOpen)} aria-pressed={panelOpen} data-testid="spasial-toggle-panel"><PanelRight className="h-4 w-4" /><span className="hidden xl:inline">Hotspot & detail</span></button>
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+          <button type="button" onClick={fitAll} className={btn(false)} title="Tampilkan seluruh wilayah terpilih" data-testid="spasial-fit"><Crosshair className="h-4 w-4" /></button>
+          <button type="button" onClick={toggleFs} className={btn(fs)} title={fs ? 'Keluar layar penuh' : 'Layar penuh'}>{fs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+        </div>
+      ) : null}
 
       {/* layer switcher */}
       {showLayers ? (
-        <div className="absolute left-3 top-16 z-30 w-[250px] space-y-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur" data-testid="spasial-layers">
+        <div className="absolute left-3 z-30 w-[250px] space-y-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur" style={{ top: topOffset ?? 64 }} data-testid="spasial-layers">
           <div className="flex items-center justify-between"><b className="text-xs font-black text-slate-800">Lapisan peta</b><button type="button" onClick={() => setShowLayers(false)} className="rounded p-0.5 text-slate-400 hover:bg-slate-100" aria-label="Tutup"><X className="h-3.5 w-3.5" /></button></div>
           <div>
             <p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Peta dasar</p>
@@ -355,7 +383,7 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
       {showLegend && !showLayers ? <Legend metric={metric} cls={cls} lvLabel={lvLabel} sumber={sumber} weekly={wi >= 0} points={layers.points !== 'off'} heat={layers.heat} onClose={() => setShowLegend(false)} /> : null}
 
       {/* right panel */}
-      {panelOpen ? <div className="absolute bottom-3 right-3 top-16 z-30 w-[350px] max-w-[calc(100%-24px)]" data-testid="spasial-panel">{rightPanel}</div> : null}
+      {panelOpen ? <div className={`absolute bottom-3 right-3 z-30 ${fullHeight ? 'w-[380px]' : 'w-[350px]'} max-w-[calc(100%-24px)] transition-all duration-200`} style={{ top: topOffset ?? 64 }} data-testid="spasial-panel">{rightPanel}</div> : null}
 
       {/* playback */}
       {weeks.length > 1 ? (
