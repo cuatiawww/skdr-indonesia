@@ -20,8 +20,8 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   }
   return (
     <>
-      {/* PR 017: MODE TV belum dirilis, halaman /tv tampil di shell biasa (navigasi + breadcrumb) */}
-      <AppShell tvMode={false}><AuthGuard>{children}</AuthGuard></AppShell>
+      {/* PR 050: /tv tampil penuh layar (tvMode=true) tanpa header dan tanpa sidebar */}
+      <AppShell tvMode={pathname === '/tv'}><AuthGuard>{children}</AuthGuard></AppShell>
       {toaster}
     </>
   )

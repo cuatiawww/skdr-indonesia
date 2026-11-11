@@ -42,3 +42,4 @@
 - Peta Dasbor Zoonosis Lite kini bersih dan hanya berfokus pada investigasi EBS dan kasus Form PE.
 - Titik agregat mingguan IBS tetap utuh dan tersedia di Dasbor SKDR Utama, Dasbor Spasial, dan Dasbor Matriks Analisa.
 - Integritas data surveilans tetap terjaga tanpa ada data yang terhapus atau dirusak.
+

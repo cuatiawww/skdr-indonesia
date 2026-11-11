@@ -37,6 +37,8 @@ export default function AppShell({
   const isHome = pathname === "/" || pathname === "/beranda";
   // PR 027: Dasbor Zoonosis Lite has its own header title/subtitle (the page body carries no title).
   const isLite = pathname === "/dasbor/zoonosis-lite";
+  // PR 050: Mode TV (/tv) is a full-viewport spatial epidemiological command center (no breadcrumbs/footer/padding).
+  const isTv = pathname === "/tv";
   const homeWrapRef = useRef<HTMLDivElement>(null);
   const [homeBgH, setHomeBgH] = useState(0);
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function AppShell({
 
   if (tvMode)
     return (
-      <main className="min-h-screen bg-slate-950 text-white">{children}</main>
+      <main className="h-screen w-screen overflow-hidden bg-[#f8fafc] text-slate-900">{children}</main>
     );
 
   return (
@@ -128,19 +130,21 @@ export default function AppShell({
             authenticated={authenticated}
             consoleMode={consoleMode}
             transparent={isHome}
-            {...(isLite ? { title: t("skdr.lite.title"), subtitle: t("skdr.lite.subtitle"), compact: true } : {})}
+            {...(isLite ? { title: t("skdr.lite.title"), subtitle: t("skdr.lite.subtitle"), compact: true } : isTv ? { compact: true } : {})}
             onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
           />
         </div>
-        <div className={`w-full flex-1 ${isDirectoryPage ? 'py-0' : 'pb-3 md:pb-5'}`}>
-          {/* PR 018: no breadcrumb on Dasbor Utama or Beranda; PR 027: nor on the one-screen Dasbor Zoonosis Lite */}
-          {pathname === "/main-dashboard" || isLite || isHome ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
-          <div className={isHome ? "" : "pt-3 md:pt-4"}>{children}</div>
+        <div className={`w-full flex-1 ${isDirectoryPage || isTv ? 'py-0' : 'pb-3 md:pb-5'}`}>
+          {/* PR 018: no breadcrumb on Dasbor Utama or Beranda; PR 027: nor on the one-screen Dasbor Zoonosis Lite; PR 050: nor on Mode TV */}
+          {pathname === "/main-dashboard" || isLite || isHome || isTv ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
+          <div className={isHome || isTv ? "" : "pt-3 md:pt-4"}>{children}</div>
         </div>
       </div>
-      <div className="print:hidden">
-        <Footer />
-      </div>
+      {!isTv ? (
+        <div className="print:hidden">
+          <Footer />
+        </div>
+      ) : null}
     </main>
   );
 }

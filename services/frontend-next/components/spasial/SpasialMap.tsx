@@ -56,10 +56,21 @@ function baseSource(b: BaseMap) {
 
 type Popup = { kind: 'area'; area: Area } | { kind: 'titik'; t: Titik } | { kind: 'row'; row: any } | { kind: 'cluster'; items: Titik[] }
 
-export default function SpasialMap({ data, titik, metric, setMetric, layers, setLayers, choroCfg, sumber, selectedId, onSelectArea, onDrill, onUp, focus, rightPanel, panelOpen, setPanelOpen, height = 680 }: {
+export interface MapHudCtrl {
+  fitAll: () => void
+  toggleFs: () => void
+  fs: boolean
+  showLegend: boolean
+  setShowLegend: (v: boolean) => void
+  showLayers: boolean
+  setShowLayers: (v: boolean) => void
+}
+
+export default function SpasialMap({ data, titik, metric, setMetric, layers, setLayers, choroCfg, sumber, selectedId, onSelectArea, onDrill, onUp, focus, rightPanel, panelOpen, setPanelOpen, height = 680, fullHeight = false, topHud, leftDock, topOffset, hideDefaultToolbar = false }: {
   data: SpasialResp | null; titik: Titik[]; metric: Metric; setMetric: (m: Metric) => void; layers: Layers; setLayers: (l: Layers) => void
   choroCfg: ChoroConfig | null; sumber: string; selectedId: number | null; onSelectArea: (a: Area | null) => void; onDrill: (a: Area) => void; onUp: (() => void) | null
   focus: Focus | null; rightPanel: ReactNode; panelOpen: boolean; setPanelOpen: (v: boolean) => void; height?: number
+  fullHeight?: boolean; topHud?: ReactNode | ((ctrl: MapHudCtrl) => ReactNode); leftDock?: ReactNode; topOffset?: number; hideDefaultToolbar?: boolean
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const el = useRef<HTMLDivElement>(null)
@@ -228,8 +239,9 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
     const selA = kabSel ? areas.find((a) => a.id === kabSel) : null
     choroSrc.current.getFeatures().forEach((f) => { if (!selA || f.get('code') === selA.code) extend(ext, f.getGeometry()!.getExtent()) })
     if (isEmpty(ext)) return
-    const right = panelOpen && (wrap.current?.clientWidth || 0) > 900 ? 380 : 40
-    m.getView().fit(ext, { padding: [70, right, 70, 40], duration: 300, maxZoom: kabSel ? 11 : 9 })
+    const right = panelOpen && (wrap.current?.clientWidth || 0) > 900 ? (fullHeight ? 400 : 380) : 40
+    const topPad = topOffset ? topOffset + 16 : 70
+    m.getView().fit(ext, { padding: [topPad, right, 70, 40], duration: 300, maxZoom: kabSel ? 11 : 9 })
   }, [geoReady, kabSel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── choropleth style context ──
@@ -303,70 +315,106 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
   const crumbs: any[] = data?.meta?.breadcrumb || []
 
   return (
-    <div ref={wrap} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs" style={{ height: fs ? '100vh' : height }} data-testid="spasial-map" data-base={layers.base}>
+    <div ref={wrap} className={fullHeight ? "relative h-full w-full overflow-hidden bg-slate-100" : "relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs"} style={{ height: fs ? '100vh' : fullHeight ? '100%' : height }} data-testid="spasial-map" data-base={layers.base}>
       <style>{`[data-base="light"] .spasial-base canvas{filter:grayscale(1) brightness(1.08) contrast(0.88)}`}</style>
       <div ref={el} className="absolute inset-0" />
       {geoErr ? <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Batas wilayah gagal dimuat; titik tetap ditampilkan.</div> : null}
 
-      {/* toolbar */}
-      <div className="absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 px-1.5 py-1 shadow-lg backdrop-blur" data-testid="spasial-toolbar">
-        {onUp ? <button type="button" onClick={onUp} className={btn(false)} title="Naik satu tingkat wilayah" data-testid="spasial-up"><ArrowLeft className="h-4 w-4" /><span className="hidden md:inline">Kembali</span></button> : null}
-        <span className="mx-1 hidden whitespace-nowrap text-[11px] font-black text-slate-800 lg:inline">{crumbs.map((c) => c.label).join(' › ') || 'Indonesia'}</span>
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button type="button" onClick={() => setShowLayers(!showLayers)} className={btn(showLayers)} aria-pressed={showLayers} data-testid="spasial-toggle-layers"><Layers className="h-4 w-4" /><span className="hidden xl:inline">Lapisan</span></button>
-        <button type="button" onClick={() => setShowLegend(!showLegend)} className={btn(showLegend)} aria-pressed={showLegend} data-testid="spasial-toggle-legend"><ListTree className="h-4 w-4" /><span className="hidden xl:inline">Legenda</span></button>
-        <button type="button" onClick={() => setPanelOpen(!panelOpen)} className={btn(panelOpen)} aria-pressed={panelOpen} data-testid="spasial-toggle-panel"><PanelRight className="h-4 w-4" /><span className="hidden xl:inline">Hotspot & detail</span></button>
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button type="button" onClick={fitAll} className={btn(false)} title="Tampilkan seluruh wilayah terpilih" data-testid="spasial-fit"><Crosshair className="h-4 w-4" /></button>
-        <button type="button" onClick={toggleFs} className={btn(fs)} title={fs ? 'Keluar layar penuh' : 'Layar penuh'}>{fs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
-      </div>
-
-      {/* layer switcher */}
-      {showLayers ? (
-        <div className="absolute left-3 top-16 z-30 w-[250px] space-y-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur" data-testid="spasial-layers">
-          <div className="flex items-center justify-between"><b className="text-xs font-black text-slate-800">Lapisan peta</b><button type="button" onClick={() => setShowLayers(false)} className="rounded p-0.5 text-slate-400 hover:bg-slate-100" aria-label="Tutup"><X className="h-3.5 w-3.5" /></button></div>
-          <div>
-            <p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Peta dasar</p>
-            <div className="grid grid-cols-4 gap-1">{([['light', 'Terang'], ['osm', 'OSM'], ['satellite', 'Satelit'], ['none', 'Polos']] as [BaseMap, string][]).map(([k, l]) => (
-              <button key={k} type="button" onClick={() => setLayers({ ...layers, base: k })} className={`rounded-md border px-1 py-1 font-bold ${layers.base === k ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600'}`}>{l}</button>))}</div>
+      {fullHeight ? (
+        <div className="pointer-events-none absolute inset-0 z-30 flex flex-col gap-2.5 p-3">
+          {topHud ? (
+            <div className="shrink-0">
+              {typeof topHud === 'function' ? topHud({ fitAll, toggleFs, fs, showLegend, setShowLegend, showLayers, setShowLayers }) : topHud}
+            </div>
+          ) : null}
+          <div className="flex min-h-0 flex-1 items-start justify-between gap-3">
+            <div className="flex max-h-full flex-col gap-2 overflow-y-auto pr-0.5">
+              {leftDock}
+              {showLegend ? <Legend metric={metric} cls={cls} lvLabel={lvLabel} sumber={sumber} weekly={wi >= 0} points={layers.points !== 'off'} heat={layers.heat} onClose={() => setShowLegend(false)} inline /> : null}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch pb-0.5">
+              {weeks.length > 1 ? (
+                <div className="pointer-events-auto flex w-[min(560px,100%)] items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur" data-testid="spasial-playback">
+                  <button type="button" disabled={!data?.seri} onClick={() => { if (!playing && wi >= weeks.length - 1) setWi(0); else if (!playing && wi < 0) setWi(0); setPlaying(!playing) }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-white disabled:opacity-40" aria-label={playing ? 'Jeda' : 'Putar per minggu epid'} data-testid="spasial-play">
+                    {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
+                  <input type="range" min={-1} max={weeks.length - 1} value={wi} disabled={!data?.seri} onChange={(e) => { setPlaying(false); setWi(Number(e.target.value)) }} className="min-w-0 flex-1 accent-teal-700" aria-label="Minggu epid" data-testid="spasial-week" />
+                  <span className="w-[150px] shrink-0 text-right text-[11px] font-extrabold text-slate-700">{wi < 0 ? `Semua minggu (${weeks[0]?.label} – ${weeks[weeks.length - 1]?.label})` : `Minggu ${weeks[wi]?.label}`}</span>
+                </div>
+              ) : null}
+            </div>
+            {panelOpen ? (
+              <div className="pointer-events-auto h-full w-[380px] shrink-0 max-w-[calc(100vw-24px)]" data-testid="spasial-panel">
+                {rightPanel}
+              </div>
+            ) : null}
           </div>
-          <label className="flex items-center justify-between gap-2 font-bold text-slate-700"><span>Choropleth {lvLabel}</span><input type="checkbox" checked={layers.choro} onChange={(e) => setLayers({ ...layers, choro: e.target.checked })} data-testid="layer-choro" /></label>
-          <label className="block"><span className="mb-0.5 block font-bold text-slate-600">Indikator warna wilayah</span>
-            <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)} className="h-8 w-full rounded-lg border border-slate-200 px-2 font-bold" data-testid="layer-metric">
-              {METRICS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
-            </select></label>
-          <label className="block"><span className="font-bold text-slate-600">Transparansi choropleth</span>
-            <input type="range" min={0.2} max={1} step={0.05} value={layers.opChoro} onChange={(e) => setLayers({ ...layers, opChoro: Number(e.target.value) })} className="w-full" /></label>
-          <div><p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Titik unit pelapor</p>
-            <div className="grid grid-cols-3 gap-1">{([['kluster', 'Kluster'], ['titik', 'Titik'], ['off', 'Sembunyi']] as [PointMode, string][]).map(([k, l]) => (
-              <button key={k} type="button" onClick={() => setLayers({ ...layers, points: k })} data-testid={`layer-points-${k}`} className={`rounded-md border px-1 py-1 font-bold ${layers.points === k ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600'}`}>{l}</button>))}</div></div>
-          <label className="flex items-center justify-between gap-2 font-bold text-slate-700"><span>Heatmap kasus</span><input type="checkbox" checked={layers.heat} onChange={(e) => setLayers({ ...layers, heat: e.target.checked })} data-testid="layer-heat" /></label>
-          <div><p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Status titik</p>
-            <div className="flex flex-wrap gap-1">{statusOpts.map((s) => { const on = !layers.status.length || layers.status.includes(s); return (
-              <button key={s} type="button" title={STATUS[s].tip} onClick={() => { const cur = layers.status.length ? layers.status : statusOpts; const n = on ? cur.filter((x) => x !== s) : [...cur, s]; setLayers({ ...layers, status: n.length === statusOpts.length ? [] : n }) }}
-                className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-bold ${on ? 'border-slate-300 bg-white text-slate-700' : 'border-slate-200 bg-slate-100 text-slate-400 line-through'}`}>
-                <span className="h-2 w-2 rounded-full" style={{ background: STATUS[s].color }} />{STATUS[s].label}</button>) })}</div></div>
-          <label className="flex items-center justify-between gap-2 font-bold text-slate-700"><span>Kasus minimal per unit</span>
-            <input type="number" min={0} value={layers.kasusMin || ''} placeholder="0" onChange={(e) => setLayers({ ...layers, kasusMin: Math.max(0, Number(e.target.value) || 0) })} className="h-7 w-20 rounded-md border border-slate-200 px-1.5 text-right" /></label>
         </div>
-      ) : null}
+      ) : (
+        <>
+          {/* toolbar */}
+          {!hideDefaultToolbar ? (
+            <div className="absolute left-1/2 top-3 z-40 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 px-1.5 py-1 shadow-lg backdrop-blur" data-testid="spasial-toolbar">
+              {onUp ? <button type="button" onClick={onUp} className={btn(false)} title="Naik satu tingkat wilayah" data-testid="spasial-up"><ArrowLeft className="h-4 w-4" /><span className="hidden md:inline">Kembali</span></button> : null}
+              <span className="mx-1 hidden whitespace-nowrap text-[11px] font-black text-slate-800 lg:inline">{crumbs.map((c) => c.label).join(' › ') || 'Indonesia'}</span>
+              <span className="mx-1 h-5 w-px bg-slate-200" />
+              <button type="button" onClick={() => setShowLayers(!showLayers)} className={btn(showLayers)} aria-pressed={showLayers} data-testid="spasial-toggle-layers"><Layers className="h-4 w-4" /><span className="hidden xl:inline">Lapisan</span></button>
+              <button type="button" onClick={() => setShowLegend(!showLegend)} className={btn(showLegend)} aria-pressed={showLegend} data-testid="spasial-toggle-legend"><ListTree className="h-4 w-4" /><span className="hidden xl:inline">Legenda</span></button>
+              <button type="button" onClick={() => setPanelOpen(!panelOpen)} className={btn(panelOpen)} aria-pressed={panelOpen} data-testid="spasial-toggle-panel"><PanelRight className="h-4 w-4" /><span className="hidden xl:inline">Hotspot & detail</span></button>
+              <span className="mx-1 h-5 w-px bg-slate-200" />
+              <button type="button" onClick={fitAll} className={btn(false)} title="Tampilkan seluruh wilayah terpilih" data-testid="spasial-fit"><Crosshair className="h-4 w-4" /></button>
+              <button type="button" onClick={toggleFs} className={btn(fs)} title={fs ? 'Keluar layar penuh' : 'Layar penuh'}>{fs ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+            </div>
+          ) : null}
 
-      {/* legend */}
-      {showLegend && !showLayers ? <Legend metric={metric} cls={cls} lvLabel={lvLabel} sumber={sumber} weekly={wi >= 0} points={layers.points !== 'off'} heat={layers.heat} onClose={() => setShowLegend(false)} /> : null}
+          {/* layer switcher */}
+          {showLayers ? (
+            <div className="absolute left-3 z-30 w-[250px] space-y-2 rounded-2xl border border-slate-200 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur" style={{ top: topOffset ?? 64 }} data-testid="spasial-layers">
+              <div className="flex items-center justify-between"><b className="text-xs font-black text-slate-800">Lapisan peta</b><button type="button" onClick={() => setShowLayers(false)} className="rounded p-0.5 text-slate-400 hover:bg-slate-100" aria-label="Tutup"><X className="h-3.5 w-3.5" /></button></div>
+              <div>
+                <p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Peta dasar</p>
+                <div className="grid grid-cols-4 gap-1">{([['light', 'Terang'], ['osm', 'OSM'], ['satellite', 'Satelit'], ['none', 'Polos']] as [BaseMap, string][]).map(([k, l]) => (
+                  <button key={k} type="button" onClick={() => setLayers({ ...layers, base: k })} className={`rounded-md border px-1 py-1 font-bold ${layers.base === k ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600'}`}>{l}</button>))}</div>
+              </div>
+              <label className="flex items-center justify-between gap-2 font-bold text-slate-700"><span>Choropleth {lvLabel}</span><input type="checkbox" checked={layers.choro} onChange={(e) => setLayers({ ...layers, choro: e.target.checked })} data-testid="layer-choro" /></label>
+              <label className="block"><span className="mb-0.5 block font-bold text-slate-600">Indikator warna wilayah</span>
+                <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)} className="h-8 w-full rounded-lg border border-slate-200 px-2 font-bold" data-testid="layer-metric">
+                  {METRICS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+                </select></label>
+              <label className="block"><span className="font-bold text-slate-600">Transparansi choropleth</span>
+                <input type="range" min={0.2} max={1} step={0.05} value={layers.opChoro} onChange={(e) => setLayers({ ...layers, opChoro: Number(e.target.value) })} className="w-full" /></label>
+              <div><p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Titik unit pelapor</p>
+                <div className="grid grid-cols-3 gap-1">{([['kluster', 'Kluster'], ['titik', 'Titik'], ['off', 'Sembunyi']] as [PointMode, string][]).map(([k, l]) => (
+                  <button key={k} type="button" onClick={() => setLayers({ ...layers, points: k })} data-testid={`layer-points-${k}`} className={`rounded-md border px-1 py-1 font-bold ${layers.points === k ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600'}`}>{l}</button>))}</div></div>
+              <label className="flex items-center justify-between gap-2 font-bold text-slate-700"><span>Heatmap kasus</span><input type="checkbox" checked={layers.heat} onChange={(e) => setLayers({ ...layers, heat: e.target.checked })} data-testid="layer-heat" /></label>
+              <div><p className="mb-1 font-extrabold uppercase tracking-wider text-slate-500">Status titik</p>
+                <div className="flex flex-wrap gap-1">{statusOpts.map((s) => { const on = !layers.status.length || layers.status.includes(s); return (
+                  <button key={s} type="button" title={STATUS[s].tip} onClick={() => { const cur = layers.status.length ? layers.status : statusOpts; const n = on ? cur.filter((x) => x !== s) : [...cur, s]; setLayers({ ...layers, status: n.length === statusOpts.length ? [] : n }) }}
+                    className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-bold ${on ? 'border-slate-300 bg-white text-slate-700' : 'border-slate-200 bg-slate-100 text-slate-400 line-through'}`}>
+                    <span className="h-2 w-2 rounded-full" style={{ background: STATUS[s].color }} />{STATUS[s].label}</button>) })}</div></div>
+              <label className="flex items-center justify-between gap-2 font-bold text-slate-700"><span>Kasus minimal per unit</span>
+                <input type="number" min={0} value={layers.kasusMin || ''} placeholder="0" onChange={(e) => setLayers({ ...layers, kasusMin: Math.max(0, Number(e.target.value) || 0) })} className="h-7 w-20 rounded-md border border-slate-200 px-1.5 text-right" /></label>
+            </div>
+          ) : null}
 
-      {/* right panel */}
-      {panelOpen ? <div className="absolute bottom-3 right-3 top-16 z-30 w-[350px] max-w-[calc(100%-24px)]" data-testid="spasial-panel">{rightPanel}</div> : null}
+          {/* legend */}
+          {showLegend && !showLayers ? <Legend metric={metric} cls={cls} lvLabel={lvLabel} sumber={sumber} weekly={wi >= 0} points={layers.points !== 'off'} heat={layers.heat} onClose={() => setShowLegend(false)} /> : null}
 
-      {/* playback */}
-      {weeks.length > 1 ? (
-        <div className={`absolute bottom-3 left-1/2 z-30 flex w-[min(560px,calc(100%-24px))] -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur ${panelOpen ? 'lg:-ml-[175px]' : ''}`} data-testid="spasial-playback">
-          <button type="button" disabled={!data?.seri} onClick={() => { if (!playing && wi >= weeks.length - 1) setWi(0); else if (!playing && wi < 0) setWi(0); setPlaying(!playing) }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-white disabled:opacity-40" aria-label={playing ? 'Jeda' : 'Putar per minggu epid'} data-testid="spasial-play">
-            {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
-          <input type="range" min={-1} max={weeks.length - 1} value={wi} disabled={!data?.seri} onChange={(e) => { setPlaying(false); setWi(Number(e.target.value)) }} className="min-w-0 flex-1 accent-teal-700" aria-label="Minggu epid" data-testid="spasial-week" />
-          <span className="w-[150px] shrink-0 text-right text-[11px] font-extrabold text-slate-700">{wi < 0 ? `Semua minggu (${weeks[0]?.label} – ${weeks[weeks.length - 1]?.label})` : `Minggu ${weeks[wi]?.label}`}</span>
-        </div>
-      ) : null}
+          {/* right panel */}
+          {panelOpen ? <div className="absolute bottom-3 right-3 z-30 w-[350px] max-w-[calc(100%-24px)] transition-all duration-200" style={{ top: topOffset ?? 64 }} data-testid="spasial-panel">{rightPanel}</div> : null}
+
+          {/* playback */}
+          {weeks.length > 1 ? (
+            <div className={`absolute bottom-3 left-1/2 z-30 flex w-[min(560px,calc(100%-24px))] -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur ${panelOpen ? 'lg:-ml-[175px]' : ''}`} data-testid="spasial-playback">
+              <button type="button" disabled={!data?.seri} onClick={() => { if (!playing && wi >= weeks.length - 1) setWi(0); else if (!playing && wi < 0) setWi(0); setPlaying(!playing) }}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-white disabled:opacity-40" aria-label={playing ? 'Jeda' : 'Putar per minggu epid'} data-testid="spasial-play">
+                {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
+              <input type="range" min={-1} max={weeks.length - 1} value={wi} disabled={!data?.seri} onChange={(e) => { setPlaying(false); setWi(Number(e.target.value)) }} className="min-w-0 flex-1 accent-teal-700" aria-label="Minggu epid" data-testid="spasial-week" />
+              <span className="w-[150px] shrink-0 text-right text-[11px] font-extrabold text-slate-700">{wi < 0 ? `Semua minggu (${weeks[0]?.label} – ${weeks[weeks.length - 1]?.label})` : `Minggu ${weeks[wi]?.label}`}</span>
+            </div>
+          ) : null}
+        </>
+      )}
 
       {hover && !popup ? <div className="pointer-events-none absolute z-30 rounded-lg border border-slate-200 bg-white/95 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow" style={{ left: hover.x + 14, top: hover.y + 10 }}>{hover.text}</div> : null}
 
@@ -445,11 +493,11 @@ function TitikPopup({ t, wi, label, weeks }: { t: Titik; wi: number; label?: str
   )
 }
 
-function Legend({ metric, cls, lvLabel, sumber, weekly, points, heat, onClose }: { metric: Metric; cls: MapClass[]; lvLabel: string; sumber: string; weekly: boolean; points: boolean; heat: boolean; onClose: () => void }) {
+function Legend({ metric, cls, lvLabel, sumber, weekly, points, heat, onClose, inline = false }: { metric: Metric; cls: MapClass[]; lvLabel: string; sumber: string; weekly: boolean; points: boolean; heat: boolean; onClose: () => void; inline?: boolean }) {
   const [col, setCol] = useState(false)
   const mt = METRICS.find((x) => x.key === metric)!
   return (
-    <div className="absolute bottom-16 left-3 z-30 w-[240px] rounded-xl border border-slate-200 bg-white/95 p-2.5 text-[10.5px] text-slate-600 shadow-lg backdrop-blur" data-testid="spasial-legend">
+    <div className={inline ? "pointer-events-auto w-[265px] rounded-2xl border border-slate-200 bg-white/95 p-3 text-[10.5px] text-slate-600 shadow-lg backdrop-blur" : "absolute bottom-16 left-3 z-30 w-[240px] rounded-xl border border-slate-200 bg-white/95 p-2.5 text-[10.5px] text-slate-600 shadow-lg backdrop-blur"} data-testid="spasial-legend">
       <div className="flex items-center justify-between gap-1">
         <button type="button" onClick={() => setCol(!col)} className="flex flex-1 items-center gap-1 text-left text-[10px] font-black uppercase tracking-wide text-slate-500">Legenda {col ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</button>
         <button type="button" onClick={onClose} className="rounded p-0.5 text-slate-400 hover:bg-slate-100" aria-label="Tutup legenda"><X className="h-3 w-3" /></button>
