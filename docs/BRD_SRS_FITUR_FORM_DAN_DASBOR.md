@@ -1,15 +1,15 @@
 # DOKUMEN SPESIFIKASI KEBUTUHAN BISNIS & SISTEM (BRD / SRS)
 ## SISTEM KEWASPADAAN DINI DAN RESPON (SKDR) INDONESIA
-**Versi Dokumen:** 1.0  
+**Versi Dokumen:** 1.1 (Diperbarui sesuai Tampilan & Arsitektur Halaman Terbaru — PR 050)  
 **Tanggal Rilis:** 11 November 2026  
 **Klasifikasi:** Dokumen Fungsional Teknis & Panduan Pengguna  
-**Target Pembaca:** Pemangku Kebijakan (Kemenkes RI, BGN, Dinas Kesehatan Provinsi & Kab/Kota), Tim Pengembang, Verifikator Epidemiologi, Petugas Fasyankes & Pengawas SPPG.
+**Target Pembaca:** Pemangku Kebijakan (Kemenkes RI, BGN, Dinas Kesehatan Provinsi & Kab/Kota), Ahli Epidemiologi Lapangan (PHEOC), Tim Pengembang, Verifikator Epidemiologi, Petugas Fasyankes & Pengawas SPPG.
 
 ---
 
 ## DAFTAR ISI
 1. [Ringkasan Eksekutif & Tujuan Sistem](#1-ringkasan-eksekutif--tujuan-sistem)
-2. [Manajemen Akses & Matriks Peran Pengguna (RBAC)](#2-manajemen-akses--matriks-peran-pengguna-rbac)
+2. [Manajemen Akses, Struktur Menu Sidebar & Matriks Peran (RBAC)](#2-manajemen-akses-struktur-menu-sidebar--matriks-peran-rbac)
 3. [Spesifikasi Seluruh Formulir Transaksi (Input Data)](#3-spesifikasi-seluruh-formulir-transaksi-input-data)
    - 3.1. Laporan EBS (Surveilans Berbasis Kejadian)
    - 3.2. Laporan Agregat IBS (Surveilans Berbasis Indikator Mingguan)
@@ -17,19 +17,22 @@
    - 3.4. Pengawasan Gizi MBG (Makan Bergizi Gratis - 13 Formulir Kemenkes)
    - 3.5. Keracunan Pangan MBG (Investigasi Insiden KLB Pangan & Pemantauan Harian)
    - 3.6. Penyelidikan Epidemiologi (Form PE 4 Penyakit Zoonosis One Health)
-4. [Spesifikasi Seluruh Modul Dasbor (Output & Analitik)](#4-spesifikasi-seluruh-modul-dasbor-output--analitik)
-   - 4.1. Dasbor Utama (`/main-dashboard`)
-   - 4.2. Dasbor Zoonosis Lite (`/dasbor/zoonosis-lite`)
-   - 4.3. Dasbor EBS & IBS (`/dasbor/ebs-ibs`)
+4. [Spesifikasi Seluruh Modul Dasbor (Output & Analitik Saat Ini)](#4-spesifikasi-seluruh-modul-dasbor-output--analitik-saat-ini)
+   - 4.1. Ringkasan Dasbor (`/dashboard`) & Beranda (`/`, `/beranda`)
+   - 4.2. Dasbor SKDR (`/main-dashboard`)
+   - 4.3. Dasbor Zoonosis Lite (`/dasbor/zoonosis-lite`)
    - 4.4. Dasbor MBG (`/dasbor/mbg`)
-   - 4.5. Dasbor Limited - Spasial (`/dashboard/spasial`)
-   - 4.6. Dasbor Limited - Matriks Analisa (`/dashboard/matriks-analisa`)
-   - 4.7. Beranda & Portal Publik (`/` dan `/beranda`)
+   - 4.5. Direktori Penyakit (`/penyakit`)
+   - 4.6. Mode TV — Pusat Komando Spasial & Meja Analisa Epidemiologi (`/tv`)
+   - 4.7. Dasbor Limited — Spasial (`/dashboard/spasial`)
+   - 4.8. Dasbor Limited — Matriks Analisa (`/dashboard/matriks-analisa`)
+   - 4.9. Dasbor Arsip Tersembunyi — Dasbor SKDR EBS & IBS (`/dasbor/ebs-ibs`)
 5. [Diagram Alur Pengguna (User Flows)](#5-diagram-alur-pengguna-user-flows)
    - Alur 1: Pelaporan Mingguan Rutin IBS & Pemicuan Alert
    - Alur 2: Deteksi Rumor EBS & Respons Cepat 7-1-7
    - Alur 3: Pengawasan Higiene SPPG & Penanggulangan Keracunan Pangan MBG
-   - Alur 4: Siklus Verifikasi Penyelidikan Epidemiologi (PE)
+   - Alur 4: Siklus Verifikasi Penyelidikan Epidemiologi (PE) & Isolasi Peta Zoonosis Lite
+   - Alur 5: Triase Spasial & Kajian Epidemiologi di Ruang Komando Mode TV (`/tv`)
 6. [Matriks Hubungan Input Formulir ke Dasbor (Data Mapping Matrix)](#6-matriks-hubungan-input-formulir-ke-dasbor-data-mapping-matrix)
 7. [Aturan Validasi & Penjaminan Kualitas Data](#7-aturan-validasi--penjaminan-kualitas-data)
 
@@ -41,30 +44,33 @@
 Sistem Kewaspadaan Dini dan Respon (SKDR) Indonesia dirancang untuk mendeteksi secara dini adanya ancaman Kejadian Luar Biasa (KLB), wabah penyakit menular potensial, serta kedaruratan kesehatan masyarakat termasuk penyakit zoonosis One Health dan insiden keamanan pangan pada program Makan Bergizi Gratis (MBG).
 
 ### 1.2. Prinsip Arsitektur Data
-1. **100% Berbasis Transaksi Terverifikasi:** Seluruh data yang disajikan di dasbor dan analitik bersumber dari formulir pelaporan resmi di lapangan (Puskesmas, Rumah Sakit, Klinik, Laboratorium, dan SPPG). Sistem tidak menggunakan teknik web scraping, crawling, atau inferensi teks NLP yang tidak terverifikasi.
-2. **Kewaspadaan Dini Otomatis:** Perhitungan ambang batas alert (*threshold*) berjalan secara deterministik matematis (membandingkan tren minggu berjalan dengan rata-rata periode acuan sebelumnya).
+1. **100% Berbasis Transaksi & Sinkronisasi Resmi:** Seluruh data yang disajikan di dasbor dan analitik bersumber dari formulir pelaporan resmi di lapangan (Puskesmas, Rumah Sakit, Klinik, Laboratorium, dan SPPG) serta sinkronisasi API resmi SKDR Kemenkes (`ebs_reports` $\rightarrow$ `laporan_ebs`, `skdr_alerts` $\rightarrow$ `laporan_ibs`). Sistem tidak menggunakan teknik web scraping, crawling, atau inferensi teks NLP yang tidak terverifikasi.
+2. **Isolasi Sumber Data sesuai Konteks Klinis:**
+   - **Dasbor SKDR (`/main-dashboard`)**, **Spasial (`/dashboard/spasial`)**, **Matriks Analisa (`/dashboard/matriks-analisa`)**, dan **Mode TV (`/tv`)** mendukung pemisahan dan penggabungan eksplisit antara **Sumber IBS** (Laporan Agregat & Individu IBS) dan **Sumber EBS** (Laporan Sinyal EBS).
+   - **Dasbor Zoonosis Lite (`/dasbor/zoonosis-lite`)** secara khusus diisolasi dari data agregat mingguan IBS (`source_type: 'ibs'` dikecualikan) sehingga murni menampilkan **Sinyal EBS** dan **Kasus Investigasi Form PE (`pe_cases`)** untuk 4 penyakit zoonosis prioritas tanpa tertimbun ribuan titik agregat puskesmas rutin.
 3. **Penyelarasan Standar Global (7-1-7 Target):** Mengadopsi tolok ukur respons kedaruratan kesehatan global (Resolve to Save Lives / WHO):
    - **7 Hari:** Deteksi dini sejak onset gejala.
-   - **1 Hari (24 Jam):** Notifikasi resmi ke dinas kesehatan / otoritas surveilans.
+   - **1 Hari (24 Jam):** Notifikasi resmi & verifikasi sinyal oleh dinas kesehatan.
    - **7 Hari:** Respon tindakan awal penyelidikan dan pengendalian di lapangan.
 
 ---
 
-## 2. MANAJEMEN AKSES & MATRIKS PERAN PENGGUNA (RBAC)
+## 2. MANAJEMEN AKSES, STRUKTUR MENU SIDEBAR & MATRIKS PERAN (RBAC)
 
-Sistem menerapkan kontrol akses berbasis peran (*Role-Based Access Control*) yang memisahkan modul publik, dasbor analitik, tata kelola data transaksi, dan administrasi sistem.
+Sistem menerapkan kontrol akses berbasis peran (*Role-Based Access Control*) yang memisahkan halaman publik, area **Dasbor**, dan area **Tata Kelola**.
 
 ```mermaid
 flowchart TD
     User([Pengguna]) --> Login{Status Login?}
-    Login -- Belum Login --> PubPages["Halaman Publik:\n• Beranda (/) \n• Login (/login)"]
+    Login -- Belum Login --> PubPages["Halaman Publik:\n• Landing Page (/)\n• Login (/login)"]
     Login -- Sudah Login --> CheckRole{Cek Role & Permission}
     
-    CheckRole -- "viewer" --> DashLim["Dasbor Terbatas:\n• Dasbor Utama\n• Dasbor Spasial\n• Dasbor Matriks Analisa"]
-    CheckRole -- "petugas" --> InputArea["Input Data:\n• Form PE (Input)\n• Laporan EBS/IBS\n• MBG Gizi & Keracunan"]
-    CheckRole -- "verifikator" --> VerifArea["Verifikasi Data:\n• Form PE (Verifikasi & Final)\n• Penelaahan Alert SKDR"]
-    CheckRole -- "pengelola" --> ManageArea["Pengelolaan:\n• Master Data Wilayah & Penyakit\n• Konfigurasi Integrasi"]
-    CheckRole -- "admin" --> FullArea["Akses Penuh (*):\n• Tata Kelola Akun & Hak Akses\n• Log Aktivitas & Konfigurasi Global"]
+    CheckRole -- "Semua Peran Login" --> DashPublic["Grup DASBOR:\n• Ringkasan Dasbor (/dashboard)\n• Dasbor SKDR (/main-dashboard)\n• Dasbor Zoonosis Lite (/dasbor/zoonosis-lite)\n• Dasbor MBG (/dasbor/mbg)\n• Penyakit (/penyakit)\n• Mode TV Spasial (/tv)"]
+    CheckRole -- "viewer / dashboard_limited" --> DashLim["Grup DASBOR LIMITED:\n• Spasial (/dashboard/spasial)\n• Matriks Analisa (/dashboard/matriks-analisa)"]
+    CheckRole -- "petugas (pe_input)" --> InputArea["Area TATA KELOLA (Input):\n• Laporan EBS & IBS (Agregat/Individu)\n• Form PE 4 Zoonosis\n• MBG Pengawasan Gizi & Keracunan"]
+    CheckRole -- "verifikator (pe_verify)" --> VerifArea["Verifikasi Data:\n• Verifikasi & Finalisasi Form PE\n• Penelaahan Alert SKDR"]
+    CheckRole -- "pengelola (master_data, integrasi)" --> ManageArea["Pengelolaan:\n• Master Wilayah, Penyakit & Fasyankes\n• Sinkronisasi Integrasi API"]
+    CheckRole -- "admin (*)" --> FullArea["Manajemen Akses:\n• Pengguna (/tatakelola/pengguna)\n• Peran (/tatakelola/peran)\n• Log Akses (/tatakelola/log-akses)"]
 ```
 
 ### 2.1. Matriks Peran Pengguna
@@ -74,12 +80,37 @@ flowchart TD
 | `pengelola` | Pengelola Data | `dashboard_limited`, `tatakelola`, `pe_input`, `pe_verify`, `master_data`, `integrasi` | Seluruh formulir transaksi, verifikasi kasus, pemeliharaan master fasyankes/wilayah, dan dasbor analitik mendalam. |
 | `verifikator` | Verifikator PE | `dashboard_limited`, `tatakelola`, `pe_input`, `pe_verify` | Pengisian dan penguncian status verifikasi form PE, EBS, IBS, serta akses ke seluruh dasbor. |
 | `petugas` | Petugas Input | `dashboard_limited`, `tatakelola`, `pe_input` | Entri data harian/mingguan (EBS, IBS agregat & individu, Pengawasan MBG, Keracunan MBG, draf PE). |
-| `viewer` | Pengguna Dasbor | `dashboard_limited` | Akses baca (*view only*) ke Dasbor Utama, Dasbor Spasial, dan Dasbor Matriks Analisa. |
+| `viewer` | Pengguna Dasbor | `dashboard_limited` | Akses baca (*view only*) ke seluruh menu grup **DASBOR** dan **DASBOR LIMITED** (`Spasial` & `Matriks Analisa`). |
 
-### 2.2. Pembagian Area URL
-- **Area Beranda (`/`, `/beranda`):** Informasi publik, ringkasan capaian nasional, dan portal masuk.
-- **Area Dasbor (`/dashboard`, `/main-dashboard`, `/dasbor/*`):** Visualisasi indikator kinerja, tren mingguan, kurva epidemiologi, dan pemetaan interaktif.
-- **Area Tata Kelola (`/tatakelola`, `/ebs`, `/ibs`, `/pe`, `/pengawasan-gizi`, `/keracunan-mbg`, `/master`):** Seluruh formulir transaksi pengisian, verifikasi laporan, dan manajemen sistem.
+### 2.2. Struktur Menu Sidebar Saat Ini
+Pada tampilan saat ini, navigasi aplikasi dibagi menjadi dua area melalui sakelar di header atas (**`DASBOR`** ↔ **`TATA KELOLA`**):
+
+#### A. Sidebar Area **DASBOR**
+| Grup Sidebar | Nama Menu di UI | Path URL | Tampilan Shell | Keterangan |
+|---|---|---|---|---|
+| **DASBOR** | **Ringkasan Dasbor** | `/dashboard` | Sidebar + Header | Hub kartu pintasan menuju seluruh modul dasbor. |
+| **DASBOR** | **Dasbor SKDR** | `/main-dashboard` | Sidebar + Header | Dasbor eksekutif utama SKDR (sebelumnya bernama *Dasbor Utama*; mendukung sakelar Sumber `EBS` / `IBS`). |
+| **DASBOR** | **Dasbor Zoonosis Lite** | `/dasbor/zoonosis-lite` | Sidebar + Header Ringkas | Dasbor satu layar 4 penyakit zoonosis (EBS + Form PE, terisolasi dari agregat IBS). |
+| **DASBOR** | **Dasbor MBG** | `/dasbor/mbg` | Sidebar + Header | Dasbor 2 tab: *Pengawasan Gizi MBG* (Form 1–13) dan *Keracunan Pangan MBG*. |
+| **DASBOR** | **Penyakit** | `/penyakit` | Sidebar + Header | Direktori referensi klinis & epidemiologi penyakit terpantau. |
+| **DASBOR** | **Mode TV** | `/tv` | **Layar Penuh Mandiri (`100vw × 100vh`) Tanpa Header & Tanpa Sidebar** | Pusat Komando Spasial & Meja Analisa Epidemiologi penuh peta dengan tombol **`← Kembali ke Spasial`**. |
+| **DASBOR LIMITED** | **Spasial** | `/dashboard/spasial` | Sidebar + Header (*Fluid Auto-Layout*) | Peta analisa SKDR IBS & EBS dengan *filter* samping, KPI, *choropleth*, kluster titik, *playback* mingguan, dan daftar laporan. |
+| **DASBOR LIMITED** | **Matriks Analisa** | `/dashboard/matriks-analisa` | Sidebar + Header (*Fluid Auto-Layout*) | Meja analitik 6 tab (Ringkasan, Matriks 48 laporan, Morbiditas, Kinerja, Alert & Sinyal, Profil Kasus) + Ekspor Excel. |
+| **LAINNYA** | **Dokumentasi** | `/dokumentasi` | Sidebar + Header | Dokumentasi penggunaan dan referensi teknis sistem. |
+| *(Tersembunyi)* | *(Dasbor SKDR EBS & IBS)* | `/dasbor/ebs-ibs` | `enabled: false` | Disembunyikan dari sidebar sejak PR 048 karena fungsinya telah disatukan ke **Dasbor SKDR**, **Spasial**, dan **Matriks Analisa**. |
+
+#### B. Sidebar Area **TATA KELOLA**
+| Grup Sidebar | Nama Menu di UI | Path URL | Izin (*Permission*) |
+|---|---|---|---|
+| **TRANSAKSI** | **Laporan EBS** | `/ebs/laporan` | `tatakelola` (baca), `pe_input` (tulis) |
+| **TRANSAKSI** | **Entri Data Agregat (IBS)** | `/ibs/laporan` | `tatakelola` (baca), `pe_input` (tulis) |
+| **TRANSAKSI** | **Form Individu (IBS)** | `/ibs/individu` | `tatakelola` (baca), `pe_input` (tulis) |
+| **TRANSAKSI** | **Form PE (4 Zoonosis)** | `/pe/cases` | `tatakelola` (baca), `pe_input` / `pe_verify` |
+| **PROGRAM MBG** | **Pengawasan Gizi MBG** | `/pengawasan-gizi` | `tatakelola` (baca), `pe_input` (tulis) |
+| **PROGRAM MBG** | **Keracunan Pangan MBG** | `/keracunan-mbg` | `tatakelola` (baca), `pe_input` (tulis) |
+| **MASTER DATA** | **Provinsi, Kab/Kota, Penyakit, Fasyankes** | `/master/*` | `master_data` |
+| **INTEGRASI** | **Sinkronisasi EBS, Alert SKDR, BNPB, dll.** | `/integrasi/*` | `integrasi` |
+| **MANAJEMEN AKSES** | **Pengguna, Peran, Log Akses** | `/tatakelola/{pengguna,peran,log-akses}` | `user_management` |
 
 ---
 
@@ -128,7 +159,7 @@ flowchart LR
    - Status KLB Saat Ini: *Berlangsung, Terkendali, atau Berakhir* (disertai tanggal berakhir).
    - Rincian Tindakan di Lapangan: Pengendalian Faktor Risiko (PFR), Komunikasi Risiko (edukasi masyarakat), dan Koordinasi Lintas Program / Lintas Sektor.
 6. **Langkah 6: Lampiran & Respon SIZE**
-   - Unggah berkas dokumen pendukung (surat tugas, foto lapangan, file PDF).
+   - Unggah berkas dokumen pendukung (surat tugas, foto lapangan, file PDF $\le 5\text{ MB}$).
    - Panel Respon SIZE (Sistem Informasi Zoonosis Terintegrasi One Health) untuk rujukan lintas kementerian.
 7. **Langkah 7: Tinjau & Kirim**
    - Evaluasi validasi real-time. Jika semua langkah lengkap dan valid, status laporan beralih dari `Draf` menjadi `Dikirim`.
@@ -149,17 +180,16 @@ flowchart LR
 1. **Langkah 1: Unit & Wilayah**
    - Jenis Unit Pelapor, Provinsi, Kab/Kota, Kecamatan, Nama Unit Puskesmas/Klinik, dan Nama Petugas Pengentri.
 2. **Langkah 2: Periode Laporan**
-   - Tahun Laporan (misal: 2026).
-   - Minggu Epidemiologi (Minggu 1 s.d. Minggu 52/53). Sistem mengunci minggu yang belum berjalan agar tidak terjadi pelaporan masa depan.
+   - Tahun Laporan (misal: 2026) dan Minggu Epidemiologi (Minggu 1 s.d. Minggu 52/53). Sistem mengunci minggu yang belum berjalan agar tidak terjadi pelaporan masa depan.
 3. **Langkah 3: Data Kasus (Grid 24 Penyakit + Total Kunjungan)**
-   - Mengisi 3 kolom per penyakit:
+   - Tabel matriks menampilkan kolom `No · Kode SMS · Kode Penyakit · Nama Penyakit` beserta 3 kolom input per penyakit:
      - **Jumlah Kasus:** Total kasus baru yang berkunjung pada minggu tersebut.
      - **Jumlah Kematian:** Kasus meninggal akibat penyakit tersebut (wajib $\le$ Jumlah Kasus).
-     - **Jumlah Lab:** Kasus yang memiliki konfirmasi uji laboratorium.
-   - **Total Kunjungan Fasyankes:** Jumlah seluruh pasien yang berkunjung ke fasyankes pada minggu tersebut (berfungsi sebagai penyebut untuk menghitung proporsi morbiditas).
-   - **Fitur Laporan Nihil:** Checkbox deklarasi bahwa pada minggu tersebut fasyankes beroperasi aktif namun tidak ditemukan satu pun kasus penyakit terpantau.
+     - **Jumlah Lab:** Kasus yang memiliki pemeriksaan laboratorium.
+   - **Total Kunjungan Fasyankes:** Kartu input terpisah untuk jumlah seluruh pasien yang berkunjung ke fasyankes pada minggu tersebut.
+   - **Fitur Laporan Nihil:** Deklarasi bahwa pada minggu tersebut fasyankes beroperasi aktif namun tidak ditemukan satu pun kasus dari 24 penyakit terpantau.
 4. **Langkah 4: Tinjau & Kirim**
-   - Validasi angka matematis, ringkasan perbandingan total kasus terhadap rata-rata 3 minggu sebelumnya, dan submit laporan.
+   - Validasi angka matematis, peringatan duplikat (`Unit + Tahun + Minggu Epid`), dan pengiriman laporan.
 
 ---
 
@@ -175,23 +205,11 @@ flowchart LR
 ```
 
 #### Rincian Isian Form Individu:
-1. **Langkah 1: Unit & Periode**
-   - Puskesmas, Petugas, No. HP, Tahun, dan Minggu Epidemiologi.
-2. **Langkah 2: Info Pasien**
-   - Nama Pasien, No. Rekam Medis / No. Epid, Alamat Lengkap Domisili.
-   - Kelompok Umur Rinci: Tahun, Bulan, dan Hari (memungkinkan pencatatan akurat untuk bayi baru lahir/balita).
-   - Jenis Kelamin dan Pekerjaan Pasien.
-3. **Langkah 3: Penyakit & Diagnosis**
-   - Penyakit Agregat: Terkoneksi ke 24 penyakit IBS SKDR.
-   - Tanggal Pemeriksaan Klinis.
-   - Status Akhir Pasien: *Sembuh, Masih Sakit / Dirawat, Dirujuk, atau Meninggal* (wajib mengisi tanggal meninggal jika status meninggal).
-   - Keluhan Utama, Lama Sakit, Kode ICD-10, dan Catatan Diagnosis Dokter.
-4. **Langkah 4: Pemeriksaan & SOAP**
-   - Antropometri & Tanda Vital: Tinggi Badan (cm), Berat Badan (kg), Suhu Tubuh (°C), Tekanan Darah Sistole/Diastole (mmHg).
-   - **Kalkulator IMT Otomatis:** Sistem secara otomatis menghitung Indeks Massa Tubuh ($\text{IMT} = \frac{\text{BB (kg)}}{\text{TB (m)}^2}$) dan mengklasifikasikan status gizi (*Gizi Kurang, Normal, Gizi Lebih, Obesitas*).
-   - Catatan Medis SOAP (Subjective, Objective, Assessment, Planning).
-5. **Langkah 5: Tinjau & Kirim**
-   - Validasi kelengkapan, verifikasi rekam medis, dan penyimpanan ke basis data individu.
+1. **Langkah 1: Unit & Periode:** Puskesmas, Petugas, No. HP, Tahun, dan Minggu Epidemiologi.
+2. **Langkah 2: Info Pasien:** Nama Pasien, No. Rekam Medis / No. Epid, Alamat Lengkap Domisili, Kelompok Umur Rinci (Tahun, Bulan, Hari), Jenis Kelamin, dan Pekerjaan Pasien.
+3. **Langkah 3: Penyakit & Diagnosis:** Penyakit Agregat (`A — Diare Akut` s.d. 24 penyakit IBS), Tanggal Pemeriksaan Klinis (dengan peringatan bila di luar rentang minggu epid terpilih), Status Akhir Pasien (*Sembuh, Masih Sakit / Dirawat, Dirujuk, atau Meninggal* — tanggal meninggal wajib bila Meninggal), Keluhan Utama, Lama Sakit, Kode ICD-10, dan Diagnosis Dokter.
+4. **Langkah 4: Pemeriksaan & SOAP:** Antropometri & Tanda Vital (Tinggi Badan, Berat Badan, Suhu Tubuh, Tekanan Darah), **Kalkulator IMT Otomatis** ($\text{IMT} = \frac{\text{BB (kg)}}{\text{TB (m)}^2}$), dan Catatan Medis SOAP ($\le 500$ karakter).
+5. **Langkah 5: Tinjau & Kirim:** Peringatan duplikat lunak (`unit + nama pasien + tanggal periksa`) dan penyimpanan ke basis data `laporan_ibs_individu`.
 
 ---
 
@@ -199,180 +217,185 @@ flowchart LR
 *Tujuan:* Standarisasi audit mutu dan higiene sanitasi dapur Satuan Pelayanan Program Gizi (SPPG) oleh Tenaga Pelaksana Gizi (TPG) Puskesmas menggunakan 13 formulir standar Kemenkes RI.
 
 #### Struktur Modul & 13 Formulir:
-- **Identitas Kunjungan (Kop Formulir):** Nama TPG, Puskesmas, Nama SPPG, Nama Pengawas Dapur SPPG, dan Hari/Tanggal Pengawasan.
-- **Formulir 1 (F1):** Identifikasi Kebutuhan Bahan Pangan (Kesesuaian volume bahan terhadap target sasaran siswa & balita).
-- **Formulir 2 (F2):** Standar Porsi & Nilai Gizi (Kecukupan kalori, protein, vitamin, dan mineral sesuai kelompok usia).
-- **Formulir 3 (F3):** Penerapan SOP Perencanaan Menu (Master menu bersiklus, diversifikasi pangan, tanpa Ultra-Processed Foods [UPF], skrining alergi makanan).
-- **Formulir 4 (F4):** Penerapan SOP Pemesanan Bahan Pangan (Validasi faktur, spesifikasi bahan segar dan kering).
-- **Formulir 5 (F5):** Penerapan SOP Penerimaan Bahan Pangan (Pemeriksaan suhu bahan saat tiba, keutuhan kemasan, tanggal kedaluwarsa).
-- **Formulir 6 (F6):** Penerapan SOP Penyimpanan Bahan Pangan (Gudang kering, cold storage/freezer, rotasi stok FIFO/FEFO).
-- **Formulir 7 (F7):** Penerapan SOP Persiapan Bahan Pangan (Pemisahan talenan daging mentah dan sayur, pencucian air mengalir, **disertai unggah foto dokumentasi langsung per butir audit**).
-- **Formulir 8 (F8):** Penerapan SOP Pengolahan Bahan Pangan (Kecukupan suhu pemasakan inti makanan $\ge 70^\circ\text{C}$, sanitasi peralatan masak, kebersihan juru masak).
-- **Formulir 9 (F9):** Penerapan SOP Pemorsian & Pengepakan (Pencatatan suhu makanan saat pemorsian, waktu jeda maksimal sebelum dikemas, kepatuhan masker/sarung tangan).
-- **Formulir 10 (F10):** Penerapan SOP Distribusi Bahan Pangan (Sanitasi armada kendaraan box tertutup, ketepatan waktu pengiriman ke sekolah penerima).
-- **Formulir 11 (F11):** Pengawasan Penyajian & Konsumsi di Sekolah / Posyandu (Penerapan cuci tangan pakai sabun [CTPS], uji organoleptik sebelum disajikan, audit sisa makanan piring siswa metode Comstock dari 5 sampel acak).
-- **Formulir 12 (F12):** Pengawasan Mutu & Higiene Sanitasi (Sertifikat Laik Higiene Sanitasi [SLHS], pengujian sampel air minum dan usap alat makan).
-- **Formulir 13 (F13):** Rekapitulasi Skor & Rekomendasi (Skor Kepatuhan Gabungan $0-100$; predikat **Sesuai Standar Gizi jika Skor $\ge 80$**, serta formulasi poin tindakan perbaikan wajib).
+- **Identitas Kunjungan (Sekali per Kunjungan):** Nama TPG, Puskesmas, Wilayah, Nama SPPG, Nama Pengawas Dapur SPPG, dan Hari/Tanggal Pengawasan.
+- **Formulir 1 (F1):** Identifikasi Kebutuhan Bahan Pangan & Ketenagaan (ambang penjamah 47/3T, kepatuhan $\ge 50\%$).
+- **Formulir 2 (F2):** Standar Porsi & Nilai Gizi (disertai saran otomatis sosialisasi + bukti).
+- **Formulir 3 (F3):** Penerapan SOP Perencanaan Menu.
+- **Formulir 4 (F4):** Penerapan SOP Pemesanan Bahan Pangan (13 butir unik).
+- **Formulir 5 (F5):** Penerapan SOP Penerimaan Bahan Pangan.
+- **Formulir 6 (F6):** Penerapan SOP Penyimpanan Bahan Pangan (FIFO/FEFO, suhu gudang & pendingin).
+- **Formulir 7 (F7):** Penerapan SOP Persiapan Bahan Pangan (5 butir + unggah foto dokumentasi per butir).
+- **Formulir 8 (F8):** Penerapan SOP Pengolahan Bahan Pangan.
+- **Formulir 9 (F9):** Penerapan SOP Pemorsian & Pengepakan (kelompok sasaran dinamis + tabel SP).
+- **Formulir 10 (F10):** Penerapan SOP Distribusi Bahan Pangan (termasuk uji 5 sampel sisa makanan, $\ge 3$ sampel $< 20\%$).
+- **Formulir 11 (F11):** Pengawasan Penyajian & Konsumsi di Sekolah / Posyandu / Kader (5 sampel sisa makanan metode Comstock).
+- **Formulir 12 (F12):** Pengawasan Mutu & Higiene Sanitasi (rekap otomatis `BAIK` / `BELUM BAIK`).
+- **Formulir 13 (F13):** Rekapitulasi Skor & Rekomendasi (Skor Kepatuhan $\text{Sesuai}/N \times 100$; predikat **Sesuai bila Skor $\ge 80$**).
 
 ---
 
 ### 3.5. Keracunan Pangan MBG (Investigasi Insiden KLB Pangan)
-*Tujuan:* Pelaporan cepat saat terjadi insiden keracunan pangan pada siswa penerima program MBG, investigasi rantai pangan, pelacakan masa inkubasi, dan pemantauan perkembangan kasus harian.
+*Tujuan:* Pelaporan cepat saat terjadi insiden keracunan pangan pada penerima program MBG, investigasi rantai pangan, pelacakan masa inkubasi, dan pemantauan perkembangan kasus harian.
 
 ```mermaid
 flowchart TD
-    K1[Langkah 1: Laporan Cepat\n- 4 Isian Wajib Cukup Kirim Alert\n- Tanggal, Provinsi, Kasus, Meninggal] --> K2[Langkah 2: Kasus & Gejala\n- Attack Rate & CFR Otomatis\n- Kalkulator Masa Inkubasi\n- Gejala Klinis Dominan]
-    K2 --> K3[Langkah 3: Menu & Penanganan\n- Komposisi Piring MBG\n- Faskes Perawatan & Terapi]
-    K3 --> K4[Langkah 4: Kesehatan Lingkungan SPPG\n- Evaluasi 26 SOP Dapur\n- Kondisi Air, Limbah, Armada]
-    K4 --> K5[Langkah 5: Uji Laboratorium\n- Sampel Makanan, Usap Alat, Rectal Swab\n- Hasil Mikroba & Toksikologi]
-    K5 --> K6[Langkah 6: Lampiran & Kesimpulan KLB]
-    K6 --> KH[Modul Pemantauan Harian\n- Update Kasus Pulang/Sembuh/Meninggal]
+    K1["Langkah 1: Laporan Cepat\n(4 Isian Wajib Cukup Kirim Alert)"] --> K2["Langkah 2: Kasus & Gejala\n(Attack Rate, CFR & Masa Inkubasi Otomatis)"]
+    K2 --> K3["Langkah 3: Menu & Penanganan\n(Komposisi Menu & Saran Diagnosis Banding)"]
+    K3 --> K4["Langkah 4: Kesehatan Lingkungan SPPG\n(Checklist 26 SOP Ada/Dilakukan)"]
+    K4 --> K5["Langkah 5: Uji Laboratorium\n(Sampel Pangan, Air, Usap Alat, Spesimen)"]
+    K5 --> K6["Langkah 6: Lampiran & Kirim"]
+    K6 --> KH["Modul Update Harian\n(Perkembangan Kumulatif per Tanggal & Grafik)"]
 ```
-
-#### Fitur & Logika Perhitungan Penting:
-1. **Mode Laporan Cepat (*Fast Reporting*):** Cukup mengisi 4 isian wajib (Tanggal/Jam Kejadian, Provinsi, Jumlah Kasus, Jumlah Meninggal) agar laporan segera masuk ke radar dinas kesehatan dan Kementerian tanpa menunggu hasil investigasi lengkap.
-2. **Kalkulator Epidemiologi Otomatis:**
-   - **Attack Rate (AR):**  
-     $$\text{AR} = \frac{\text{Jumlah Kasus (Sakit)}}{\text{Jumlah Siswa Terpapar (Makan)}} \times 100\%$$
-   - **Case Fatality Rate (CFR):**  
-     $$\text{CFR} = \frac{\text{Jumlah Meninggal}}{\text{Jumlah Kasus}} \times 100\%$$
-   - **Kalkulator Masa Inkubasi Otomatis:** Menghitung selisih jam konsumsi menu MBG terhadap jam timbulnya gejala pertama untuk memunculkan estimasi masa inkubasi (terpendek, terpanjang, median, dan rata-rata).
-3. **Audit 26 SOP Sanitasi Dapur SPPG:** Checklist kepatuhan operasional dapur mulai dari ketersediaan bank sampel makanan, kepemilikan sertifikat SLHS, pemeriksaan penjamah makanan, hingga metode pembuangan limbah sisa makanan.
-4. **Logistik Sampel Laboratorium:** Melacak sampel makanan tersisa, sampel bahan mentah, air minum, dan sampel biologis pasien (muntahan / usap dubur) yang dikirim ke BBLKM / Labkesda.
-5. **Pemantauan Harian Pasca Insiden:** Fitur catatan harian untuk memantau status pemulihan pasien (berapa yang sudah sembuh, berapa yang masih dirawat di RS) sampai KLB dinyatakan berakhir.
 
 ---
 
 ### 3.6. Penyelidikan Epidemiologi (Form PE 4 Penyakit Zoonosis One Health)
-*Tujuan:* Formulir investigasi mendalam kasus perorangan untuk 4 penyakit zoonosis prioritas One Health di Indonesia sesuai pedoman teknis surveilans Kemenkes RI.
-
-#### 4 Penyakit Zoonosis yang Dikelola:
-1. **Leptospirosis:** Investigasi riwayat kontak banjir, genangan air kotor, pekerjaan berisiko (petani, petugas kebersihan selokan), keberadaan hewan pengerat (tikus) di pemukiman, dan pemeriksaan MAT (*Microscopic Agglutination Test*) / RDT Leptospira.
-2. **Rabies / GHPR (Gigitan Hewan Penular Rabies):** Investigasi riwayat gigitan anjing/kera/kucing, lokasi luka gigitan (risiko tinggi: leher/wajah/ujung jari), pencucian luka dengan sabun & air mengalir 15 menit, pemberian Vaksin Anti Rabies (VAR) & Serum Anti Rabies (SAR), serta status hewan penular (mati/diobservasi 14 hari).
-3. **Antraks:** Investigasi bentuk klinis (Antraks Kulit/eschar kehitaman, Antraks Saluran Pencernaan, Antraks Pernapasan), riwayat kontak pemotongan hewan ternak sakit/mati mendadak, konsumsi daging tiren (*bangkai*), dan uji lab PCR / kultur *Bacillus anthracis*.
-4. **Avian Influenza (Flu Burung - H5N1 / H5N6):** Investigasi riwayat kontak unggas sakit/mati mendadak di peternakan atau pasar burung, kontak dengan kotoran unggas, gejala ISPA berat / pneumonia akut, riwayat konsumsi unggas yang tidak matang, dan pemeriksaan RT-PCR swab nasofaring.
-
-#### Alur Status Formulir PE:
-- **Draf:** Pengisian awal oleh petugas fasyankes di lapangan.
-- **Dikirim:** Berkas selesai diisi dan diteruskan ke verifikator dinas kesehatan.
-- **Terverifikasi:** Verifikator memeriksa kecocokan gejala klinis, riwayat epidemiologi, dan dokumen pendukung.
-- **Final:** Status dikunci dengan penetapan klasifikasi kasus resmi (*Suspek, Probable, Konfirmasi Laboratorium, atau Discarded/Bukan Kasus*).
+*Tujuan:* Formulir investigasi mendalam kasus perorangan untuk 4 penyakit zoonosis prioritas One Health di Indonesia (**Leptospirosis, Rabies/GHPR, Antraks, dan Flu Burung/Avian Influenza**) dengan siklus status `Draf` $\rightarrow$ `Dikirim` $\rightarrow$ `Terverifikasi` $\rightarrow$ `Final` (disimpan pada tabel `pe_cases`).
 
 ---
 
-## 4. SPESIFIKASI SELURUH MODUL DASBOR (OUTPUT & ANALITIK)
+## 4. SPESIFIKASI SELURUH MODUL DASBOR (OUTPUT & ANALITIK SAAT INI)
 
 ---
 
-### 4.1. Dasbor Utama (`/main-dashboard`)
-Dasbor eksekutif tingkat nasional dan daerah untuk memantau situasi epidemiologi secara menyeluruh.
+### 4.1. Ringkasan Dasbor (`/dashboard`) & Beranda (`/`, `/beranda`)
+- **Landing Page Publik (`/`):** Gerbang informasi publik SKDR dengan ringkasan kewaspadaan dini nasional dan tombol masuk portal (**Akses SKDR** $\rightarrow$ `/login`).
+- **Beranda Terautentikasi (`/beranda`):** Halaman sambutan bagi pengguna yang telah masuk, menampilkan seluruh grup navigasi lintas area.
+- **Ringkasan Dasbor (`/dashboard`):** Katalog kartu pintasan cepat menuju seluruh modul dasbor (**Dasbor SKDR**, **Dasbor Zoonosis Lite**, **Dasbor MBG**, **Penyakit**, **Mode TV**, **Spasial**, dan **Matriks Analisa**).
+
+---
+
+### 4.2. Dasbor SKDR (`/main-dashboard`)
+*(Sebelumnya bernama **Dasbor Utama**, diperbarui menjadi **Dasbor SKDR** pada PR 048).*  
+Dasbor eksekutif tingkat nasional dan daerah yang membaca langsung dari matriks **Laporan EBS (`laporan_ebs`)** dan **Laporan Agregat/Individu IBS (`laporan_ibs`, `laporan_ibs_individu`)**.
 
 ```mermaid
 graph TD
-    subgraph Dasbor Utama
-        K[KPI Executive Summary\n- Total Kasus, Kematian, CFR Wilson 95%\n- Rasio Fasyankes Aktif & Kepatuhan Lapor]
-        A[Panel Alert SKDR Mingguan\n- Ambang Batas 2 SD\n- Pemicu Verifikasi & Notifikasi WhatsApp/Email]
-        T[Tolok Ukur Global 7-1-7\n- Deteksi <=7 Hari, Notifikasi <=1 Hari, Respon <=7 Hari]
-        M[Peta Multi-Mode Spasial\n- Choropleth Sebaran Kasus\n- Titik Fasyankes & Heatmap Klaster]
-        C[Karusel & Tabel 24 Penyakit\n- Tren 4-12 Minggu Terakhir\n- Status Sinyal Peringatan Dini]
-        L[Pelacakan Laboratorium & Spesimen\n- Waktu Tunggu Hasil Lab / TAT\n- Rasio Positivitas Spesimen]
-        KLS[Manajemen Klaster KLB Aktif]
-        NAR[Rekonsiliasi NAR - SKDR]
+    subgraph "Dasbor SKDR (/main-dashboard)"
+        S["Sakelar Sumber Data: EBS ↔ IBS\n+ Filter Tahun/Minggu Epid, Provinsi, Kab/Kota, Penyakit"]
+        S --> K["1. Ringkasan Eksekutif (KPI)\nKasus, Kematian, CFR Wilson 95% CI, Unit Pelapor"]
+        S --> C["2. Karusel & Tabel Penyakit\nTren Mingguan & Status Sinyal"]
+        S --> A["3. Panel Alert SKDR & Status Verifikasi\nAmbang Batas & Tindak Lanjut"]
+        S --> T["4. Kinerja Respons 7-1-7\nDeteksi <=7h, Notifikasi <=1h, Respon <=7h"]
+        S --> L["5. Pelacakan Spesimen Laboratorium\nPositivitas & Turnaround Time"]
+        S --> M["6. Peta Sinyal Multi-Mode\nChoropleth, Titik & Heatmap"]
+        S --> H["7. Tren Heatmap & Kurva Epidemi\n+ Manajemen Klaster & Rekonsiliasi NAR"]
     end
 ```
 
-#### Modul-Modul di Dasbor Utama:
-1. **KPI Executive Summary:**
-   - Total Kasus Kumulatif & Total Kematian.
-   - **CFR Wilson Score Interval (95% CI):** Menghitung Case Fatality Rate menggunakan formula statistik Wilson Score untuk memberikan rentang estimasi kematian yang akurat pada sampel kecil/besar.
-   - Kelengkapan Laporan (%) dan Ketepatan Laporan (%) fasyankes terhadap batas waktu mingguan.
-2. **Panel Alert SKDR Mingguan:**
-   - Menampilkan daftar sinyal bahaya penyakit yang melampaui nilai ambang batas (*mean* 3–5 minggu sebelumnya ditambah 2 Standar Deviasi).
-   - Menampilkan status penanganan: *Alert Baru, Sedang Diverifikasi, Terkonfirmasi KLB, atau Bukan Masalah Kesehatan*.
-3. **Indikator Kinerja 7-1-7:**
-   - Grafik pencapaian target global (Target $\le 7$ hari deteksi, $\le 1$ hari notifikasi, $\le 7$ hari tindakan awal). Mengidentifikasi titik hambatan (*bottleneck*) penanggulangan wabah.
-4. **Peta Sebaran Kasus Multi-Mode:**
-   - Peta interaktif berbasis OpenLayers dengan opsi layer Choropleth wilayah, Titik Fasyankes Pelapor, dan Heatmap intensitas kejadian.
-5. **Karusel Penyakit & Kurva Epidemiologi:**
-   - Kartu visualisasi 24 penyakit terpantau dengan kurva batang kasus mingguan serta indikator status hijau (aman), kuning (waspada), atau merah (alert).
-6. **Integrasi Laboratorium & Klaster KLB:**
-   - Memantau jumlah spesimen terkirim, waktu tunggu hasil (*Turnaround Time*), dan daftar klaster KLB aktif yang membutuhkan penyelidikan bersama lintas sektor.
-7. **Rekonsiliasi Data NAR - SKDR:**
-   - Membandingkan data pengujian laboratorium pada sistem New All Record (NAR) dengan pencatatan kasus pada SKDR untuk mengidentifikasi selisih kasus (*gap analysis*).
+#### Karakteristik Kunci Dasbor SKDR:
+- **Dinamis Mengikuti Sakelar Sumber (`EBS` vs `IBS`):** Seluruh seksi (Ringkasan KPI, CFR, Alert, 7-1-7, Laboratorium, Peta, Tren Heatmap, Kurva Epidemi, Klaster, dan NAR) berubah mengikuti sumber yang dipilih pengguna pada bilah filter atas.
+- **Paritas Data Sinkronisasi Kemenkes:** Job inkremental di *backend* (`impor_lama.rs`) secara otomatis menyinkronkan data dari tabel API lama (`ebs_reports` dan `skdr_alerts`) ke dalam tabel `laporan_ebs` dan `laporan_ibs`.
 
 ---
 
-### 4.2. Dasbor Zoonosis Lite (`/dasbor/zoonosis-lite`)
-Dasbor terfokus untuk pemantauan spesifik 4 penyakit zoonosis prioritas One Health (Leptospirosis, Rabies/GHPR, Antraks, Flu Burung).
-- Menampilkan metrik CFR masing-masing penyakit dengan perbandingan antar wilayah.
-- Heatmap tren musiman mingguan (misal: lonjakan Leptospirosis pada musim hujan/banjir).
-- Modal rincian konfirmasi spesimen hewan ke manusia.
+### 4.3. Dasbor Zoonosis Lite (`/dasbor/zoonosis-lite`)
+Dasbor satu layar (*one-screen dashboard*) untuk pemantauan 4 penyakit zoonosis prioritas One Health (**Antraks, Rabies/GHPR, Leptospirosis, dan Flu Burung**).
 
----
-
-### 4.3. Dasbor EBS & IBS (`/dasbor/ebs-ibs`)
-Dasbor yang terhubung langsung secara real-time dengan transaksi pengisian formulir lapangan (Laporan EBS dan Laporan IBS).
-- **Tab Dasbor EBS:** Memantau seluruh rumor kejadian luar biasa yang masuk, kecepatan verifikasi rumor oleh petugas, persentase rumor yang berkembang menjadi KLB, dan peta titik rumor berbasis GPS fasyankes.
-- **Tab Dasbor IBS:** Memantau agregat mingguan 24 penyakit, tren proporsi morbiditas terhadap total kunjungan puskesmas, dan matriks kelengkapan unit pelapor per kabupaten/kota.
-- **Fitur Peta Spasial Multi-Layer:** Memungkinkan penggabungan tampilan layer titik rumor EBS dan layer agregat wilayah IBS dalam satu kanvas peta.
+#### Karakteristik Kunci & Isolasi Data (PR 027, PR 028, PR 049):
+1. **Isolasi Murni dari Agregat Mingguan IBS (PR 049):**
+   - Peta sebaran sinyal pada Dasbor Zoonosis Lite secara ketat **mengecualikan titik agregat mingguan IBS (`source_type = 'ibs'`)**.
+   - Peta dan daftar sinyal hanya menampilkan **Sinyal Kejadian EBS (`source_type = 'ebs'`)** dan **Kasus Investigasi Form PE (`source_type = 'pe'` dari `pe_cases`)** melalui *view* `surveillance_reports` (migrasi `066`). Hal ini memastikan peta Zoonosis Lite tetap fokus pada lokasi kejadian zoonosis yang sesungguhnya dan tidak tertimbun oleh 12.528 titik fasyankes agregat IBS.
+2. **Kartu 4 Zoonosis + CFR Wilson 95% CI + Sparkline Mingguan:** Menampilkan beban kasus, kematian, dan CFR lengkap dengan interval kepercayaan Wilson 95% serta perbandingan CFR antar penyakit.
+3. **Lapisan Konteks Ekologis One Health di Peta:**
+   - **Lapisan Burung Migran (GBIF):** Titik pengamatan burung liar/migran sebagai konteks risiko Flu Burung (Avian Influenza).
+   - **Lapisan Vektor Nyamuk (iNaturalist):** Konteks pengamatan vektor di sekitar wilayah sinyal.
+4. **Modal Analisis Laboratorium & Detail Lainnya:** Tombol pembuka modal multi-tab yang mewarisi filter aktif halaman:
+   - *Tab Laboratorium* (Matriks Penyakit $\times$ Hasil, Matriks Provinsi $\times$ Penyakit)
+   - *Tab 7-1-7*
+   - *Tab Alert & Verifikasi*
+   - *Tab Klaster & Kurva Epidemi*
+   - *Tab Kematian Form PE*
 
 ---
 
 ### 4.4. Dasbor MBG (`/dasbor/mbg`)
-Dasbor khusus program Makan Bergizi Gratis yang mengintegrasikan pengawasan gizi preventif dan respon insiden keracunan pangan kuratif.
-- **Tab Pengawasan Gizi SPPG:**
-  - Skor rata-rata kepatuhan standar gizi SPPG per kabupaten/kota.
-  - Distribusi status: *Memenuhi Syarat (Skor $\ge 80$)* vs *Belum Memenuhi Syarat (Skor $< 80$)*.
-  - Peta sebaran dapur SPPG dan analisis butir SOP yang paling sering gagal dipenuhi (misal: pemisahan talenan, pencucian alat, suhu pemorsian).
-- **Tab Keracunan Pangan MBG:**
-  - Statistik insiden keracunan pangan aktif, total siswa terdampak, rasio rawat inap vs rawat jalan, dan angka kematian (CFR).
-  - Distribusi dugaan menu pangan penyebab keracunan dan agen patogen hasil uji lab (misal: *Staphylococcus aureus, Bacillus cereus, Salmonella, E. coli*).
-  - Peta titik sekolah dan SPPG terdampak.
-- **Analisis Korelasi Silang (*Cross-Correlation*):** Menghubungkan skor audit SPPG di Formulir 1–13 dengan riwayat terjadinya kasus keracunan makanan untuk pembinaan terarah.
+Dasbor khusus program Makan Bergizi Gratis dengan 2 halaman (*pagination tabs*) yang membaca langsung dari transaksi database tanpa data *dummy*:
+1. **Halaman 1 — Pengawasan Gizi MBG (`mbg_kunjungan` & `mbg_form` F1–F13):**
+   - 6 kartu KPI eksekutif (Total Kunjungan SPPG, Rata-rata Skor Kepatuhan, % SPPG Memenuhi Syarat $\ge 80$, dll.).
+   - Peta Spasial Multi-Layer OpenLayers 10 (*Choropleth* Provinsi $\rightarrow$ *drill-down* Kab/Kota + *Spatial Density Heatmap* + Titik SPPG).
+   - Matriks Heatmap Mingguan (Provinsi $\times$ Minggu & Formulir F1–F13 $\times$ Minggu), profil ketenagaan, dan kepatuhan 8 SOP utama.
+2. **Halaman 2 — Keracunan Pangan MBG (`mbg_keracunan` & `mbg_keracunan_update`):**
+   - 6 kartu KPI insiden (Total Kejadian, Total Kasus Sakit, Rawat Inap, Kematian, Attack Rate rata-rata, dan CFR).
+   - Peta titik insiden keracunan, tren perkembangan harian, distribusi gejala/demografi, evaluasi gap 26 SOP dapur, hasil sampel laboratorium, serta **Korelasi Silang SPPG Keracunan $\times$ Skor Pengawasan Gizi**.
 
 ---
 
-### 4.5. Dasbor Limited - Spasial (`/dashboard/spasial`)
-Dasbor pemetaan tingkat lanjut yang dirancang untuk analisis geografis mendalam bagi verifikator dan pimpinan dinas kesehatan.
+### 4.5. Direktori Penyakit (`/penyakit`)
+Halaman referensi penyakit menular berpotensi KLB yang menyajikan profil klinis, definisi operasional kasus, ambang batas kewaspadaan dini, dan tautan cepat menuju analisis penyakit terkait.
+
+---
+
+### 4.6. Mode TV — Pusat Komando Spasial & Meja Analisa Epidemiologi (`/tv`)
+*(Diimplementasikan pada PR 050 sebagai kanvas penuh layar ruang komando PHEOC / layar TV dinding).*
 
 ```mermaid
-flowchart LR
-    F[Panel Filter Samping\n- Rentang Minggu Epid\n- Sumber: IBS/EBS/Semua\n- Penyakit & Status KLB] --> M[Peta Utama Spasial\n- Drilldown: Nasional -> Prov -> Kab/Kota -> Kec\n- Choropleth Kelas Kuantil\n- 12.500+ Titik Unit Pelapor\n- Heatmap Kepadatan]
-    M --> P[Slider Putar Ulang Epid\n- Animasi Perjalanan Kasus dari Minggu ke Minggu]
-    M --> R[Panel Ringkasan & Daftar Laporan Terpilih]
+flowchart TD
+    subgraph "Mode TV — Pusat Komando Spasial (/tv) [100vw × 100vh Tanpa Header & Tanpa Sidebar]"
+        direction TB
+        TOP["Bilah Komando Atas (Top Command Bar)\n• Tombol '← Kembali ke Spasial' (/dashboard/spasial)\n• Badge Risiko Otomatis: SIAGA KLB | WASPADA SINYAL | TERKENDALI\n• Breadcrumb Wilayah + Tombol Naik • Sakelar Sumber: IBS | EBS | Semua\n• Pemilih Warna Peta • Preset 4M / 12M / Tahun Berjalan • Filter, KPI, Lapisan, Legenda, Analisa, Layar Penuh"]
+        KPI["6 Kartu KPI Epidemiologi HUD (Interaktif 1-Klik)\n1. Kasus & Δ Mingguan | 2. Kematian & CFR (Wilson 95% CI) | 3. Alert/Sinyal & % Verifikasi\n4. KLB & % Respons <=24J | 5. Sebaran Wilayah & Konsentrasi Pareto Top-3 | 6. Unit Pelapor & % GPS Presisi"]
+        TOP --> KPI
+        KPI --> WORKSPACE
+        subgraph WORKSPACE["Area Kerja Peta Penuh Layar (Flex HUD Anti-Tumpuk)"]
+            direction LR
+            LEFT["Dock Kiri: Lapisan & Triase Titik 1-Klik\n• Semua Unit Pelapor\n• Khusus KLB Aktif\n• Alert Belum Diverifikasi\n• Respons > 24 Jam\n• Terverifikasi\n• Mode Kluster/Titik, Choropleth, Heatmap, Peta Dasar\n+ Kartu Legenda di Bawahnya"]
+            CENTER["Kanvas Peta Interaktif OpenLayers\n• Choropleth Provinsi -> Drill-down Kab/Kota\n• Kluster & Titik Fasyankes Berstatus\n• Time-Slider Putar Ulang Minggu Epid di Bawah"]
+            RIGHT["Panel Kanan: Meja Analisa Epidemiologi (4 Tab)\n• Tab 1: Kajian Epid (Fase Kurva, Pareto, Kinerja 24J, Rekomendasi)\n• Tab 2: Triase Wilayah (Zona Merah / Waspada / Terkendali)\n• Tab 3: Hotspot Unit Pelapor (Top 25 Fasyankes Prioritas)\n• Tab 4: Detail Wilayah (Penyakit, Sub-Wilayah, Unit, Link Matriks)"]
+        end
+    end
 ```
 
-#### Fitur Utama Dasbor Spasial:
-1. **Hierarki Drilldown Wilayah 4 Tingkat:** Kemampuan menjelajah peta mulai dari peta Nasional $\rightarrow$ Provinsi $\rightarrow$ Kabupaten/Kota $\rightarrow$ Kecamatan dengan penyesuaian batas wilayah dinamis (*GeoJSON TopoJSON boundaries*).
-2. **Kuantil Choropleth Dinamis:** Pewarnaan gradasi wilayah berdasarkan rentang kuantil jumlah kasus atau laju insidensi (*Incidence Rate* per 100.000 penduduk).
-3. **Sebaran Titik Unit Pelapor:** Visualisasi lebih dari 12.500 unit fasyankes (Puskesmas dan Rumah Sakit) lengkap dengan status alert pada masing-masing unit (Pin Merah: Berstatus KLB, Pin Kuning: Alert belum diverifikasi, Pin Hijau: Normal / Terverifikasi).
-4. **Playback Mode (Putar Ulang Mingguan):** Tombol *Play/Pause* dengan time-slider yang memutar animasi perkembangan transmisi penyakit dari minggu epidemiologi awal hingga minggu terakhir secara visual.
-5. **Fluid Auto-Layout:** Tata letak fleksibel lebar penuh (*fluid 100% width*) tanpa batas margin kaku, yang otomatis menyesuaikan saat panel filter samping dibuka atau ditutup.
+#### Spesifikasi Lengkap Fitur Mode TV (`/tv`):
+1. **Tampilan Mandiri Penuh Layar (`100vw × 100vh`) & Desain Konsisten:**
+   - Berjalan dengan `tvMode={true}` tanpa header aplikasi dan tanpa sidebar kiri agar 100% ruang layar digunakan oleh peta spasial.
+   - Menggunakan palet warna putih bersih dan *Kemenkes Teal* (`bg-white/95`, `border-slate-200`, `bg-teal-50 text-teal-800`, `bg-teal-700 text-white`) yang 100% konsisten dengan halaman **Spasial (`/dashboard/spasial`)**.
+   - Dilengkapi tombol **`← Kembali ke Spasial`** di pojok kiri atas yang membawa pengguna kembali ke `/dashboard/spasial` dengan mempertahankan seluruh parameter filter di URL.
+2. **Tata Letak Flex HUD Anti-Tumpuk (*Zero-Overlap Layout*):**
+   - Bilah komando atas, baris 6 kartu KPI, kolom kiri (`Dock Lapisan & Triase` + `Legenda`), pemutar minggu epidemiologi di tengah bawah, dan kolom kanan (`Meja Analisa Epidemiologi`) disusun menggunakan struktur *flex column/row* di dalam kontainer peta, sehingga **tidak pernah saling menabrak atau menutupi** baik pada monitor laptop maupun layar TV dinding (termasuk saat tombol **Layar Penuh** diaktifkan).
+3. **Indikator Status Kesiapsiagaan Epidemiologi Otomatis:**
+   - Menghitung tingkat risiko secara *real-time* dari data wilayah terpilih:
+     - **`SIAGA KLB`** (Merah): Bila terdapat kejadian KLB aktif ($\text{KLB} > 0$), atau $\text{CFR} \ge 2{,}0\%$, atau lonjakan mingguan $\Delta \ge +25\%$ dengan beban $\ge 50$ kasus.
+     - **`WASPADA SINYAL`** (Oranye): Bila terdapat sinyal alert ($\text{Alert} > 0$), kenaikan mingguan $\Delta > +5\%$, atau $\text{CFR} \ge 0{,}5\%$.
+     - **`TERKENDALI`** (Hijau): Bila tidak ada KLB maupun lonjakan sinyal.
+4. **6 Kartu KPI Epidemiologi Interaktif (1-Klik Mengubah Lapisan Peta):**
+   - **Kartu 1 — Kasus:** Total kasus periode terpilih, $\Delta\%$ terhadap periode sebelumnya, serta perbandingan kasus minggu ini vs minggu lalu ($\Delta\%$ kecepatan transmisi). *(Klik $\rightarrow$ Choropleth Kasus)*.
+   - **Kartu 2 — Kematian & CFR:** CFR (`%`), jumlah kematian absolut, rentang kepercayaan **Wilson 95% CI**, dan badge tingkat keparahan (`Tinggi` / `Waspada` / `Rendah`). *(Klik $\rightarrow$ Choropleth CFR)*.
+   - **Kartu 3 — Alert / Sinyal:** Total sinyal kewaspadaan dini, persentase sinyal terverifikasi (`%`), dan jumlah unit fasyankes dengan alert belum diverifikasi. *(Klik $\rightarrow$ Choropleth Alert)*.
+   - **Kartu 4 — KLB & Respons $\le 24\text{J}$:** Jumlah KLB aktif, persentase sinyal yang direspons dalam $\le 24\text{ jam}$, dan jumlah fasyankes dengan respons terlambat ($>24\text{ jam}$). *(Klik $\rightarrow$ Choropleth KLB)*.
+   - **Kartu 5 — Sebaran & Pareto:** Rasio wilayah terdampak (`X / Y` Provinsi atau Kab/Kota beserta `%` cakupan) dan **Indeks Konsentrasi Pareto** (`%` beban kasus yang terkonsentrasi pada 3 wilayah tertinggi). *(Klik $\rightarrow$ Choropleth Perubahan Mingguan)*.
+   - **Kartu 6 — Unit Pelapor di Peta:** Jumlah fasyankes bertitik di peta, total laporan, serta persentase koordinat presisi GPS unit vs perkiraan pusat kab/kota. *(Klik $\rightarrow$ Beralih mode Kluster / Titik)*.
+5. **Dock Kiri — Lapisan & Triase Cepat Titik Unit (1-Klik):**
+   - Menyediakan 5 tombol triase cepat beserta jumlah unitnya: **`Semua Unit Pelapor`**, **`Khusus KLB Aktif`**, **`Alert Belum Diverifikasi`**, **`Respons > 24 Jam`**, dan **`Terverifikasi`**.
+   - Kontrol mode titik (`Kluster` / `Titik` / `Sembunyi`), toggle `Choropleth` + slider transparansi, toggle `Heatmap`, pilihan `Peta Dasar` (`Terang`, `OSM`, `Satelit`, `Polos`), dan filter kasus minimal per unit.
+6. **Panel Kanan — Meja Analisa Epidemiologi (4 Tab):**
+   - **Tab 1 (`Kajian Epid`):** Sintesis otomatis ahli epidemiologi mencakup: (1) *Dinamika & Fase Kurva Epidemi* (*Fase Akselerasi*, *Fase Plateau*, atau *Fase Dekelerasi* + identifikasi Minggu Puncak & grafik batang kurva epidemi), (2) *Sebaran Spasial & Pareto Top-3 Wilayah*, (3) *Evaluasi Kinerja Verifikasi & Respons 24 Jam* terhadap target Kemenkes $\ge 80\%$ lengkap dengan tombol pintas untuk mengisolasi titik belum verifikasi / respons $>24\text{ jam}$ di peta, serta (4) *Rekomendasi Tindak Lanjut Epidemiologi*.
+   - **Tab 2 (`Triase`):** Peringkat risiko komposit seluruh Provinsi/Kab-Kota ke dalam **Zona Merah**, **Waspada**, dan **Terkendali** dengan tombol *Perbesar ke Kab/Kota*.
+   - **Tab 3 (`Hotspot`):** Daftar 25 fasyankes prioritas investigasi diurutkan menurut status KLB dan jumlah kasus; klik baris untuk langsung memperbesar peta ke titik fasyankes tersebut.
+   - **Tab 4 (`Detail wilayah`):** Inspeksi mendalam wilayah terpilih (`/api/v1/analisa/spasial/wilayah`) menampilkan metrik wilayah, kurva epidemi wilayah, tabel **Penyakit Teratas**, **Kab/Kota atau Kecamatan Teratas**, **Unit Pelapor Teratas**, dan tautan langsung ke **Matriks Analisa**.
 
 ---
 
-### 4.6. Dasbor Limited - Matriks Analisa (`/dashboard/matriks-analisa`)
-Pusat analitik kuantitatif data SKDR yang menyediakan 6 tab analisis mendalam dan fitur ekspor data.
-
-#### 6 Tab Analitik:
-1. **Tab 1: Ringkasan (Executive Metrics):** Ringkasan kartu metrik utama, perbandingan kasus antar periode (minggu ini vs minggu lalu vs tahun lalu), dan interpretasi otomatis situasi epidemiologi.
-2. **Tab 2: Matriks & Laporan (Cross-Tabular Grid):** Grid tabel silang interaktif yang memetakan baris wilayah/penyakit terhadap kolom minggu-minggu epidemiologi. Dilengkapi fitur pencarian, sortir, dan penyaringan instan.
-3. **Tab 3: Morbiditas:** Analisis angka kesakitan, piramida distribusi usia dan jenis kelamin, rasio insidensi, serta proporsi penyakit terbanyak.
-4. **Tab 4: Kinerja Pelaporan:** Mengukur kepatuhan unit pelapor dalam mengirimkan laporan mingguan:
-   - **Kelengkapan Laporan:** Persentase fasyankes yang mengirim laporan (Target nasional $\ge 80\%$).
-   - **Ketepatan Laporan:** Persentase laporan yang masuk sebelum batas waktu Selasa pukul 12.00 WIB (Target nasional $\ge 80\%$).
-   - **Tabel Peringkat Kinerja Unit:** Menampilkan daftar fasyankes paling patuh dan fasyankes yang sering terlambat/absen melapor.
-5. **Tab 5: Alert & Sinyal:** Menampilkan seluruh log pemicuan sinyal kewaspadaan dini, deviasi standar dari baseline, dan status verifikasi lapangan oleh dinas kesehatan.
-6. **Tab 6: Profil Kasus:** Penelusuran data mikro individual dan kronologi detail kasus EBS yang membutuhkan pengawasan khusus.
-7. **Ekspor Data Excel (XLSX):** Fitur ekspor satu klik seluruh data matriks dan laporan ke format spreadsheet Excel resmi untuk kebutuhan penyusunan laporan berkala ke pimpinan daerah.
+### 4.7. Dasbor Limited — Spasial (`/dashboard/spasial`)
+Dasbor pemetaan analitik di dalam shell aplikasi standar (dilengkapi panel filter samping *sticky*, baris 7 kartu KPI, kotak interpretasi otomatis, peta interaktif OpenLayers, serta **Daftar Laporan Spasial** di bagian bawah halaman lengkap dengan pencarian, paginasi, tombol fokus peta per baris, dan **Ekspor Excel**).
+- Menggunakan **Fluid Auto-Layout (`w-full`)** (PR 046) sehingga area peta dan tabel otomatis melebar penuh saat sidebar kiri maupun panel filter samping disembunyikan.
 
 ---
 
-### 4.7. Beranda & Portal Publik (`/` dan `/beranda`)
-Halaman gerbang yang menyajikan ringkasan situasi kesehatan nasional kepada publik tanpa membuka data sensitif pasien:
-- Peta sebaran umum situasi penyakit menular.
-- Rangkuman kewaspadaan dini penyakit potensial KLB berjalan.
-- Panduan teknis dan pintu masuk (*Single Sign-On login*) bagi petugas kesehatan berwenang.
+### 4.8. Dasbor Limited — Matriks Analisa (`/dashboard/matriks-analisa`)
+Pusat analitik kuantitatif data SKDR (`IBS`, `EBS`, dan `Semua`) dengan panel filter samping *sticky* (PR 043), *fluid full-width auto-layout* (PR 046), dan **6 Tab Analitik** (PR 042):
+1. **Tab 1 — `Ringkasan & Tren`:** Kartu KPI eksekutif, kurva epidemi dengan garis ambang **Rerata + 2 SD**, perbandingan dengan tahun lalu, dan interpretasi otomatis.
+2. **Tab 2 — `Matriks & Laporan`:** Katalog **48 jenis laporan/grafik/diagram resmi SKDR (IBS + EBS)**, tabel silang (*pivot*) kustom, dan *drill-down* berjenjang (Nasional $\rightarrow$ Provinsi $\rightarrow$ Kab/Kota $\rightarrow$ Kecamatan $\rightarrow$ Puskesmas).
+3. **Tab 3 — `Morbiditas`:** Analisis beban penyakit, distribusi kelompok umur & jenis kelamin, serta proporsi penyakit terhadap kunjungan.
+4. **Tab 4 — `Kinerja Pelaporan`:** Kelengkapan & ketepatan laporan mingguan (maksimal 100%, garis target 80%, legenda 3 warna) serta cakupan EBS dan indikator 7-1-7.
+5. **Tab 5 — `Alert & Sinyal`:** Kualitas sinyal, rasio konversi menjadi KLB, 20 kecamatan hotspot teratas, dan *line list* sinyal dengan penyamaran PII otomatis.
+6. **Tab 6 — `Profil Kasus`:** Demografi umur/jenis kelamin, CFR beserta interval kepercayaan Wilson 95% CI, dan rincian klinis.
+- Setiap tab dilengkapi tombol **Ekspor Excel (`.xlsx`)**.
+
+---
+
+### 4.9. Dasbor Arsip Tersembunyi — Dasbor SKDR EBS & IBS (`/dasbor/ebs-ibs`)
+Halaman dasbor transaksi awal untuk Laporan EBS dan Laporan IBS (PR 035). Sejak **PR 048**, item menu ini disembunyikan dari sidebar (`enabled: false` pada `app_settings.navigation_menu`) agar navigasi pengguna lebih ringkas karena seluruh kapabilitas analitik dan pemetaannya telah tercakup di **Dasbor SKDR (`/main-dashboard`)**, **Spasial (`/dashboard/spasial`)**, **Matriks Analisa (`/dashboard/matriks-analisa`)**, dan **Mode TV (`/tv`)**.
 
 ---
 
@@ -388,21 +411,20 @@ sequenceDiagram
     actor V as Verifikator Dinkes Kab/Kota
     actor D as Pimpinan / Tim Respon
 
-    P->>S: Buka menu /ibs/laporan -> Entri Data Mingguan
+    P->>S: Buka menu /ibs/laporan -> Entri Data Agregat Mingguan
     S->>P: Tampilkan Wizard 4 Langkah (Prefill Unit & Minggu Berjalan)
     P->>S: Masukkan angka kasus, kematian, lab per 24 penyakit + Total Kunjungan
-    S->>S: Validasi logika (Kematian <= Kasus, Total Kunjungan > 0)
+    S->>S: Validasi logika (Kematian <= Kasus, Duplikat Unit+Minggu)
     P->>S: Klik "Kirim Laporan"
-    S->>DB: Simpan data ke tabel laporan transaksi IBS
-    S->>S: Jalankan kalkulasi deteksi sinyal alert (Mean + 2 SD)
+    S->>DB: Simpan data ke tabel laporan_ibs
+    S->>S: Hitung deteksi sinyal alert (Mean + 2 SD)
     alt Nilai Kasus Melampaui Ambang Batas (Alert Terpicu)
-        S->>V: Munculkan Pin Merah pada Dasbor Utama & Dasbor Spasial
-        V->>S: Buka Dasbor Alert & Signal Feed
-        V->>P: Verifikasi telepon / kunjungan investigasi lapangan
-        V->>S: Update status alert: Terverifikasi / Terkonfirmasi KLB
-        V->>D: Notifikasi eskalasi untuk penanganan darurat
+        S->>V: Munculkan Sinyal pada Dasbor SKDR, Spasial & Mode TV
+        V->>S: Buka Mode TV (/tv) / Matriks Analisa Tab Alert & Sinyal
+        V->>P: Verifikasi lapangan (<24 jam)
+        V->>D: Eskalasi TGC bila terkonfirmasi KLB
     else Kasus Normal (Di Bawah Ambang Batas)
-        S->>S: Masukkan ke agregat statistik mingguan (Pin Hijau)
+        S->>S: Masuk ke agregat statistik mingguan (Status Laporan Tanpa Alert)
     end
 ```
 
@@ -422,12 +444,12 @@ sequenceDiagram
     P->>S: Akses /ebs/laporan/baru (Wizard 7 Langkah)
     P->>S: Isi identitas pelapor, dugaan penyakit, jumlah kasus & kematian awal
     P->>S: Simpan Draf -> Kirim Laporan EBS
-    Note over S,TGC: Target Notifikasi: <= 1 Hari (24 Jam)
-    S->>TGC: Alert darurat masuk ke sistem & notifikasi dinas terkait
+    Note over S,TGC: Target Notifikasi & Verifikasi: <= 1 Hari (24 Jam)
+    S->>TGC: Sinyal EBS tampil di Dasbor SKDR (Sumber EBS), Zoonosis Lite & Mode TV
     Note over TGC,S: Target Respon: <= 7 Hari
     TGC->>M: Turun ke lokasi: ambil spesimen lab, isolasi, tatalaksana
     TGC->>S: Update Laporan EBS (Hasil lab, formulir W1, mobilisasi TGC, status KLB)
-    S->>S: Perbarui metrik 7-1-7 pada Dasbor Utama secara real-time
+    S->>S: Perbarui metrik 7-1-7 pada Dasbor SKDR & Matriks Analisa secara real-time
 ```
 
 ---
@@ -437,86 +459,92 @@ sequenceDiagram
 flowchart TD
     Start([Mulai]) --> RoutineCheck{Jenis Kegiatan?}
     
-    %% Cabang Pengawasan Rutin
     RoutineCheck -- Pengawasan Rutin SPPG --> P1[TPG Puskesmas berkunjung ke Dapur SPPG]
     P1 --> P2[Buka /pengawasan-gizi -> Isi Formulir 1 s.d. 13]
-    P2 --> P3[Audit 26 SOP, Uji Suhu Masak, Unggah Foto Talenan/Peralatan]
+    P2 --> P3[Audit SOP, Uji Sampel Sisa Makanan Comstock, Unggah Foto F7]
     P3 --> P4[Sistem hitung Skor Kepatuhan 0-100]
     P4 --> P5{Skor >= 80?}
-    P5 -- Ya --> P6[Status: Memenuhi Standar Gizi]
-    P5 -- Tidak --> P7[Status: Belum Memenuhi -> Buat Surat Rekomendasi Perbaikan]
-    P6 & P7 --> P8[Data tampil di Dasbor MBG Tab Gizi]
+    P5 -- Ya --> P6[Status: Sesuai Standar Gizi]
+    P5 -- Tidak --> P7[Status: Tidak Sesuai -> Rekomendasi Perbaikan Wajib]
+    P6 & P7 --> P8[Data tampil di Dasbor MBG Tab Pengawasan Gizi]
     
-    %% Cabang Insiden Keracunan
-    RoutineCheck -- Terjadi Insiden Keracunan --> K1[Siswa mengalami mual/muntah usai makan MBG]
-    K1 --> K2[Petugas buka /keracunan-mbg -> Mode Laporan Cepat]
-    K2 --> K3[Input 4 Isian Wajib: Waktu, Lokasi, Jml Sakit, Jml Meninggal]
-    K3 --> K4[Kirim Laporan Cepat -> Alert darurat terbit di Dasbor MBG]
-    K4 --> K5[Lakukan Investigasi Lapangan Lengkap:]
-    K5 --> K5a[• Hitung Attack Rate & Masa Inkubasi\n• Catat menu & gejala dominan\n• Kirim sampel makanan ke Labkesda/BBLKM\n• Isi form evaluasi 26 SOP dapur SPPG]
-    K5a --> K6[Buka Update Harian Kasus: pantau jumlah sembuh & rawat inap]
-    K6 --> K7[Hasil Lab Keluar -> Tetapkan penyebab & tutup status KLB]
+    RoutineCheck -- Terjadi Insiden Keracunan --> K1[Siswa mengalami gejala usai konsumsi MBG]
+    K1 --> K2[Petugas buka /keracunan-mbg -> Langkah 1: Laporan Cepat]
+    K2 --> K3[Input 4 Isian Wajib: Tanggal, Provinsi, Jml Kasus, Jml Meninggal]
+    K3 --> K4[Kirim Laporan Cepat -> Sinyal tampil di Dasbor MBG Tab Keracunan]
+    K4 --> K5[Lengkapi Investigasi: Gejala, Masa Inkubasi, 26 SOP, Sampel Lab]
+    K5 --> K6[Catat Update Harian Kasus hingga KLB Ditutup]
 ```
 
 ---
 
-### Alur 4: Siklus Verifikasi Penyelidikan Epidemiologi (PE)
+### Alur 4: Siklus Verifikasi Form PE & Isolasi Peta Zoonosis Lite
 ```mermaid
-stateDiagram-v2
-    [*] --> Draf: Petugas Fasyankes mengisi form PE (Lepto / Rabies / Antraks / AI)
-    Draf --> Draf: Autosave data lokal & kelengkapan gejala/lab
-    Draf --> Dikirim: Petugas menekan "Kirim Form PE"
-    Dikirim --> Terverifikasi: Verifikator memeriksa riwayat paparan hewan & hasil tes lab
-    Dikirim --> Draf: Verifikator meminta perbaikan data jika data kurang lengkap
-    Terverifikasi --> Final: Penetapan status diagnosis akhir (Konfirmasi / Probable / Discarded)
-    Final --> [*]: Kasus terkunci & masuk ke Dasbor Analisis Zoonosis One Health
+flowchart LR
+    subgraph "Sumber Input"
+        PE["Form PE 4 Zoonosis (/pe/cases)\nLepto, Rabies, Antraks, Flu Burung"]
+        EBS["Laporan EBS (/ebs/laporan)\nSinyal Kejadian Zoonosis"]
+        IBS["Laporan Agregat IBS (/ibs/laporan)\nRekap Mingguan 24 Penyakit"]
+    end
+    PE -->|"Status: Draf -> Dikirim -> Terverifikasi -> Final\n(source_type = 'pe')"| ZL["Dasbor Zoonosis Lite\n(/dasbor/zoonosis-lite)"]
+    EBS -->|"Sinyal Kejadian\n(source_type = 'ebs')"| ZL
+    IBS -.->|"Diisolasi / Dikecualikan (PR 049)\nagar peta tidak tertimbun titik agregat"| X(["Tidak Masuk ke Peta Zoonosis Lite"])
+    IBS -->|"Dialirkan ke Dasbor Analitik Agregat"| MAIN["Dasbor SKDR, Spasial,\nMatriks Analisa & Mode TV"]
+```
+
+---
+
+### Alur 5: Triase Spasial & Kajian Epidemiologi di Ruang Komando Mode TV (`/tv`)
+```mermaid
+flowchart TD
+    OpenTV(["Petugas PHEOC / Epidemiolog membuka /tv\n(atau klik 'Mode TV' dari Sidebar)"]) --> FullMap["Tampil Peta Penuh Layar 100vw × 100vh\n(Tanpa Header & Tanpa Sidebar)"]
+    FullMap --> CheckBadge{"Lihat Badge Status Risiko\ndi Bilah Komando Atas"}
+    CheckBadge -- "SIAGA KLB (Merah)" --> TriageKLB["Klik Kartu KPI #4 (KLB) atau\nTombol Dock Kiri 'Khusus KLB Aktif'"]
+    CheckBadge -- "WASPADA SINYAL (Oranye)" --> TriageVerif["Klik Tombol 'Alert Belum Diverifikasi'\natau 'Respons > 24 Jam' di Dock Kiri"]
+    CheckBadge -- "TERKENDALI (Hijau)" --> TriageRoutine["Pantau Sebaran Pareto Top-3\n& Putar Time-Slider Mingguan"]
+    
+    TriageKLB & TriageVerif & TriageRoutine --> InspectRight["Telaah Panel Kanan 'Meja Analisa Epidemiologi'"]
+    InspectRight --> Tab1["Tab 1 (Kajian Epid):\nBaca Fase Kurva, Pareto Top-3, Kinerja 24J & Rekomendasi"]
+    InspectRight --> Tab2["Tab 2 (Triase):\nKlik Wilayah Zona Merah -> Perbesar ke Kab/Kota"]
+    InspectRight --> Tab3["Tab 3 (Hotspot):\nKlik Fasyankes Prioritas -> Zoom ke Titik Unit di Peta"]
+    InspectRight --> Tab4["Tab 4 (Detail Wilayah):\nLihat Penyakit Teratas & Buka di Matriks Analisa"]
+    Tab1 & Tab2 & Tab3 & Tab4 --> BackBtn["Klik '← Kembali ke Spasial' bila ingin melihat Tabel Daftar & Ekspor Excel"]
 ```
 
 ---
 
 ## 6. MATRIKS HUBUNGAN INPUT FORMULIR KE DASBOR (DATA MAPPING MATRIX)
 
-Tabel berikut menunjukkan bagaimana setiap data yang diinput oleh pengguna di formulir transaksi mengalir dan mempengaruhi tampilan modul dasbor:
+Tabel berikut memetakan aliran setiap formulir transaksi ke halaman-halaman dasbor aktif saat ini:
 
-| Formulir Transaksi | Data / Isian Kunci | Modul Dasbor Penerima | Indikator / Visualisasi yang Terpengaruh |
+| Formulir Transaksi / Sumber | Data / Isian Kunci | Halaman Dasbor Penerima Saat Ini | Indikator & Visualisasi yang Terpengaruh |
 |---|---|---|---|
-| **Laporan Agregat IBS** | Jumlah Kasus per Penyakit | Dasbor Utama, Dasbor Spasial, Matriks Analisa | Tren kurva epidemiologi, total kasus nasional/wilayah, pewarnaan kuantil choropleth, grid data silang mingguan. |
-| **Laporan Agregat IBS** | Jumlah Kematian | Dasbor Utama, Dasbor Spasial, Matriks Morbiditas | Angka total kematian dan perhitungan Case Fatality Rate (CFR Wilson Score 95% CI). |
-| **Laporan Agregat IBS** | Kasus Melampaui Ambang Batas | Dasbor Utama, Dasbor Spasial (Pin Merah), Tab Sinyal | Pemicuan Alert SKDR mingguan, notifikasi verifikasi fasyankes, pendaftaran log sinyal. |
-| **Laporan Agregat IBS** | Total Kunjungan Fasyankes | Matriks Analisa (Tab Morbiditas) | Penyebut proporsi insidensi penyakit terhadap seluruh beban layanan fasyankes. |
-| **Laporan Agregat IBS** | Waktu Kirim & Status Laporan | Matriks Analisa (Tab Kinerja Pelaporan) | Metrik Kelengkapan Laporan (%) dan Ketepatan Laporan (%) Puskesmas (sebelum Selasa 12.00). |
-| **Laporan Individu IBS** | Diagnosis, ICD-10, SOAP | Dasbor Utama, Matriks Profil Kasus | Sebaran diagnosis spesifik, data mikro rekam medis, verifikasi kasus individual. |
-| **Laporan Individu IBS** | Tinggi & Berat Badan, Umur | Matriks Analisa (Tab Morbiditas) | Status IMT gizi pasien, piramida kelompok usia balita vs dewasa. |
-| **Laporan EBS** | Rumor & Status Kejadian | Dasbor EBS & IBS (Tab EBS), Dasbor Utama | Jumlah rumor masuk, peta sebaran rumor, rasio rumor terverifikasi kasus. |
-| **Laporan EBS** | Matriks Usia (11 Kelompok) & Jenis Kelamin | Dasbor EBS, Matriks Analisa (Tab Morbiditas) | Distribusi demografi kasus terdampak kejadian luar biasa. |
-| **Laporan EBS** | Status KLB, W1, TGC, Respon | Dasbor Utama (Indikator 7-1-7), Modul Klaster | Pencapaian target respon kedaruratan 7-1-7, daftar klaster wabah aktif. |
-| **Pengawasan Gizi MBG** | Butir Audit F1–F12 & Skor F13 | Dasbor MBG (Tab Pengawasan Gizi) | Rata-rata skor kepatuhan SPPG, persentase SPPG memenuhi syarat, ranking butir SOP kritis. |
-| **Pengawasan Gizi MBG** | Foto Bukti Persiapan F7 | Dasbor MBG (Detail Audit SPPG) | Galeri visual kepatuhan higiene dapur untuk tim pembina dinas kesehatan. |
-| **Keracunan Pangan MBG** | Jumlah Sakit & Meninggal | Dasbor MBG (Tab Keracunan Pangan) | Total kasus keracunan pangan MBG, rasio kematian (CFR), status kedaruratan pangan. |
-| **Keracunan Pangan MBG** | Jam Makan & Jam Onset Gejala | Dasbor MBG (Tab Keracunan Pangan) | Grafik distribusi kurva masa inkubasi dan penentuan dugaan agen patogen. |
-| **Keracunan Pangan MBG** | Hasil Uji Lab Sampel Pangan | Dasbor MBG, Dasbor Utama (Lab) | Konfirmasi cemaran mikrobiologi / toksin kimia pada makanan program MBG. |
-| **Form PE (4 Zoonosis)** | Data Klinis, Lab, Hewan Penular | Dasbor Zoonosis Lite, Dasbor Spasial | Peta titik transmisi zoonosis One Health, pemantauan masa observasi hewan rabies, uji MAT Leptospira. |
+| **Laporan Agregat IBS** (`/ibs/laporan` & Sinkronisasi Alert SKDR) | Kasus, Kematian, Lab, Alert, KLB, Status Verifikasi & Respons $<24\text{J}$ | **Dasbor SKDR** (`/main-dashboard`), **Spasial** (`/dashboard/spasial`), **Matriks Analisa** (`/dashboard/matriks-analisa`), **Mode TV** (`/tv`) | KPI Kasus/Kematian/CFR Wilson 95% CI, Choropleth Provinsi & Kab/Kota, 12.800+ titik fasyankes, triase titik belum verifikasi / respons $>24\text{ jam}$, kurva epidemi, dan 48 laporan matriks. *(Dikecualikan dari peta Zoonosis Lite)*. |
+| **Laporan Individu IBS** (`/ibs/individu`) | Diagnosis, ICD-10, Umur/JK, Tanda Vital, IMT, SOAP | **Dasbor SKDR**, **Matriks Analisa** (Tab Profil Kasus & Morbiditas), **Spasial** | Distribusi demografi umur/jenis kelamin, profil klinis pasien, dan rincian kasus individu. |
+| **Laporan EBS** (`/ebs/laporan` & Sinkronisasi API EBS) | Rumor/Sinyal, Matriks Usia 11 Kelompok, Lab, KLB, W1, TGC, Respons 24J | **Dasbor SKDR** (Sumber `EBS`), **Dasbor Zoonosis Lite**, **Spasial**, **Matriks Analisa**, **Mode TV** (`/tv`) | Sinyal kewaspadaan dini EBS, capaian indikator 7-1-7, peta titik sinyal EBS, konversi rumor menjadi KLB, dan kajian epidemiologi Mode TV. |
+| **Form PE 4 Zoonosis** (`/pe/cases`) | Kasus Investigasi Lepto, Rabies, Antraks, Flu Burung; Paparan Hewan; Lab; Kematian | **Dasbor Zoonosis Lite** (`/dasbor/zoonosis-lite`) | Titik peta kasus investigasi PE (`source_type = 'pe'`), tab Kematian Form PE, dan analisis klaster zoonosis One Health. |
+| **Pengawasan Gizi MBG** (`/pengawasan-gizi`) | Skor & Checklist Formulir 1 s.d. 13, Sampel Comstock, Foto F7 | **Dasbor MBG** (`/dasbor/mbg` — Tab Pengawasan Gizi) | KPI kepatuhan SPPG ($\ge 80$), peta multi-layer SPPG, matriks heatmap F1–F13 $\times$ Minggu, dan korelasi silang keracunan. |
+| **Keracunan Pangan MBG** (`/keracunan-mbg`) | Laporan Cepat, Attack Rate, Masa Inkubasi, 26 SOP, Lab, Update Harian | **Dasbor MBG** (`/dasbor/mbg` — Tab Keracunan Pangan) | KPI insiden keracunan pangan, grafik perkembangan harian, distribusi gejala & patogen, serta peta titik insiden. |
 
 ---
 
 ## 7. ATURAN VALIDASI & PENJAMINAN KUALITAS DATA
 
-Untuk menjamin integritas data surveilans nasional, sistem menerapkan aturan validasi ketat (*data integrity rules*) di tingkat peramban (*client-side*) maupun peladen (*backend server-side*):
+Untuk menjamin integritas data surveilans nasional, sistem menerapkan aturan validasi berlapis di tingkat peramban (*client-side*) maupun peladen (*backend server-side*):
 
 1. **Integritas Kematian terhadap Kasus:**
-   - Jumlah Kematian tidak boleh lebih besar dari Jumlah Kasus ($Kematian \le Kasus$).
-   - Jika Jumlah Kematian $> 0$, sistem mewajibkan pengisian Tanggal Meninggal.
+   - Jumlah Kematian tidak boleh melebihi Jumlah Kasus ($\text{Kematian} \le \text{Kasus}$).
+   - Bila status pasien meninggal atau jumlah kematian $> 0$, pengisian Tanggal Meninggal bersifat wajib.
 2. **Integritas Waktu Epidemiologi:**
-   - Tanggal timbul gejala (*onset*) tidak boleh berada di masa depan ($Onset \le Hari Ini$).
-   - Tanggal kedatangan ke faskes harus sama dengan atau setelah tanggal onset ($Tgl Faskes \ge Onset$).
+   - Tanggal timbul gejala (*onset*) tidak boleh berada di masa depan ($\text{Onset} \le \text{Hari Ini}$).
+   - Tanggal kedatangan ke fasyankes harus sama dengan atau setelah tanggal onset ($\text{Tgl Faskes} \ge \text{Onset}$).
    - Minggu epidemiologi yang dipilih tidak boleh melampaui minggu berjalan pada kalender saat ini.
 3. **Integritas Matriks Demografi EBS:**
-   - Jumlah total penjumlahan kasus pada seluruh sel usia dan jenis kelamin ($11 \text{ baris} \times 2 \text{ kolom}$) wajib sama dengan angka total Jumlah Kasus yang diisikan.
+   - Penjumlahan kasus pada matriks usia ($11\text{ kelompok umur} \times 2\text{ jenis kelamin}$) diverifikasi terhadap angka total Jumlah Kasus.
 4. **Pencegahan Redundansi & Duplikasi:**
-   - Sistem mencegah entri ganda untuk laporan agregat IBS pada kombinasi unik: `Unit Pelapor + Tahun + Minggu Epidemiologi`. Bila data sudah ada, sistem membuka mode pembaruan (*edit existing*), bukan membuat baris baru.
-5. **Autosave & Keamanan Sesi:**
-   - Seluruh formulir wizard secara berkala menyimpan draf di sisi klien/server sehingga petugas di daerah dengan koneksi internet tidak stabil tidak kehilangan data yang sedang diinput saat terjadi gangguan jaringan.
+   - Mencegah entri ganda untuk laporan agregat IBS pada kombinasi unik `Unit Pelapor + Tahun + Minggu Epidemiologi` (`HTTP 409 Conflict`), serta memberi peringatan duplikat pada laporan EBS ($\pm 7\text{ hari}$) dan Form Individu IBS (`Unit + Nama Pasien + Tanggal Periksa`).
+5. **Autosave Draf & Keamanan Sesi:**
+   - Seluruh formulir wizard menyimpan draf otomatis (*autosave* + cadangan lokal peramban) serta dilindungi sesi *cookie* `HttpOnly` (`skdr_session`) dengan *guard* hak akses per endpoint di *backend*.
 
 ---
-*Dokumen ini merupakan panduan fungsional resmi dan acuan pengujian (User Acceptance Testing - UAT) untuk seluruh pemangku kepentingan sistem SKDR Indonesia.*
-
+*Dokumen ini merupakan panduan fungsional resmi dan acuan pengujian (User Acceptance Testing - UAT) yang telah diselaraskan dengan tampilan dan arsitektur halaman SKDR Indonesia saat ini (hingga PR 050).*
