@@ -76,7 +76,7 @@
     },
     "items": {
       "home": "Beranda",
-      "mainDashboard": "Main Dashboard",
+      "mainDashboard": "Dasbor SKDR",
       "regionsCountry": "Regions/Country",
       "diseases": "Diseases",
       "sources": "Sumber Data",
@@ -1265,7 +1265,7 @@
     },
     "form": {
       "title": "Formulir Laporan Kasus",
-      "subtitle": "Kirim laporan kasus. Laporan langsung tampil di Dasbor Utama (kartu dan peta).",
+      "subtitle": "Kirim laporan kasus. Laporan langsung tampil di Dasbor SKDR (kartu dan peta).",
       "loadFailed": "Gagal memuat data master: {error}",
       "disease": "Penyakit",
       "chooseDisease": "Pilih penyakit",

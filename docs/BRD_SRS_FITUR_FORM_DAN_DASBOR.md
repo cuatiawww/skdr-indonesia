@@ -519,3 +519,4 @@ Untuk menjamin integritas data surveilans nasional, sistem menerapkan aturan val
 
 ---
 *Dokumen ini merupakan panduan fungsional resmi dan acuan pengujian (User Acceptance Testing - UAT) untuk seluruh pemangku kepentingan sistem SKDR Indonesia.*
+

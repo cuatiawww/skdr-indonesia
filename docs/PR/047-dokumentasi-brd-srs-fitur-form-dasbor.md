@@ -69,3 +69,4 @@ Menjabarkan relasi antara field formulir input terhadap indikator, metrik angka,
 - Struktur markdown divalidasi terhadap format GitHub Flavored Markdown (GFM).
 - Seluruh diagram Mermaid (`flowchart`, `sequenceDiagram`, `stateDiagram-v2`) divalidasi sintaks dan keterbacaannya.
 - Verifikasi silang nama modul, rute URL, nama peran RBAC, dan logika perhitungan terhadap kode sumber backend (`services/backend-rust`) dan frontend (`services/frontend-next`).
+

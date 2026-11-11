@@ -179,7 +179,7 @@ function DashboardModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
   const nf = (v: number) => new Intl.NumberFormat('id-ID').format(v)
   const modules = [
-    { name: 'Dasbor Utama & Peta Nasional', desc: 'Agregasi sinyal EBS, kasus PE, peta choropleth provinsi/kabupaten, dan tren mingguan (W1–W52).' },
+    { name: 'Dasbor SKDR & Peta Nasional', desc: 'Agregasi sinyal EBS, kasus PE, peta choropleth provinsi/kabupaten, dan tren mingguan (W1–W52).' },
     { name: 'Dasbor SKDR EBS & IBS', desc: 'Analitik langsung dari transaksi Form Laporan EBS, Entri Data Agregat (24 penyakit), dan Form Individu.' },
     { name: 'Dasbor Program MBG', desc: 'Pemantauan Pengawasan Gizi SPPG (Form 1–13) serta investigasi kejadian Keracunan Pangan MBG.' },
     { name: 'Form Penyelidikan Epidemiologi (PE)', desc: 'Pencatatan kasus Antraks, Rabies, Leptospirosis, Flu Burung, hingga pelaporan rutin puskesmas.' },
