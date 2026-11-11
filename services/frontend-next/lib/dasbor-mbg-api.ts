@@ -50,6 +50,22 @@ export type MbgFilterOptions = {
   provinces: { id: number; name: string }[]
   kabkota: { id: number; province_id: number; name: string }[]
   sppg: string[]
+  /** PR 052: kecamatan pada transaksi Keracunan (mengikuti filter provinsi/kab) */
+  kecamatan?: { name: string; kabkota_id: number | null }[]
+}
+
+/** PR 052: baris ranking wilayah Keracunan (provinsi / kab-kota / kecamatan). */
+export type MbgRankRow = {
+  id: number | null
+  name: string
+  parent: string | null
+  kejadian: number
+  kasus: number
+  meninggal: number
+  terpapar: number
+  rawat_inap: number
+  cfr_pct: number | null
+  ar_pct: number | null
 }
 
 export type GiziDashData = {
@@ -108,7 +124,12 @@ export type GiziDashData = {
     draf: number
     rekap12_baik: number
     rekap12_belum_baik: number
+    avg_skor?: number | null
   }[]
+  /** PR 052: seri harian menurut tanggal kunjungan */
+  daily_series?: { tanggal: string; kunjungan: number; rekap12_baik: number; rekap12_belum_baik: number; skor_sum: number; skor_n: number }[]
+  /** PR 052: butir "Tidak Sesuai" per formulir (formulir dikirim) */
+  temuan?: { form_no: number; kode: string; label: string | null; jumlah: number; dinilai: number; pct: number | null }[]
   heatmap: {
     weeks: EpiWeekPoint[]
     by_province: {
@@ -212,6 +233,26 @@ export type KeracunanDashData = {
     rawat_jalan: number
     sembuh: number
   }[]
+  /** PR 052 */
+  daily_series?: { tanggal: string; kejadian: number; kasus: number; meninggal: number; terpapar: number; rawat_inap: number }[]
+  ranking?: { provinsi: MbgRankRow[]; kabkota: MbgRankRow[]; kecamatan: MbgRankRow[] }
+  ketepatan_lapor?: {
+    dilaporkan: number
+    belum_dilaporkan: number
+    le24: number
+    h24_48: number
+    h48_72: number
+    gt72: number
+    pct_le24: number | null
+    median_jam: number | null
+    median_gejala_lapor_jam: number | null
+    n_gejala_lapor: number
+  }
+  lab_ringkas?: { belum: number; dikirim: number; hasil: number; kejadian_positif: number; median_tat_jam: number | null; n_tat: number }
+  pangan?: {
+    menu: { komponen: string; nama: string; kejadian: number; kasus: number }[]
+    sampel_positif: { nama: string; kategori: string; positif: number; diuji: number; pct_positif: number | null }[]
+  }
   by_gejala: {
     nama: string
     kejadian: number
@@ -273,6 +314,8 @@ export type KeracunanDashData = {
     pengawasan_kunjungan: number
     pengawasan_rekap12: string | null
     pengawasan_rekap13: string | null
+    pengawasan_avg_skor?: number | null
+    pengawasan_terakhir?: string | null
   }[]
   heatmap: {
     weeks: EpiWeekPoint[]
@@ -310,6 +353,11 @@ export type KeracunanDashData = {
     sekolah_count: number
     ikl: string | null
     slhs: string | null
+    kecamatan?: string | null
+    sekolah?: string | null
+    rawat_inap?: number
+    tgl_lapor?: string | null
+    lapor_jam?: number | null
   }[]
   filter_options: MbgFilterOptions
 }

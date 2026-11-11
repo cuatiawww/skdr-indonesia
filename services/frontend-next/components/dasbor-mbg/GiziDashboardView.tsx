@@ -1,212 +1,64 @@
 'use client'
-// PR 036: Halaman 1 — Pengawasan Gizi MBG (langsung dari transaksi `mbg_kunjungan` & `mbg_form` Form 1–13).
+// PR 036: Halaman Pengawasan Gizi MBG (langsung dari transaksi `mbg_kunjungan` & `mbg_form` Form 1–13).
+// PR 052: filter dipindah ke panel samping bersama; ditambah tren skor SOP per granularitas (ambang 80), distribusi
+// kesimpulan per formulir (termasuk "belum dinilai"), temuan "Tidak Sesuai" teratas per butir F1–F11, dan SPPG skor terendah.
+// Semua panel PR 036 dipertahankan.
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   Award, Building2, CheckCircle2, ClipboardCheck, ClipboardList,
-  MapPin, RotateCcw, ShieldAlert, Utensils,
+  MapPin, ShieldAlert,
 } from 'lucide-react'
 import {
   Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { fetchGiziDash, type GiziDashData } from '@/lib/dasbor-mbg-api'
+import type { GiziDashData } from '@/lib/dasbor-mbg-api'
 import { GiziMatrixHeatmap } from '@/components/dasbor-mbg/MbgHeatmap'
 import { EmptyBox, KpiCard, RatioBar, RekapBadge, nf, pf } from '@/components/dasbor-mbg/MbgUi'
-import { ErrorState, SkeletonChart, SkeletonMap } from '@/components/ui/Skeleton'
+import { SkorTrend } from '@/components/dasbor-mbg/MbgCharts'
+import { Interpretasi, Panel } from '@/components/analisa/ui'
+import { ErrorState, SkeletonChart, SkeletonKpiRow, SkeletonMap } from '@/components/ui/Skeleton'
+import { CEK_NASKAH, F9, FORM_TITLES } from '@/lib/pengawasan-gizi/naskah'
+import { GRAN_OPTS, type MapState, type MbgFilter } from '@/lib/dasbor-mbg-filter'
 
 const EbsIbsLayerMap = dynamic(() => import('@/components/dasbor-ebs-ibs/EbsIbsLayerMap'), {
   ssr: false,
   loading: () => <SkeletonMap />,
 })
 
-type Filters = {
-  status: string
-  rekap12: string
-  from: string
-  to: string
-  province_id: string
-  kabkota_id: string
-  sppg: string
+/** Label butir F3–F11 dari naskah formulir (kode "i{n}"); F1/F2 sudah berlabel dari backend. */
+export function temuanLabel(formNo: number, kode: string, label: string | null): string {
+  if (label) return label
+  const k = Number(kode.replace(/^i/, ''))
+  const komp = formNo === 9 ? F9.komponen : CEK_NASKAH.find((c) => c.no === formNo)?.komponen
+  const it = komp?.flatMap((c) => c.items).find((x) => x.k === k)
+  return it ? `${k}. ${it.label}` : `Butir ${k}`
 }
 
-const EMPTY_FILTERS: Filters = {
-  status: 'all',
-  rekap12: 'all',
-  from: '',
-  to: '',
-  province_id: '',
-  kabkota_id: '',
-  sppg: '',
-}
-
-export default function GiziDashboardView({ onCount }: { onCount?: (n: number) => void }) {
-  const [f, setF] = useState<Filters>(EMPTY_FILTERS)
-  const [mapLevel, setMapLevel] = useState<'prov' | 'kab'>('prov')
-  const [mapParent, setMapParent] = useState<{ id: number; name: string } | null>(null)
-  const [data, setData] = useState<GiziDashData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState(false)
-  const [retry, setRetry] = useState(0)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setErr(false)
-    try {
-      const res = await fetchGiziDash({
-        ...f,
-        level: mapLevel,
-        parent: mapParent?.id ?? '',
-      })
-      setData(res)
-      onCount?.(res.kpis.total_kunjungan)
-    } catch {
-      setErr(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [f, mapLevel, mapParent, onCount])
-
-  useEffect(() => { load() }, [load, retry])
-
-  const kabOptions = useMemo(() => {
-    const all = data?.filter_options.kabkota || []
-    if (!f.province_id) return all
-    return all.filter((k) => String(k.province_id) === f.province_id)
-  }, [data, f.province_id])
-
-  const hasFilters = Boolean(
-    f.status !== 'all' || f.rekap12 !== 'all' || f.from || f.to || f.province_id || f.kabkota_id || f.sppg,
-  )
+export default function GiziDashboardView({ data, loading, error, reload, f, map, setMap }: {
+  data: GiziDashData | null
+  loading: boolean
+  error: string | null
+  reload: () => void
+  f: MbgFilter
+  map: MapState
+  setMap: (m: MapState) => void
+}) {
+  const mapParent = map.parent
+  const setMapParent = (p: { id: number; name: string } | null) => setMap(p ? { level: 'kab', parent: p } : { level: 'prov', parent: null })
+  const granLabel = GRAN_OPTS.find((g) => g.value === f.gran)?.label
+  const formDist = useMemo(() => (data?.by_formulir || []).map((x) => ({ ...x, belum: Math.max(0, x.tersimpan - x.sesuai - x.tidak_sesuai) })), [data])
+  const lowest = useMemo(() => [...(data?.sppg_summary || [])].filter((s) => s.avg_skor != null).sort((a, b) => (a.avg_skor ?? 0) - (b.avg_skor ?? 0)).slice(0, 10), [data])
+  const temuan = data?.temuan || []
 
   return (
     <div className="space-y-5" data-testid="gizi-dashboard-view">
-      {/* Filter Bar */}
-      <div className="skdr-card p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-              <Utensils className="h-4 w-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Filter Pengawasan Gizi MBG</h3>
-              <p className="text-xs text-slate-500">
-                Sumber langsung: transaksi <code className="text-[11px]">mbg_kunjungan</code> &amp; <code className="text-[11px]">mbg_form</code> (Form 1–13)
-                {data?.kpis.date_min ? ` · Periode data: ${data.kpis.date_min} s/d ${data.kpis.date_max}` : ''}
-              </p>
-            </div>
-          </div>
-          {hasFilters ? (
-            <button
-              type="button"
-              onClick={() => {
-                setF(EMPTY_FILTERS)
-                setMapLevel('prov')
-                setMapParent(null)
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset Filter
-            </button>
-          ) : null}
-        </div>
-
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Status Kunjungan
-            <select
-              value={f.status}
-              onChange={(e) => setF({ ...f, status: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="all">Semua (Dikirim &amp; Draf)</option>
-              <option value="dikirim">Dikirim</option>
-              <option value="draf">Draf</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Rekap Standar Gizi (F12)
-            <select
-              value={f.rekap12}
-              onChange={(e) => setF({ ...f, rekap12: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="all">Semua Rekap F12</option>
-              <option value="BAIK">BAIK</option>
-              <option value="BELUM BAIK">BELUM BAIK</option>
-              <option value="belum">Belum Ada Rekap F12</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Tanggal Dari
-            <input
-              type="date"
-              value={f.from}
-              onChange={(e) => setF({ ...f, from: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Tanggal Sampai
-            <input
-              type="date"
-              value={f.to}
-              onChange={(e) => setF({ ...f, to: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Provinsi
-            <select
-              value={f.province_id}
-              onChange={(e) => setF({ ...f, province_id: e.target.value, kabkota_id: '' })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="">Semua Provinsi</option>
-              {(data?.filter_options.provinces || []).map((p) => (
-                <option key={p.id} value={String(p.id)}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Kabupaten / Kota
-            <select
-              value={f.kabkota_id}
-              onChange={(e) => setF({ ...f, kabkota_id: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="">Semua Kab/Kota</option>
-              {kabOptions.map((k) => (
-                <option key={k.id} value={String(k.id)}>{k.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Nama SPPG
-            <select
-              value={f.sppg}
-              onChange={(e) => setF({ ...f, sppg: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="">Semua SPPG</option>
-              {(data?.filter_options.sppg || []).map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-
-      {err ? <ErrorState onRetry={() => setRetry((x) => x + 1)} /> : null}
+      {error ? <ErrorState message={error} onRetry={reload} /> : null}
 
       {loading && !data ? (
         <div className="space-y-4">
+          <SkeletonKpiRow count={6} />
           <SkeletonMap />
           <SkeletonChart />
         </div>
@@ -258,6 +110,84 @@ export default function GiziDashboardView({ onCount }: { onCount?: (n: number) =
             />
           </div>
 
+          <Interpretasi lines={[
+            data.kpis.total_kunjungan ? `${nf(data.kpis.total_kunjungan)} kunjungan pengawasan ke ${nf(data.kpis.sppg_unik)} SPPG pada filter ini.` : null,
+            data.kpis.avg_skor_sop != null ? `Rata-rata skor penerapan SOP ${pf(data.kpis.avg_skor_sop)}${data.kpis.avg_skor_sop < 80 ? ' — di bawah ambang 80 (belum sesuai standar).' : ' — memenuhi ambang 80.'}` : null,
+            data.kpis.rekap12_belum_baik ? `${nf(data.kpis.rekap12_belum_baik)} kunjungan berkesimpulan standar gizi (F12) BELUM BAIK; SPPG ini prioritas pembinaan karena kelemahan higiene & proses dapur adalah faktor risiko keracunan pangan.` : null,
+            temuan[0] ? `Temuan tersering: F${temuan[0].form_no} ${temuanLabel(temuan[0].form_no, temuan[0].kode, temuan[0].label)} (${nf(temuan[0].jumlah)} formulir).` : null,
+          ]} />
+
+          {/* PR 052: tren skor + distribusi kesimpulan */}
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+            <Panel title={`Tren Rata-rata Skor Penerapan SOP per ${granLabel}`} testId="panel-skor-trend"
+              tip="Rata-rata skor Formulir 3–11 per kunjungan, dikelompokkan menurut tanggal kunjungan. Garis merah = ambang 80 (sesuai standar gizi apabila skor ≥ 80).">
+              <SkorTrend series={data.daily_series} gran={f.gran} />
+            </Panel>
+            <Panel title="Distribusi Kesimpulan per Formulir" testId="panel-kesimpulan"
+              tip="Jumlah formulir tersimpan menurut kesimpulan: Sesuai/BAIK, Tidak Sesuai/BELUM BAIK, atau belum dinilai (butir belum lengkap / formulir tanpa kesimpulan).">
+              {!formDist.some((x) => x.tersimpan > 0) ? <EmptyBox msg="Belum ada pengisian Formulir 1–13 pada kunjungan terfilter." /> : (
+                <div className="h-[290px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={formDist.map((x) => ({ ...x, kode: `F${x.form_no}` }))} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="kode" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip labelFormatter={(l: any) => { const n = Number(String(l).slice(1)); return `${l} · ${FORM_TITLES[n]?.short || ''}` }} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="sesuai" stackId="a" name="Sesuai / BAIK" fill="#10b981" />
+                      <Bar dataKey="tidak_sesuai" stackId="a" name="Tidak Sesuai / BELUM BAIK" fill="#f59e0b" />
+                      <Bar dataKey="belum" stackId="a" name="Belum dinilai" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Panel>
+          </div>
+
+          {/* PR 052: temuan teratas + SPPG skor terendah */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Panel title="Temuan “Tidak Sesuai” Terbanyak" testId="panel-temuan"
+              desc="Butir penilaian F1–F11 yang paling sering Tidak Sesuai (formulir berstatus dikirim)"
+              tip="Persentase = jumlah formulir dengan butir tersebut Tidak Sesuai ÷ jumlah formulir yang sama yang dikirim. Gunakan untuk menentukan materi pembinaan SPPG.">
+              {!temuan.length ? <EmptyBox msg="Belum ada temuan Tidak Sesuai pada formulir yang dikirim." /> : (
+                <div className="max-h-[360px] overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-slate-200"><th className="py-2 pr-2 text-left">Form</th><th className="py-2 pr-2 text-left">Butir</th><th className="py-2 text-right">Jumlah</th><th className="py-2 text-right">% form</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {temuan.slice(0, 25).map((t) => (
+                        <tr key={`${t.form_no}-${t.kode}`} className="hover:bg-slate-50">
+                          <td className="py-1.5 pr-2 align-top font-extrabold text-emerald-800" title={FORM_TITLES[t.form_no]?.title}>F{t.form_no}</td>
+                          <td className="py-1.5 pr-2 text-slate-700"><div className="line-clamp-2">{temuanLabel(t.form_no, t.kode, t.label)}</div><div className="text-[10px] text-slate-400">{FORM_TITLES[t.form_no]?.short}</div></td>
+                          <td className="py-1.5 text-right align-top font-bold tabular-nums text-amber-700">{nf(t.jumlah)}</td>
+                          <td className="py-1.5 text-right align-top tabular-nums text-slate-600">{pf(t.pct)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Panel>
+            <Panel title="SPPG dengan Skor Pengawasan Terendah" testId="panel-skor-terendah"
+              desc="10 SPPG dengan rata-rata skor penerapan SOP (F3–F11) terendah"
+              tip="Skor < 80 = belum sesuai standar. Bandingkan dengan tab Ringkasan (Tautan Risiko) untuk melihat apakah SPPG ini juga pernah mengalami kejadian keracunan.">
+              {!lowest.length ? <EmptyBox msg="Belum ada SPPG dengan skor penerapan SOP." /> : (
+                <div className="space-y-2.5">
+                  {lowest.map((x) => (
+                    <div key={x.nama_sppg}>
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="min-w-0 truncate font-semibold text-slate-800">{x.nama_sppg} <span className="font-normal text-slate-500">· {[x.kabkota_name, x.province_name].filter(Boolean).join(', ')}</span></span>
+                        <span className={`shrink-0 font-mono font-bold ${(x.avg_skor ?? 0) < 80 ? 'text-red-700' : 'text-emerald-700'}`}>{x.avg_skor?.toFixed(1)}</span>
+                      </div>
+                      <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-slate-100"><div className={(x.avg_skor ?? 0) < 80 ? 'bg-red-500' : 'bg-emerald-500'} style={{ width: `${Math.min(100, x.avg_skor ?? 0)}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </div>
+
           {/* Spatial Layer Map + Region Ranking */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className="xl:col-span-2">
@@ -267,14 +197,8 @@ export default function GiziDashboardView({ onCount }: { onCount?: (n: number) =
                 parentName={mapParent?.name}
                 regions={data.map.regions}
                 points={data.map.points}
-                onDrillDown={(id, name) => {
-                  setMapLevel('kab')
-                  setMapParent({ id, name })
-                }}
-                onResetLevel={() => {
-                  setMapLevel('prov')
-                  setMapParent(null)
-                }}
+                onDrillDown={(id, name) => setMapParent({ id, name })}
+                onResetLevel={() => setMapParent(null)}
               />
             </div>
 
@@ -313,10 +237,7 @@ export default function GiziDashboardView({ onCount }: { onCount?: (n: number) =
                           onClick={() => {
                             if (data.map.level === 'prov') {
                               const id = Number(r.key)
-                              if (Number.isFinite(id) && id > 0) {
-                                setMapLevel('kab')
-                                setMapParent({ id, name: r.name })
-                              }
+                              if (Number.isFinite(id) && id > 0) setMapParent({ id, name: r.name })
                             }
                           }}
                         >

@@ -1,293 +1,155 @@
 'use client'
-// PR 036: Halaman 2 — Keracunan Pangan MBG (langsung dari transaksi `mbg_keracunan` & `mbg_keracunan_update`, plus korelasi ke Pengawasan Gizi SPPG).
+// PR 036: Halaman Keracunan Pangan MBG (langsung dari transaksi `mbg_keracunan` & `mbg_keracunan_update`, plus korelasi ke Pengawasan Gizi SPPG).
+// PR 052: filter dipindah ke panel samping bersama (MbgFilterPanel); ditambah KPI epidemiologis (CFR + IK 95% Wilson,
+// attack rate, rawat inap), kurva epidemi per granularitas, grafik wilayah ala Kemkes, ketepatan lapor, ringkasan lab,
+// pangan dicurigai, dan daftar kejadian (cari + halaman + tautan detail). Semua panel PR 036 dipertahankan.
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Activity, AlertTriangle, FlaskConical, Hospital, RotateCcw,
-  School, ShieldAlert, Skull, Stethoscope, Users,
+  Activity, FlaskConical, Hospital,
+  ShieldAlert, Skull, Stethoscope, Timer, Users, Utensils,
 } from 'lucide-react'
 import {
   Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { fetchKeracunanDash, type KeracunanDashData } from '@/lib/dasbor-mbg-api'
+import type { KeracunanDashData } from '@/lib/dasbor-mbg-api'
 import { KeracunanMatrixHeatmap } from '@/components/dasbor-mbg/MbgHeatmap'
 import { EmptyBox, KpiCard, RatioBar, RekapBadge, nf, pf } from '@/components/dasbor-mbg/MbgUi'
-import { ErrorState, SkeletonChart, SkeletonMap } from '@/components/ui/Skeleton'
+import { EpiCurve, RegionChart, type RegionLevel } from '@/components/dasbor-mbg/MbgCharts'
+import IncidentList from '@/components/dasbor-mbg/IncidentList'
+import { Interpretasi, Panel } from '@/components/analisa/ui'
+import { ErrorState, SkeletonChart, SkeletonKpiRow, SkeletonMap } from '@/components/ui/Skeleton'
+import { fmtJam, GRAN_OPTS, jenisLabel, wilson, type MapState, type MbgFilter } from '@/lib/dasbor-mbg-filter'
 
 const EbsIbsLayerMap = dynamic(() => import('@/components/dasbor-ebs-ibs/EbsIbsLayerMap'), {
   ssr: false,
   loading: () => <SkeletonMap />,
 })
 
-type Filters = {
-  status: string
-  lab_status: string
-  ikl: string
-  slhs: string
-  from: string
-  to: string
-  province_id: string
-  kabkota_id: string
-  sppg: string
+export function autoRegionLevel(f: MbgFilter): RegionLevel {
+  return f.kab.length ? 'kecamatan' : f.prov.length ? 'kabkota' : 'provinsi'
 }
 
-const EMPTY_FILTERS: Filters = {
-  status: 'all',
-  lab_status: 'all',
-  ikl: 'all',
-  slhs: 'all',
-  from: '',
-  to: '',
-  province_id: '',
-  kabkota_id: '',
-  sppg: '',
-}
-
-export default function KeracunanDashboardView({ onCount }: { onCount?: (n: number) => void }) {
-  const [f, setF] = useState<Filters>(EMPTY_FILTERS)
-  const [mapLevel, setMapLevel] = useState<'prov' | 'kab'>('prov')
-  const [mapParent, setMapParent] = useState<{ id: number; name: string } | null>(null)
-  const [data, setData] = useState<KeracunanDashData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState(false)
-  const [retry, setRetry] = useState(0)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setErr(false)
-    try {
-      const res = await fetchKeracunanDash({
-        ...f,
-        level: mapLevel,
-        parent: mapParent?.id ?? '',
-      })
-      setData(res)
-      onCount?.(res.kpis.total_kejadian)
-    } catch {
-      setErr(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [f, mapLevel, mapParent, onCount])
-
-  useEffect(() => { load() }, [load, retry])
-
-  const kabOptions = useMemo(() => {
-    const all = data?.filter_options.kabkota || []
-    if (!f.province_id) return all
-    return all.filter((k) => String(k.province_id) === f.province_id)
-  }, [data, f.province_id])
-
-  const hasFilters = Boolean(
-    f.status !== 'all' || f.lab_status !== 'all' || f.ikl !== 'all' || f.slhs !== 'all'
-    || f.from || f.to || f.province_id || f.kabkota_id || f.sppg,
-  )
+export default function KeracunanDashboardView({ data, loading, error, reload, f, map, setMap }: {
+  data: KeracunanDashData | null
+  loading: boolean
+  error: string | null
+  reload: () => void
+  f: MbgFilter
+  map: MapState
+  setMap: (m: MapState) => void
+}) {
+  const setMapLevel = (l: 'prov' | 'kab') => { if (l === 'prov') setMap({ level: 'prov', parent: null }) }
+  const setMapParent = (p: { id: number; name: string } | null) => setMap(p ? { level: 'kab', parent: p } : { level: 'prov', parent: null })
+  const mapParent = map.parent
+  const k = data?.kpis
+  const cfr = k ? wilson(k.total_meninggal, k.total_kasus) : null
+  const kt = data?.ketepatan_lapor
+  const lr = data?.lab_ringkas
+  const granLabel = GRAN_OPTS.find((g) => g.value === f.gran)?.label
 
   return (
     <div className="space-y-5" data-testid="keracunan-dashboard-view">
-      {/* Filter Bar */}
-      <div className="skdr-card p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-700">
-              <AlertTriangle className="h-4 w-4" />
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Filter Keracunan Pangan MBG</h3>
-              <p className="text-xs text-slate-500">
-                Sumber langsung: transaksi <code className="text-[11px]">mbg_keracunan</code> &amp; <code className="text-[11px]">mbg_keracunan_update</code>
-                {data?.kpis.date_min ? ` · Periode data: ${data.kpis.date_min} s/d ${data.kpis.date_max}` : ''}
-              </p>
-            </div>
-          </div>
-          {hasFilters ? (
-            <button
-              type="button"
-              onClick={() => {
-                setF(EMPTY_FILTERS)
-                setMapLevel('prov')
-                setMapParent(null)
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset Filter
-            </button>
-          ) : null}
-        </div>
-
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-9">
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Status Laporan
-            <select
-              value={f.status}
-              onChange={(e) => setF({ ...f, status: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="all">Semua Status</option>
-              <option value="dilaporkan">Dilaporkan</option>
-              <option value="ditutup">Ditutup</option>
-              <option value="draf">Draf</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Status Lab
-            <select
-              value={f.lab_status}
-              onChange={(e) => setF({ ...f, lab_status: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="all">Semua Lab</option>
-              <option value="belum">Belum Diambil</option>
-              <option value="dikirim">Dikirim</option>
-              <option value="hasil">Ada Hasil</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Hasil IKL
-            <select
-              value={f.ikl}
-              onChange={(e) => setF({ ...f, ikl: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="all">Semua IKL</option>
-              <option value="Memenuhi Syarat">Memenuhi Syarat</option>
-              <option value="Tidak Memenuhi Syarat">Tidak Memenuhi</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Kepemilikan SLHS
-            <select
-              value={f.slhs}
-              onChange={(e) => setF({ ...f, slhs: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="all">Semua SLHS</option>
-              <option value="Ya">Ya (Ada SLHS)</option>
-              <option value="Tidak">Tidak Ada</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Kejadian Dari
-            <input
-              type="date"
-              value={f.from}
-              onChange={(e) => setF({ ...f, from: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Kejadian Sampai
-            <input
-              type="date"
-              value={f.to}
-              onChange={(e) => setF({ ...f, to: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Provinsi
-            <select
-              value={f.province_id}
-              onChange={(e) => setF({ ...f, province_id: e.target.value, kabkota_id: '' })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="">Semua Provinsi</option>
-              {(data?.filter_options.provinces || []).map((p) => (
-                <option key={p.id} value={String(p.id)}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Kabupaten / Kota
-            <select
-              value={f.kabkota_id}
-              onChange={(e) => setF({ ...f, kabkota_id: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="">Semua Kab/Kota</option>
-              {kabOptions.map((k) => (
-                <option key={k.id} value={String(k.id)}>{k.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">
-            Nama SPPG
-            <select
-              value={f.sppg}
-              onChange={(e) => setF({ ...f, sppg: e.target.value })}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800"
-            >
-              <option value="">Semua SPPG</option>
-              {(data?.filter_options.sppg || []).map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-
-      {err ? <ErrorState onRetry={() => setRetry((x) => x + 1)} /> : null}
+      {error ? <ErrorState message={error} onRetry={reload} /> : null}
 
       {loading && !data ? (
         <div className="space-y-4">
+          <SkeletonKpiRow count={6} />
           <SkeletonMap />
           <SkeletonChart />
         </div>
-      ) : data ? (
+      ) : data && k ? (
         <>
-          {/* 6 KPI Cards */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiCard
-              icon={ShieldAlert}
-              label="Total Kejadian"
-              value={nf(data.kpis.total_kejadian)}
-              sub={`${nf(data.kpis.dilaporkan)} dilaporkan · ${nf(data.kpis.ditutup)} ditutup · ${nf(data.kpis.draf)} draf`}
-              tone="amber"
-            />
-            <KpiCard
-              icon={Skull}
-              label="Total Kasus & CFR"
-              value={nf(data.kpis.total_kasus)}
-              sub={`${nf(data.kpis.total_meninggal)} meninggal · CFR: ${pf(data.kpis.cfr_pct)}`}
-              tone="red"
-            />
-            <KpiCard
-              icon={Activity}
-              label="Attack Rate & Inkubasi"
-              value={pf(data.kpis.attack_rate_pct)}
-              sub={`${nf(data.kpis.total_terpapar)} terpapar · Avg inkubasi: ${data.kpis.avg_inkubasi_jam != null ? `${data.kpis.avg_inkubasi_jam.toFixed(1)} jam` : '—'}`}
-              tone="blue"
-            />
-            <KpiCard
-              icon={Hospital}
-              label="Perawatan & Sekolah"
-              value={`${nf(data.kpis.rawat_inap)} / ${nf(data.kpis.rawat_jalan)}`}
-              sub={`Inap / Jalan · ${nf(data.kpis.sembuh)} sembuh · ${nf(data.kpis.total_sekolah_terdampak)} sekolah`}
-              tone="teal"
-            />
-            <KpiCard
-              icon={FlaskConical}
-              label="Kesiapan Lab Sampel"
-              value={nf(data.kpis.lab_hasil)}
-              sub={`Hasil keluar · ${nf(data.kpis.lab_dikirim)} dikirim · ${nf(data.kpis.lab_belum)} belum`}
-              tone="emerald"
-            />
-            <KpiCard
-              icon={School}
-              label="SLHS & IKL SPPG"
-              value={`${nf(data.kpis.slhs_ya)} SLHS`}
-              sub={`IKL Memenuhi: ${nf(data.kpis.ikl_memenuhi)} · Tidak: ${nf(data.kpis.ikl_tidak_memenuhi)}`}
-              tone="slate"
-            />
+          {/* PR 052: KPI epidemiologis (menggantikan 6 kartu PR 036; seluruh angka lama tetap ada di sub-teks) */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" data-testid="keracunan-kpi">
+            <KpiCard icon={ShieldAlert} label="Kejadian (KLB)" value={nf(k.total_kejadian)} tone="amber"
+              sub={`${nf(k.dilaporkan)} dilaporkan · ${nf(k.ditutup)} ditutup · ${nf(k.draf)} draf · ${nf(k.sppg_unik)} SPPG`} />
+            <KpiCard icon={Users} label="Kasus" value={nf(k.total_kasus)} tone="red"
+              sub={`${nf(k.total_terpapar)} terpapar · ${nf(k.total_sekolah_terdampak)} sekolah · ${nf(k.provinsi_unik)} prov / ${nf(k.kabkota_unik)} kab/kota`} />
+            <KpiCard icon={Hospital} label="Rawat Inap" value={nf(k.rawat_inap)} tone="teal"
+              sub={`${pf(k.total_kasus ? (k.rawat_inap * 100) / k.total_kasus : null)} dari kasus · ${nf(k.rawat_jalan)} rawat jalan · ${nf(k.sembuh)} sembuh`} />
+            <KpiCard icon={Skull} label="Kematian & CFR" value={nf(k.total_meninggal)} tone="slate"
+              sub={cfr ? <>CFR <b className="text-slate-800">{pf(cfr.p)}</b> (IK 95% {pf(cfr.lo)}–{pf(cfr.hi)})</> : 'CFR: — (belum ada kasus)'} />
+            <KpiCard icon={Activity} label="Attack Rate" value={pf(k.attack_rate_pct)} tone="blue"
+              sub={`Kasus ÷ terpapar (hanya kejadian dengan data terpapar) · inkubasi rata-rata ${k.avg_inkubasi_jam != null ? `${k.avg_inkubasi_jam.toFixed(1)} jam` : '—'}`} />
+            <KpiCard icon={FlaskConical} label="Status Lab" value={`${nf(k.lab_hasil)} hasil`} tone="emerald"
+              sub={`${nf(k.lab_dikirim)} dikirim · ${nf(k.lab_belum)} belum diambil${lr ? ` · ${nf(lr.kejadian_positif)} kejadian sampel positif` : ''}`} />
+          </div>
+
+          <Interpretasi lines={[
+            k.total_kejadian ? `Pada filter ini tercatat ${nf(k.total_kejadian)} kejadian keracunan pangan MBG dengan ${nf(k.total_kasus)} kasus.` : null,
+            cfr ? `CFR ${pf(cfr.p)} (IK 95% ${pf(cfr.lo)}–${pf(cfr.hi)}); interval lebar berarti jumlah kasus masih kecil sehingga CFR belum stabil.` : null,
+            kt && kt.dilaporkan ? `${pf(kt.pct_le24)} kejadian dilaporkan ≤ 24 jam setelah kejadian (median ${fmtJam(kt.median_jam)}); target laporan cepat KLB adalah 1×24 jam.` : null,
+            lr && k.total_kejadian ? `Sampel lab sudah berhasil untuk ${nf(lr.hasil)} dari ${nf(k.total_kejadian)} kejadian; tanpa konfirmasi lab, agen penyebab dan pangan penyebab belum dapat dipastikan.` : null,
+          ]} />
+
+          {/* PR 052: kurva epidemi + grafik wilayah (panel "KERACUNAN MAKAN MBG" Kemkes) */}
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+            <Panel title={`Kurva Epidemi · ${jenisLabel(f.jenis)} per ${granLabel}`} testId="panel-epi-curve"
+              tip="Menurut tanggal kejadian (bukan tanggal lapor). Periode tanpa kejadian tetap ditampilkan bernilai 0 supaya pola klaster terlihat. Ubah Jenis Analisa & granularitas di panel filter.">
+              <EpiCurve series={data.daily_series} jenis={f.jenis} gran={f.gran} />
+            </Panel>
+            <Panel title={`${jenisLabel(f.jenis)} Keracunan Pangan MBG per Wilayah`} testId="panel-region-chart"
+              tip="Setara panel 'KERACUNAN MAKAN MBG' di dasbor Kemkes: jenis grafik Column/Line/Bar, label data, dan urutan Nama Daerah/Tertinggi/Terendah. Tingkat wilayah otomatis mengikuti filter (provinsi → kab/kota → kecamatan) dan bisa diganti.">
+              <RegionChart ranking={data.ranking} jenis={f.jenis} autoLevel={autoRegionLevel(f)} />
+            </Panel>
+          </div>
+
+          {/* PR 052: ketepatan lapor · lab · pangan dicurigai */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel title={<span className="inline-flex items-center gap-1.5"><Timer className="h-4 w-4 text-blue-700" /> Ketepatan Waktu Lapor</span>} testId="panel-ketepatan"
+              tip="Selang tanggal-jam kejadian → laporan dikirim (status Dilaporkan). Laporan cepat KLB keracunan pangan semestinya ≤ 24 jam. Draf belum dihitung.">
+              {!kt || !(kt.dilaporkan + kt.belum_dilaporkan) ? <EmptyBox msg="Belum ada laporan pada filter ini." /> : (
+                <div className="space-y-2.5">
+                  <RatioBar label="≤ 24 jam (tepat waktu)" good={kt.le24} total={Math.max(1, kt.dilaporkan)} barCls="bg-emerald-600" />
+                  <RatioBar label="24–48 jam" good={kt.h24_48} total={Math.max(1, kt.dilaporkan)} barCls="bg-amber-500" />
+                  <RatioBar label="48–72 jam" good={kt.h48_72} total={Math.max(1, kt.dilaporkan)} barCls="bg-orange-600" />
+                  <RatioBar label="> 72 jam" good={kt.gt72} total={Math.max(1, kt.dilaporkan)} barCls="bg-red-600" />
+                  <div className="grid grid-cols-3 gap-2 pt-1 text-center text-xs">
+                    <div className="rounded-lg bg-slate-50 px-2 py-1.5"><div className="text-[10px] font-bold text-slate-500">Median kejadian→lapor</div><div className="font-black text-slate-900">{fmtJam(kt.median_jam)}</div></div>
+                    <div className="rounded-lg bg-slate-50 px-2 py-1.5"><div className="text-[10px] font-bold text-slate-500">Median gejala→lapor</div><div className="font-black text-slate-900">{fmtJam(kt.median_gejala_lapor_jam)}</div></div>
+                    <div className="rounded-lg bg-slate-50 px-2 py-1.5"><div className="text-[10px] font-bold text-slate-500">Belum dilaporkan</div><div className="font-black text-slate-900">{nf(kt.belum_dilaporkan)}</div></div>
+                  </div>
+                </div>
+              )}
+            </Panel>
+            <Panel title={<span className="inline-flex items-center gap-1.5"><FlaskConical className="h-4 w-4 text-emerald-700" /> Status Pemeriksaan Lab</span>} testId="panel-lab"
+              tip="Belum = sampel belum diambil; Dikirim = sampel diambil/dikirim; Hasil = hasil uji tersedia. Waktu tunggu = pengambilan sampel → hasil keluar.">
+              {!k.total_kejadian ? <EmptyBox msg="Belum ada kejadian pada filter ini." /> : (
+                <div className="space-y-2.5">
+                  <RatioBar label="Ada hasil" good={k.lab_hasil} total={k.total_kejadian} barCls="bg-emerald-600" />
+                  <RatioBar label="Sampel dikirim, menunggu hasil" good={k.lab_dikirim} total={k.total_kejadian} barCls="bg-blue-600" />
+                  <RatioBar label="Sampel belum diambil" good={k.lab_belum} total={k.total_kejadian} barCls="bg-slate-400" />
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-center text-xs">
+                    <div className="rounded-lg bg-red-50 px-2 py-1.5"><div className="text-[10px] font-bold text-red-700">Kejadian sampel positif</div><div className="font-black text-red-900">{nf(lr?.kejadian_positif)}</div></div>
+                    <div className="rounded-lg bg-slate-50 px-2 py-1.5"><div className="text-[10px] font-bold text-slate-500">Median waktu tunggu hasil</div><div className="font-black text-slate-900">{fmtJam(lr?.median_tat_jam)}{lr?.n_tat ? <span className="font-medium text-slate-400"> (n={lr.n_tat})</span> : null}</div></div>
+                  </div>
+                </div>
+              )}
+            </Panel>
+            <Panel title={<span className="inline-flex items-center gap-1.5"><Utensils className="h-4 w-4 text-orange-700" /> Pangan Dicurigai</span>} testId="panel-pangan"
+              tip="Sampel positif = sampel pangan/air/spesimen dengan hasil mikrobiologi atau kimia Positif (bukti terkuat). Menu tersaji = komponen menu pada hari kejadian (petunjuk awal, belum tentu penyebab).">
+              {!(data.pangan?.sampel_positif.length || data.pangan?.menu.length) ? <EmptyBox msg="Belum ada isian menu atau hasil sampel pangan." /> : (
+                <div className="space-y-3 text-xs">
+                  {data.pangan?.sampel_positif.length ? (
+                    <div>
+                      <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-wider text-red-700">Sampel positif lab</div>
+                      <div className="space-y-1">{data.pangan.sampel_positif.slice(0, 6).map((x) => (
+                        <div key={x.nama} className="flex items-center justify-between gap-2 rounded-lg bg-red-50/60 px-2.5 py-1.5"><span className="min-w-0 truncate font-semibold text-slate-800" title={`${x.nama} · ${x.kategori}`}>{x.nama} <span className="font-normal text-slate-500">· {x.kategori}</span></span><span className="shrink-0 whitespace-nowrap font-mono text-[11px] font-bold text-red-700">{x.positif}/{x.diuji} positif</span></div>
+                      ))}</div>
+                    </div>
+                  ) : null}
+                  {data.pangan?.menu.length ? (
+                    <div>
+                      <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">Menu tersaji saat kejadian</div>
+                      <div className="space-y-1">{data.pangan.menu.slice(0, 8).map((x) => (
+                        <div key={`${x.komponen}-${x.nama}`} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5"><span className="min-w-0 truncate font-semibold text-slate-800" title={`${x.nama} · ${x.komponen}`}>{x.nama} <span className="font-normal text-slate-500">· {x.komponen}</span></span><span className="shrink-0 whitespace-nowrap text-right font-mono text-[10.5px] text-slate-600">{x.kejadian} kej<br />{nf(x.kasus)} kasus</span></div>
+                      ))}</div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </Panel>
           </div>
 
           {/* Spatial Layer Map + Region Ranking */}
@@ -299,14 +161,8 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
                 parentName={mapParent?.name}
                 regions={data.map.regions}
                 points={data.map.points}
-                onDrillDown={(id, name) => {
-                  setMapLevel('kab')
-                  setMapParent({ id, name })
-                }}
-                onResetLevel={() => {
-                  setMapLevel('prov')
-                  setMapParent(null)
-                }}
+                onDrillDown={(id, name) => setMapParent({ id, name })}
+                onResetLevel={() => setMapLevel('prov')}
               />
             </div>
 
@@ -344,10 +200,7 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
                           onClick={() => {
                             if (data.map.level === 'prov') {
                               const id = Number(r.key)
-                              if (Number.isFinite(id) && id > 0) {
-                                setMapLevel('kab')
-                                setMapParent({ id, name: r.name })
-                              }
+                              if (Number.isFinite(id) && id > 0) setMapParent({ id, name: r.name })
                             }
                           }}
                         >
@@ -511,6 +364,16 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
                 <EmptyBox msg="Belum ada data investigasi lingkungan." />
               ) : (
                 <div className="space-y-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2" data-testid="slhs-ikl">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                      <div className="font-bold text-slate-700">SLHS SPPG</div>
+                      <div className="mt-1 font-mono text-[11px]"><b className="text-emerald-700">{nf(data.lingkungan_sop.slhs.ya)} Ada</b> · <span className="text-red-600">{nf(data.lingkungan_sop.slhs.tidak)} Tidak</span> · <span className="text-slate-400">{nf(data.lingkungan_sop.slhs.kosong)} kosong</span></div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                      <div className="font-bold text-slate-700">Hasil IKL</div>
+                      <div className="mt-1 font-mono text-[11px]"><b className="text-emerald-700">{nf(data.lingkungan_sop.ikl.memenuhi)} MS</b> · <span className="text-red-600">{nf(data.lingkungan_sop.ikl.tidak_memenuhi)} TMS</span> · <span className="text-slate-400">{nf(data.lingkungan_sop.ikl.kosong)} kosong</span></div>
+                    </div>
+                  </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
                     <div className="font-bold text-slate-700">Penjamah Pangan Tersertifikasi</div>
                     <div className="mt-1 flex items-baseline justify-between">
@@ -621,8 +484,8 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
             </div>
           </div>
 
-          {/* SPPG Cross-Reference Matrix (Keracunan x Pengawasan Gizi) + Recent Incidents */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {/* SPPG Cross-Reference Matrix (Keracunan x Pengawasan Gizi) */}
+          <div className="grid grid-cols-1 gap-4">
             <div className="skdr-card flex flex-col p-4">
               <div className="mb-3">
                 <h3 className="text-sm font-bold text-slate-800">Matriks SPPG Terdampak × Status Pengawasan Gizi</h3>
@@ -639,6 +502,7 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
                         <th className="py-2 text-right">Kej</th>
                         <th className="py-2 text-right">Kasus</th>
                         <th className="py-2 text-right">Kunj Gizi</th>
+                        <th className="py-2 text-right">Skor SOP</th>
                         <th className="py-2 text-center">F12 Terakhir</th>
                       </tr>
                     </thead>
@@ -654,6 +518,7 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
                           <td className="py-2 text-right tabular-nums text-slate-700">{nf(s.kejadian)}</td>
                           <td className="py-2 text-right font-bold tabular-nums text-red-700">{nf(s.kasus)}</td>
                           <td className="py-2 text-right tabular-nums text-emerald-700">{nf(s.pengawasan_kunjungan)}</td>
+                          <td className={`py-2 text-right font-mono tabular-nums ${s.pengawasan_avg_skor != null && s.pengawasan_avg_skor < 80 ? 'font-bold text-red-700' : 'text-slate-700'}`}>{s.pengawasan_avg_skor != null ? s.pengawasan_avg_skor.toFixed(1) : '—'}</td>
                           <td className="py-2 text-center"><RekapBadge value={s.pengawasan_rekap12} /></td>
                         </tr>
                       ))}
@@ -662,51 +527,10 @@ export default function KeracunanDashboardView({ onCount }: { onCount?: (n: numb
                 </div>
               )}
             </div>
-
-            <div className="skdr-card flex flex-col p-4">
-              <div className="mb-3">
-                <h3 className="text-sm font-bold text-slate-800">Daftar Kejadian Keracunan Pangan Terbaru</h3>
-                <p className="text-xs text-slate-500">Maksimal 50 laporan terkini sesuai filter (tanpa data PII pelapor)</p>
-              </div>
-              {!data.recent_incidents.length ? (
-                <EmptyBox msg="Belum ada transaksi keracunan pangan pada filter ini." />
-              ) : (
-                <div className="max-h-[360px] overflow-auto">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                      <tr className="border-b border-slate-200">
-                        <th className="py-2 pr-2 text-left">Laporan &amp; SPPG</th>
-                        <th className="py-2 text-center">Tanggal</th>
-                        <th className="py-2 text-right">Kasus (AR)</th>
-                        <th className="py-2 text-center">Lab</th>
-                        <th className="py-2 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {data.recent_incidents.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50">
-                          <td className="py-2 pr-2">
-                            <div className="font-mono text-[11px] font-bold text-slate-800">{r.no_laporan || `#${r.id}`}</div>
-                            <div className="text-[11px] text-slate-600">{r.nama_sppg || '—'}</div>
-                            <div className="text-[10px] text-slate-400">
-                              {[r.kabkota_name, r.province_name].filter(Boolean).join(', ')}
-                            </div>
-                          </td>
-                          <td className="py-2 text-center font-mono text-[11px] text-slate-600">{r.tgl_kejadian || '—'}</td>
-                          <td className="py-2 text-right tabular-nums">
-                            <div className="font-bold text-red-700">{nf(r.jumlah_kasus)}</div>
-                            <div className="text-[10px] text-slate-400">AR: {pf(r.ar_pct)}</div>
-                          </td>
-                          <td className="py-2 text-center"><RekapBadge value={r.lab_status} /></td>
-                          <td className="py-2 text-center"><RekapBadge value={r.status} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
           </div>
+
+          {/* PR 052: daftar kejadian (drilldown) — menggantikan tabel 50 laporan terbaru PR 036 */}
+          <IncidentList rows={data.recent_incidents} />
         </>
       ) : null}
     </div>

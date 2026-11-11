@@ -3,8 +3,11 @@
 //! * Keracunan Pangan MBG (`mbg_keracunan`, `mbg_keracunan_update`)
 //! Seluruh angka, tren, heatmap, dan titik peta berasal langsung dari data transaksi + master wilayah/fasyankes.
 //! Tidak ada data dummy/hardcoded/fallback, dan tidak ada field PII (nama TPG, pengawas, pelapor, HP, email) yang diekspos.
+//! PR 052: revamp — seri harian (agregasi Tahun/Bulan/Minggu Epid/Harian di klien), ranking provinsi/kab/kecamatan,
+//! ketepatan waktu lapor, ringkasan lab & pangan dicurigai, temuan per butir F1–F13, skor pengawasan per SPPG (tautan risiko),
+//! serta filter kecamatan & sekolah (Keracunan).
 use axum::{extract::{Query, State}, Json};
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -131,6 +134,9 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
     let mut date_max: Option<NaiveDate> = None;
 
     let mut week_map: BTreeMap<(i32, i32), (i64, i64, i64, i64, i64)> = BTreeMap::new(); // (kunj, dik, dr, r12_baik, r12_belum)
+    let mut week_skor: BTreeMap<(i32, i32), (f64, i64)> = BTreeMap::new();
+    // PR 052: seri harian (kunjungan, F12 baik, F12 belum baik, jumlah skor, n skor) → agregasi Tahun/Bulan/Minggu/Harian di klien
+    let mut daily_gizi: BTreeMap<NaiveDate, (i64, i64, i64, f64, i64)> = BTreeMap::new();
     let mut heat_prov: HashMap<String, (Option<i32>, String, HashMap<(i32, i32), (i64, i64)>, i64, i64, i64)> = HashMap::new();
     let mut obs_weeks: Vec<(i32, i32)> = vec![];
 
@@ -226,6 +232,15 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
             w.0 += 1;
             if st_str == "dikirim" { w.1 += 1; } else { w.2 += 1; }
             if r12.as_deref() == Some("BAIK") { w.3 += 1; } else if r12.as_deref() == Some("BELUM BAIK") { w.4 += 1; }
+            if let Some(s) = avg_s {
+                let ws = week_skor.entry(yw).or_insert((0.0, 0));
+                ws.0 += s;
+                ws.1 += 1;
+            }
+            let dg = daily_gizi.entry(d).or_insert((0, 0, 0, 0.0, 0));
+            dg.0 += 1;
+            if r12.as_deref() == Some("BAIK") { dg.1 += 1; } else if r12.as_deref() == Some("BELUM BAIK") { dg.2 += 1; }
+            if let Some(s) = avg_s { dg.3 += s; dg.4 += 1; }
 
             let pk = pid.map(|x| x.to_string()).unwrap_or_else(|| "none".into());
             let pe = heat_prov.entry(pk).or_insert_with(|| (pid, pname.clone().unwrap_or_else(|| "(Belum diisi)".into()), HashMap::new(), 0, 0, 0));
@@ -310,6 +325,9 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
     let mut f2_a_tot = vec![0i64; 7];
     let mut f2_b_ok = vec![0i64; 8];
     let mut f2_b_tot = vec![0i64; 8];
+    // PR 052: temuan "Tidak Sesuai" per butir (hanya formulir berstatus dikirim) → (form_no, kode) → (label, jumlah)
+    let mut temuan: HashMap<(i16, String), (Option<String>, i64)> = HashMap::new();
+    let mut form_dikirim: HashMap<i16, i64> = HashMap::new();
 
     if !kept_vec.is_empty() {
         let f_rows = c
@@ -343,6 +361,14 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
                 *fs.by_week_all.entry(yw).or_insert(0) += 1;
                 if is_fail {
                     *fs.by_week_fail.entry(yw).or_insert(0) += 1;
+                }
+            }
+
+            if fst == "dikirim" {
+                *form_dikirim.entry(fno).or_insert(0) += 1;
+                for (kode, label) in temuan_form(fno, &dval) {
+                    let t = temuan.entry((fno, kode)).or_insert((label, 0));
+                    t.1 += 1;
                 }
             }
 
@@ -477,6 +503,13 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
         .collect();
     reg_out.sort_by(|a, b| b["kunjungan"].as_i64().cmp(&a["kunjungan"].as_i64()));
 
+    let mut temuan_out: Vec<Value> = temuan.into_iter().map(|((fno, kode), (label, cnt))| json!({
+        "form_no": fno, "kode": kode, "label": label, "jumlah": cnt,
+        "dinilai": form_dikirim.get(&fno).copied().unwrap_or(0),
+        "pct": pct(cnt, form_dikirim.get(&fno).copied().unwrap_or(0)),
+    })).collect();
+    temuan_out.sort_by(|a, b| b["jumlah"].as_i64().cmp(&a["jumlah"].as_i64()).then_with(|| a["form_no"].as_i64().cmp(&b["form_no"].as_i64())).then_with(|| a["kode"].as_str().cmp(&b["kode"].as_str())));
+
     // Dynamic filter options
     let opt_prov = c.query("SELECT DISTINCT ml.id, ml.name FROM mbg_kunjungan k JOIN master_locations ml ON ml.id = k.province_id WHERE k.deleted_at IS NULL ORDER BY ml.name", &[]).await.map_err(internal)?;
     let opt_kab = c.query("SELECT DISTINCT mk.id, mk.province_id, mk.name FROM mbg_kunjungan k JOIN master_kabkota mk ON mk.id = k.kabkota_id WHERE k.deleted_at IS NULL ORDER BY mk.name", &[]).await.map_err(internal)?;
@@ -528,8 +561,14 @@ pub async fn pengawasan_gizi(State(st): State<AppState>, Query(q): Query<GiziDas
             "weekly_trend": week_map.into_iter().map(|((y, w), (kj, dik, dr, b, bb))| json!({
                 "year": y, "week": w, "week_start": week_start_date(y, w).format("%Y-%m-%d").to_string(),
                 "label": week_label(y, w), "kunjungan": kj, "dikirim": dik, "draf": dr,
-                "rekap12_baik": b, "rekap12_belum_baik": bb
+                "rekap12_baik": b, "rekap12_belum_baik": bb,
+                "avg_skor": week_skor.get(&(y, w)).filter(|x| x.1 > 0).map(|x| (x.0 / x.1 as f64 * 10.0).round() / 10.0)
             })).collect::<Vec<_>>(),
+            "daily_series": daily_gizi.iter().map(|(d, (kj, b, bb, ss, sc))| json!({
+                "tanggal": d.format("%Y-%m-%d").to_string(), "kunjungan": kj, "rekap12_baik": b, "rekap12_belum_baik": bb,
+                "skor_sum": (ss * 10.0).round() / 10.0, "skor_n": sc
+            })).collect::<Vec<_>>(),
+            "temuan": temuan_out,
             "heatmap": {
                 "weeks": axis.iter().map(|(y, w, s, l)| json!({ "year": y, "week": w, "start": s, "label": l })).collect::<Vec<_>>(),
                 "by_province": hp_rows,
@@ -566,6 +605,9 @@ pub struct KeracunanDashQuery {
     pub slhs: Option<String>,
     pub level: Option<String>,
     pub parent: Option<i32>,
+    /// PR 052: daftar nama kecamatan (dipisah koma) & potongan nama sekolah
+    pub kecamatan: Option<String>,
+    pub sekolah: Option<String>,
 }
 
 const KERACUNAN_USIA: &[(&str, &str)] = &[
@@ -585,7 +627,9 @@ const KERACUNAN_WHERE: &str = "k.deleted_at IS NULL
     AND (cardinality($6::int[]) = 0 OR k.kabkota_id = ANY($6))
     AND ($7::text IS NULL OR lower(trim(COALESCE(k.nama_sppg,''))) = lower(trim($7)))
     AND ($8::text IS NULL OR COALESCE(k.data->>'ikl','') = $8)
-    AND ($9::text IS NULL OR COALESCE(k.data->>'slhs','') = $9)";
+    AND ($9::text IS NULL OR COALESCE(k.data->>'slhs','') = $9)
+    AND (cardinality($10::text[]) = 0 OR lower(trim(COALESCE(k.kecamatan_nama,''))) = ANY($10))
+    AND ($11::text IS NULL OR (COALESCE(k.sekolah,'') || ' ' || COALESCE(k.data->>'sekolah','')) ILIKE '%' || $11 || '%')";
 
 /// GET /api/v1/dasbor/mbg/keracunan
 pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDashQuery>) -> Result<Json<Value>, ApiError> {
@@ -599,7 +643,9 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
     let sppg = opt_str(&q.sppg);
     let ikl = opt_str(&q.ikl).filter(|s| s == "Memenuhi Syarat" || s == "Tidak Memenuhi Syarat");
     let slhs = opt_str(&q.slhs).filter(|s| s == "Ya" || s == "Tidak");
-    let params: Vec<&(dyn ToSql + Sync)> = vec![&status, &lab_status, &from, &to, &prov, &kab, &sppg, &ikl, &slhs];
+    let kec: Vec<String> = q.kecamatan.as_deref().unwrap_or("").split(',').map(|x| x.trim().to_lowercase()).filter(|x| !x.is_empty()).collect();
+    let sekolah = opt_str(&q.sekolah).map(|x| x.replace(['%', '_'], ""));
+    let params: Vec<&(dyn ToSql + Sync)> = vec![&status, &lab_status, &from, &to, &prov, &kab, &sppg, &ikl, &slhs, &kec, &sekolah];
 
     let rows = c
         .query(
@@ -612,7 +658,9 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                         COALESCE(k.jumlah_kasus, 0)::bigint,
                         COALESCE(k.jumlah_meninggal, 0)::bigint,
                         k.jumlah_terpapar::bigint,
-                        k.data
+                        k.data,
+                        NULLIF(trim(k.kecamatan_nama), ''), NULLIF(trim(k.sekolah), ''),
+                        (k.reported_at AT TIME ZONE 'Asia/Jakarta'), k.tgl_kejadian
                  FROM mbg_keracunan k
                  LEFT JOIN master_locations ml ON ml.id = k.province_id
                  LEFT JOIN master_kabkota mk ON mk.id = k.kabkota_id
@@ -630,19 +678,23 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
             "SELECT lower(trim(k.nama_sppg)),
                     COUNT(DISTINCT k.id)::bigint,
                     (ARRAY_AGG(f12.kesimpulan ORDER BY k.tanggal DESC NULLS LAST, k.id DESC) FILTER (WHERE f12.kesimpulan IS NOT NULL))[1],
-                    (ARRAY_AGG(f13.kesimpulan ORDER BY k.tanggal DESC NULLS LAST, k.id DESC) FILTER (WHERE f13.kesimpulan IS NOT NULL))[1]
+                    (ARRAY_AGG(f13.kesimpulan ORDER BY k.tanggal DESC NULLS LAST, k.id DESC) FILTER (WHERE f13.kesimpulan IS NOT NULL))[1],
+                    AVG(sk.avg_skor)::float8,
+                    MAX(k.tanggal)::text
              FROM mbg_kunjungan k
              LEFT JOIN mbg_form f12 ON f12.kunjungan_id = k.id AND f12.form_no = 12 AND f12.status = 'dikirim'
              LEFT JOIN mbg_form f13 ON f13.kunjungan_id = k.id AND f13.form_no = 13 AND f13.status = 'dikirim'
+             LEFT JOIN LATERAL (SELECT AVG(f.skor) AS avg_skor FROM mbg_form f
+                                WHERE f.kunjungan_id = k.id AND f.form_no BETWEEN 3 AND 11 AND f.skor IS NOT NULL) sk ON TRUE
              WHERE k.deleted_at IS NULL AND NULLIF(trim(k.nama_sppg),'') IS NOT NULL
              GROUP BY 1",
             &[],
         )
         .await
         .map_err(internal)?;
-    let gizi_by_sppg: HashMap<String, (i64, Option<String>, Option<String>)> = gizi_sppg_rows
+    let gizi_by_sppg: HashMap<String, (i64, Option<String>, Option<String>, Option<f64>, Option<String>)> = gizi_sppg_rows
         .into_iter()
-        .map(|r| (r.get(0), (r.get(1), r.get(2), r.get(3))))
+        .map(|r| (r.get(0), (r.get(1), r.get(2), r.get(3), r.get(4), r.get(5))))
         .collect();
 
     let mut kept_ids: Vec<i64> = vec![];
@@ -721,6 +773,18 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
     let map_level = q.level.clone().filter(|x| x == "kab").unwrap_or_else(|| "prov".into());
     let map_parent = q.parent;
     let mut recent_incidents: Vec<Value> = vec![];
+    // PR 052
+    let mut daily_ker: BTreeMap<NaiveDate, (i64, i64, i64, i64, i64)> = BTreeMap::new(); // (kej, kasus, meninggal, terpapar, rawat inap)
+    let mut rank_prov: HashMap<String, RankAcc> = HashMap::new();
+    let mut rank_kab: HashMap<String, RankAcc> = HashMap::new();
+    let mut rank_kec: HashMap<String, RankAcc> = HashMap::new();
+    let mut lapor_jam: Vec<f64> = vec![];
+    let mut gejala_lapor_jam: Vec<f64> = vec![];
+    let mut belum_lapor = 0i64;
+    let mut lab_tat_jam: Vec<f64> = vec![];
+    let mut lab_positif_kejadian = 0i64;
+    let mut menu_map: HashMap<(String, String), (String, i64, i64)> = HashMap::new(); // (komponen, nama lc) → (nama, kejadian, kasus)
+    let mut pangan_pos: HashMap<String, (String, String, i64, i64)> = HashMap::new(); // nama lc → (nama, kategori, positif, diuji)
 
     for r in &rows {
         let id: i64 = r.get(0);
@@ -741,8 +805,13 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
         let meninggal: i64 = r.get(15);
         let terpapar_col: Option<i64> = r.get(16);
         let data_val: Value = r.get(17);
+        let kec_nama: Option<String> = r.get(18);
+        let sekolah_col: Option<String> = r.get(19);
+        let reported_local: Option<NaiveDateTime> = r.get(20);
+        let tgl_dt: Option<NaiveDateTime> = r.get(21);
         let empty = serde_json::Map::new();
         let d = data_val.as_object().unwrap_or(&empty);
+        let inap_i = json_int(d.get("rawat_inap"));
 
         kept_ids.push(id);
         kpis_total += 1;
@@ -881,6 +950,56 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
             *checklist_counts[idx].entry(val).or_insert(0) += 1;
         }
 
+        // PR 052: seri harian, ranking wilayah, ketepatan lapor, lab, pangan
+        let terp_ar = terp_eff.filter(|t| *t > 0 && kasus <= *t);
+        if let Some(dt) = tgl_d {
+            let e = daily_ker.entry(dt).or_insert((0, 0, 0, 0, 0));
+            e.0 += 1; e.1 += kasus; e.2 += meninggal; e.3 += terp_eff.unwrap_or(0); e.4 += inap_i;
+        }
+        rank_add(&mut rank_prov, pid.map(|x| x.to_string()).unwrap_or_else(|| "none".into()), pid, pname.clone(), None, kasus, meninggal, terp_eff, terp_ar, inap_i);
+        rank_add(&mut rank_kab, kbid.map(|x| x.to_string()).unwrap_or_else(|| "none".into()), kbid, kname.clone(), pname.clone(), kasus, meninggal, terp_eff, terp_ar, inap_i);
+        rank_add(&mut rank_kec, format!("{}|{}", kbid.unwrap_or(0), kec_nama.as_deref().unwrap_or("").to_lowercase()), None, kec_nama.clone(), kname.clone(), kasus, meninggal, terp_eff, terp_ar, inap_i);
+        let lapor_h = match (reported_local, tgl_dt) {
+            (Some(rp), Some(tk)) => Some(((rp - tk).num_minutes() as f64 / 60.0).max(0.0)),
+            _ => None,
+        };
+        match lapor_h {
+            Some(h) => lapor_jam.push(h),
+            None => belum_lapor += 1,
+        }
+        if let (Some(rp), Some(g)) = (reported_local, d.get("jam_gejala").and_then(|v| v.as_str()).and_then(parse_dt)) {
+            gejala_lapor_jam.push(((rp - g).num_minutes() as f64 / 60.0).max(0.0));
+        }
+        if let (Some(a), Some(b)) = (
+            d.get("lab_tgl_ambil").and_then(|v| v.as_str()).and_then(parse_dt),
+            d.get("lab_tgl_hasil").and_then(|v| v.as_str()).and_then(parse_dt),
+        ) {
+            if b >= a { lab_tat_jam.push((b - a).num_minutes() as f64 / 60.0); }
+        }
+        for (key, komp) in [("menu_karbo", "Karbohidrat"), ("menu_protein1", "Protein"), ("menu_protein2", "Protein"), ("menu_sayur", "Sayur"), ("menu_buah", "Buah")] {
+            if let Some(nm) = d.get(key).and_then(|v| v.as_str()).map(str::trim).filter(|x| !x.is_empty()) {
+                let m = menu_map.entry((komp.to_string(), nm.to_lowercase())).or_insert((nm.to_string(), 0, 0));
+                m.1 += 1;
+                m.2 += kasus;
+            }
+        }
+        let mut any_pos = false;
+        if let Some(arr) = d.get("sampel").and_then(|v| v.as_array()) {
+            for o in arr.iter().filter_map(|x| x.as_object()) {
+                let pos = o.get("mikro").and_then(|v| v.as_str()) == Some("Positif") || o.get("kimia").and_then(|v| v.as_str()) == Some("Positif");
+                let tested = pos || o.get("mikro").and_then(|v| v.as_str()) == Some("Negatif") || o.get("kimia").and_then(|v| v.as_str()) == Some("Negatif");
+                any_pos |= pos;
+                let kat = o.get("kategori").and_then(|v| v.as_str()).map(str::trim).filter(|x| !x.is_empty()).unwrap_or("Lainnya").to_string();
+                let nm = o.get("sampel").and_then(|v| v.as_str()).map(str::trim).filter(|x| !x.is_empty()).map(String::from).unwrap_or_else(|| kat.clone());
+                if tested {
+                    let pe = pangan_pos.entry(nm.to_lowercase()).or_insert((nm.clone(), kat.clone(), 0, 0));
+                    pe.3 += 1;
+                    if pos { pe.2 += 1; }
+                }
+            }
+        }
+        if any_pos { lab_positif_kejadian += 1; }
+
         if let Some(dt) = tgl_d {
             date_min = Some(match date_min { Some(m) => m.min(dt), None => dt });
             date_max = Some(match date_max { Some(m) => m.max(dt), None => dt });
@@ -919,7 +1038,7 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
             }
         }
 
-        if recent_incidents.len() < 50 {
+        if recent_incidents.len() < 1000 {
             let ar_i = terp_eff.filter(|t| *t > 0 && kasus <= *t).and_then(|t| pct(kasus, t));
             let cfr_i = pct(meninggal, kasus);
             recent_incidents.push(json!({
@@ -930,6 +1049,9 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                 "ar_pct": ar_i, "cfr_pct": cfr_i, "sekolah_count": sekolah_cnt.max(js_field),
                 "ikl": if ikl_v == "(Belum diisi)" { None } else { Some(ikl_v) },
                 "slhs": if slhs_v == "(Belum diisi)" { None } else { Some(slhs_v) },
+                "kecamatan": kec_nama, "sekolah": sekolah_col, "rawat_inap": inap_i,
+                "tgl_lapor": reported_local.map(|x| x.format("%Y-%m-%d %H:%M").to_string()),
+                "lapor_jam": lapor_h.map(|h| (h * 10.0).round() / 10.0),
             }));
         }
     }
@@ -1060,6 +1182,8 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                 "pengawasan_kunjungan": g.map(|x| x.0).unwrap_or(0),
                 "pengawasan_rekap12": g.and_then(|x| x.1.clone()),
                 "pengawasan_rekap13": g.and_then(|x| x.2.clone()),
+                "pengawasan_avg_skor": g.and_then(|x| x.3).map(|v| (v * 10.0).round() / 10.0),
+                "pengawasan_terakhir": g.and_then(|x| x.4.clone()),
             })
         })
         .collect();
@@ -1103,6 +1227,43 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
     let opt_prov = c.query("SELECT DISTINCT ml.id, ml.name FROM mbg_keracunan k JOIN master_locations ml ON ml.id = k.province_id WHERE k.deleted_at IS NULL ORDER BY ml.name", &[]).await.map_err(internal)?;
     let opt_kab = c.query("SELECT DISTINCT mk.id, mk.province_id, mk.name FROM mbg_keracunan k JOIN master_kabkota mk ON mk.id = k.kabkota_id WHERE k.deleted_at IS NULL ORDER BY mk.name", &[]).await.map_err(internal)?;
     let opt_sppg = c.query("SELECT DISTINCT trim(nama_sppg) FROM mbg_keracunan WHERE deleted_at IS NULL AND NULLIF(trim(nama_sppg),'') IS NOT NULL ORDER BY 1", &[]).await.map_err(internal)?;
+    let opt_kec = c
+        .query(
+            "SELECT DISTINCT trim(k.kecamatan_nama), k.kabkota_id FROM mbg_keracunan k
+             WHERE k.deleted_at IS NULL AND NULLIF(trim(k.kecamatan_nama),'') IS NOT NULL
+               AND (cardinality($1::int[]) = 0 OR k.province_id = ANY($1))
+               AND (cardinality($2::int[]) = 0 OR k.kabkota_id = ANY($2))
+             ORDER BY 1 LIMIT 2000",
+            &[&prov, &kab],
+        )
+        .await
+        .map_err(internal)?;
+
+    let ranking = |m: HashMap<String, RankAcc>| -> Vec<Value> {
+        let mut v: Vec<Value> = m.into_values().map(|a| a.json()).collect();
+        v.sort_by(|a, b| b["kejadian"].as_i64().cmp(&a["kejadian"].as_i64()).then_with(|| b["kasus"].as_i64().cmp(&a["kasus"].as_i64())));
+        v
+    };
+    let ketepatan = {
+        let mut b = [0i64; 4];
+        for h in &lapor_jam {
+            let i = if *h <= 24.0 { 0 } else if *h <= 48.0 { 1 } else if *h <= 72.0 { 2 } else { 3 };
+            b[i] += 1;
+        }
+        json!({
+            "dilaporkan": lapor_jam.len() as i64, "belum_dilaporkan": belum_lapor,
+            "le24": b[0], "h24_48": b[1], "h48_72": b[2], "gt72": b[3],
+            "pct_le24": pct(b[0], lapor_jam.len() as i64),
+            "median_jam": median(&lapor_jam), "median_gejala_lapor_jam": median(&gejala_lapor_jam),
+            "n_gejala_lapor": gejala_lapor_jam.len() as i64,
+        })
+    };
+    let mut menu_out: Vec<Value> = menu_map.into_iter().map(|((komp, _), (nm, kej, ks))| json!({ "komponen": komp, "nama": nm, "kejadian": kej, "kasus": ks })).collect();
+    menu_out.sort_by(|a, b| b["kejadian"].as_i64().cmp(&a["kejadian"].as_i64()).then_with(|| b["kasus"].as_i64().cmp(&a["kasus"].as_i64())));
+    menu_out.truncate(20);
+    let mut pos_out: Vec<Value> = pangan_pos.into_values().map(|(nm, kat, p, t)| json!({ "nama": nm, "kategori": kat, "positif": p, "diuji": t, "pct_positif": pct(p, t) })).collect();
+    pos_out.sort_by(|a, b| b["positif"].as_i64().cmp(&a["positif"].as_i64()).then_with(|| b["diuji"].as_i64().cmp(&a["diuji"].as_i64())));
+    pos_out.truncate(20);
 
     Ok(Json(json!({
         "success": true,
@@ -1129,6 +1290,17 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                 "label": week_label(y, w), "kejadian": kj, "kasus": ks, "meninggal": mn, "terpapar": tp
             })).collect::<Vec<_>>(),
             "daily_updates": daily_updates,
+            "daily_series": daily_ker.iter().map(|(d, (kj, ks, mn, tp, inap))| json!({
+                "tanggal": d.format("%Y-%m-%d").to_string(), "kejadian": kj, "kasus": ks, "meninggal": mn, "terpapar": tp, "rawat_inap": inap
+            })).collect::<Vec<_>>(),
+            "ranking": { "provinsi": ranking(rank_prov), "kabkota": ranking(rank_kab), "kecamatan": ranking(rank_kec) },
+            "ketepatan_lapor": ketepatan,
+            "lab_ringkas": {
+                "belum": lab_belum, "dikirim": lab_dikirim, "hasil": lab_hasil,
+                "kejadian_positif": lab_positif_kejadian,
+                "median_tat_jam": median(&lab_tat_jam), "n_tat": lab_tat_jam.len() as i64,
+            },
+            "pangan": { "menu": menu_out, "sampel_positif": pos_out },
             "by_gejala": gejala_out,
             "demografi": {
                 "pria": pria_sum, "wanita": wanita_sum,
@@ -1171,9 +1343,110 @@ pub async fn keracunan(State(st): State<AppState>, Query(q): Query<KeracunanDash
                 "provinces": opt_prov.iter().map(|r| json!({ "id": r.get::<_, i32>(0), "name": r.get::<_, String>(1) })).collect::<Vec<_>>(),
                 "kabkota": opt_kab.iter().map(|r| json!({ "id": r.get::<_, i32>(0), "province_id": r.get::<_, i32>(1), "name": r.get::<_, String>(2) })).collect::<Vec<_>>(),
                 "sppg": opt_sppg.iter().map(|r| r.get::<_, String>(0)).collect::<Vec<_>>(),
+                "kecamatan": opt_kec.iter().map(|r| json!({ "name": r.get::<_, String>(0), "kabkota_id": r.get::<_, Option<i32>>(1) })).collect::<Vec<_>>(),
             }
         }
     })))
+}
+
+// ─── PR 052 helpers ───────────────────────────────────────────────────────────
+
+/// Akumulator ranking wilayah (provinsi / kab-kota / kecamatan).
+#[derive(Default)]
+struct RankAcc {
+    id: Option<i32>,
+    name: String,
+    parent: Option<String>,
+    kejadian: i64,
+    kasus: i64,
+    meninggal: i64,
+    terpapar: i64,
+    ar_kasus: i64,
+    ar_terpapar: i64,
+    rawat_inap: i64,
+}
+impl RankAcc {
+    fn json(&self) -> Value {
+        json!({
+            "id": self.id, "name": self.name, "parent": self.parent,
+            "kejadian": self.kejadian, "kasus": self.kasus, "meninggal": self.meninggal, "terpapar": self.terpapar,
+            "rawat_inap": self.rawat_inap, "cfr_pct": pct(self.meninggal, self.kasus), "ar_pct": pct(self.ar_kasus, self.ar_terpapar),
+        })
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn rank_add(m: &mut HashMap<String, RankAcc>, key: String, id: Option<i32>, name: Option<String>, parent: Option<String>,
+            kasus: i64, meninggal: i64, terpapar: Option<i64>, terp_ar: Option<i64>, inap: i64) {
+    let a = m.entry(key).or_insert_with(|| RankAcc {
+        id,
+        name: name.filter(|x| !x.trim().is_empty()).unwrap_or_else(|| "(Belum diisi)".into()),
+        parent,
+        ..Default::default()
+    });
+    a.kejadian += 1;
+    a.kasus += kasus;
+    a.meninggal += meninggal;
+    a.terpapar += terpapar.unwrap_or(0);
+    a.rawat_inap += inap;
+    if let Some(t) = terp_ar {
+        a.ar_kasus += kasus;
+        a.ar_terpapar += t;
+    }
+}
+
+/// Tanggal-jam isian form ("YYYY-MM-DDTHH:MM", opsional detik; atau dipisah spasi).
+fn parse_dt(s: &str) -> Option<NaiveDateTime> {
+    let s = s.trim();
+    ["%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"]
+        .iter()
+        .find_map(|f| NaiveDateTime::parse_from_str(s, f).ok())
+}
+
+fn median(v: &[f64]) -> Option<f64> {
+    if v.is_empty() {
+        return None;
+    }
+    let mut x = v.to_vec();
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let m = x.len() / 2;
+    let r = if x.len() % 2 == 0 { (x[m - 1] + x[m]) / 2.0 } else { x[m] };
+    Some((r * 10.0).round() / 10.0)
+}
+
+/// Butir "Tidak Sesuai" satu formulir dari `data._hasil` (kode butir, label bila diketahui backend).
+/// F1: A/B.1/B.2 · F2: A.n ketersediaan & B.n kesesuaian SOP · F3–F11: nomor butir (label di klien dari naskah formulir).
+fn temuan_form(fno: i16, d: &Value) -> Vec<(String, Option<String>)> {
+    let h = d.get("_hasil");
+    let mut out = vec![];
+    match fno {
+        1 => {
+            for (k, l) in [("a", "A. Pengawas gizi/TPG belum memenuhi kualifikasi & pelatihan"), ("b1", "B.1 Jumlah penjamah makanan belum mencukupi"), ("b2", "B.2 Penjamah makanan belum terlatih (< 50%)")] {
+                if h.and_then(|x| x.get(k)).and_then(|v| v.as_str()) == Some("Tidak Sesuai") {
+                    out.push((k.to_uppercase(), Some(l.to_string())));
+                }
+            }
+        }
+        2 => {
+            for (arr, pre, what) in [("tidak_a", "A", "Ketersediaan SOP"), ("tidak_b", "B", "Kesesuaian/sosialisasi SOP")] {
+                for v in h.and_then(|x| x.get(arr)).and_then(|v| v.as_array()).into_iter().flatten() {
+                    if let Some(r) = v.as_i64() {
+                        let nm = F2_SOP_NAMES.get((r - 1).max(0) as usize).copied().unwrap_or("SOP");
+                        out.push((format!("{pre}{r}"), Some(format!("{pre}.{r} {what}: {nm}"))));
+                    }
+                }
+            }
+        }
+        3..=11 => {
+            for v in h.and_then(|x| x.get("tidak_sesuai")).and_then(|v| v.as_array()).into_iter().flatten() {
+                if let Some(r) = v.as_i64() {
+                    out.push((format!("i{r}"), None));
+                }
+            }
+        }
+        _ => {}
+    }
+    out
 }
 
 #[cfg(test)]
@@ -1192,5 +1465,33 @@ mod tests {
         assert_eq!(GIZI_FORMS_META.len(), 13);
         assert_eq!(F2_SOP_NAMES.len(), 8);
         assert_eq!(KERACUNAN_USIA.len(), 5);
+    }
+
+    #[test]
+    fn pr052_helpers() {
+        assert_eq!(median(&[]), None);
+        assert_eq!(median(&[5.0, 1.0, 3.0]), Some(3.0));
+        assert_eq!(median(&[1.0, 2.0, 3.0, 10.0]), Some(2.5));
+        assert!(parse_dt("2026-11-09T11:30").is_some());
+        assert!(parse_dt("2026-11-09 11:30:15").is_some());
+        assert!(parse_dt("kemarin").is_none());
+        let f1 = json!({ "_hasil": { "a": "Tidak Sesuai", "b1": "Sesuai", "b2": "Tidak Sesuai" } });
+        let t: Vec<String> = temuan_form(1, &f1).into_iter().map(|x| x.0).collect();
+        assert_eq!(t, vec!["A".to_string(), "B2".to_string()]);
+        let f2 = json!({ "_hasil": { "tidak_a": [2], "tidak_b": [8] } });
+        let t2 = temuan_form(2, &f2);
+        assert_eq!(t2[0].0, "A2");
+        assert!(t2[1].1.as_deref().unwrap().contains("Distribusi"));
+        let f5 = json!({ "_hasil": { "tidak_sesuai": [1, 4] } });
+        assert_eq!(temuan_form(5, &f5).len(), 2);
+        assert!(temuan_form(12, &f5).is_empty());
+        let mut m = HashMap::new();
+        rank_add(&mut m, "1".into(), Some(1), Some("Jawa Barat".into()), None, 30, 1, Some(100), Some(100), 5);
+        rank_add(&mut m, "1".into(), Some(1), Some("Jawa Barat".into()), None, 10, 0, None, None, 0);
+        let j = m.get("1").unwrap().json();
+        assert_eq!(j["kejadian"], 2);
+        assert_eq!(j["kasus"], 40);
+        assert_eq!(j["ar_pct"], 30.0);
+        assert_eq!(j["cfr_pct"], 2.5);
     }
 }
