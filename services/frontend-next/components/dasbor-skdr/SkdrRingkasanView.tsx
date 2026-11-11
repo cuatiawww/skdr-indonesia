@@ -48,14 +48,6 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
     cfr: 0.84,
   })
 
-  // Simulated alert breakdown by status
-  const alertStatusData = [
-    { label: 'Terverifikasi (Respon ≤24 Jam)', count: 2840, color: '#10b981' },
-    { label: 'Dalam Investigasi / TGC', count: 412, color: '#f59e0b' },
-    { label: 'Sinyal Baru (Belum Verifikasi)', count: 160, color: '#ef4444' },
-    { label: 'False Alarm / Discarded', count: 520, color: '#94a3b8' },
-  ]
-
   // Top 10 Disease Alerts
   const topAlertDiseases = [
     { code: '01AWD', name: 'Diare Akut', kasus: 16840, alertCount: 420, verifPct: 94.2, cfr: '0.12%' },
@@ -199,93 +191,46 @@ export default function SkdrRingkasanView({ f }: { f: SkdrFilter }) {
         </div>
       </div>
 
-      {/* Main Grid: Spatial Map & Alert Status */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left: Spatial Cluster Map (8 cols) */}
-        <div className="skdr-card p-5 lg:col-span-8 flex flex-col">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
-              </div>
-              <h3 className="text-base font-black text-slate-900 mt-0.5">
-                Sebaran Sinyal Alert IBS & EBS per Fasyankes
-              </h3>
+      {/* Full-width Spatial Map Section */}
+      <div className="skdr-card p-5 w-full flex flex-col">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" /> Peta Spasial Klaster Surveilans Nasional
             </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                Tahun {f.ey} · M{f.sw}–M{f.ew}
-              </span>
-            </div>
+            <h3 className="text-base font-black text-slate-900 mt-0.5">
+              Sebaran Sinyal Alert IBS & EBS per Fasyankes
+            </h3>
           </div>
-          <div className="mt-4 min-h-[440px] flex-1 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-            <PetaMultiMode
-              query={{
-                start_year: f.sy,
-                start_week: f.sw,
-                end_year: f.ey,
-                end_week: f.ew,
-                source: f.sumber === 'semua' ? undefined : f.sumber,
-                disease: f.penyakit.length ? f.penyakit.join(',') : undefined,
-              }}
-              sumber={f.sumber === 'ibs' ? 'pe' : f.sumber === 'ebs' ? 'ebs' : 'all'}
-              sinyal={
-                <SpatialOutbreakMap
-                  countries={[{ name: 'Indonesia', cases: kpiData.totalIbs, deaths: 0 }]}
-                  locations={[]}
-                  highlightCountry="Indonesia"
-                  boundaryScope="indonesia"
-                  initialCenter={[118, -2.5]}
-                  initialZoom={5}
-                  sourceMode={f.sumber === 'ibs' ? 'pe' : f.sumber === 'ebs' ? 'ebs' : 'all'}
-                />
-              }
-            />
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              Tahun {f.ey} · M{f.sw}–M{f.ew}
+            </span>
           </div>
         </div>
-
-        {/* Right: Alert Status Breakdown (4 cols) */}
-        <div className="skdr-card p-5 lg:col-span-4 flex flex-col justify-between">
-          <div>
-            <div className="border-b border-slate-100 pb-3">
-              <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-                Manajemen Alert
-              </div>
-              <h3 className="text-base font-black text-slate-900 mt-0.5">
-                Status Respon Sinyal SKDR
-              </h3>
-            </div>
-            <div className="mt-4 space-y-3">
-              {alertStatusData.map((s) => {
-                const total = 3932
-                const pct = ((s.count / total) * 100).toFixed(1)
-                return (
-                  <div key={s.label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-800">{s.label}</span>
-                      <span className="font-black text-slate-900">
-                        {s.count.toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: s.color }}
-                      />
-                    </div>
-                    <div className="mt-1 text-right text-[10px] font-bold text-slate-500">
-                      {pct}% dari total sinyal
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-xs text-slate-700">
-            <span className="font-black text-primary block mb-1">Standar Prosedur Kemenkes</span>
-            Alert berstatus <strong>SIAGA KLB</strong> wajib diverifikasi oleh Tim TGC Puskesmas /
-            Dinkes dalam waktu maksimal <strong>24 jam</strong> pasca sinyal muncul.
-          </div>
+        <div className="mt-4 min-h-[540px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          <PetaMultiMode
+            query={{
+              start_year: f.sy,
+              start_week: f.sw,
+              end_year: f.ey,
+              end_week: f.ew,
+              source: f.sumber === 'semua' ? undefined : f.sumber,
+              disease: f.penyakit.length ? f.penyakit.join(',') : undefined,
+            }}
+            sumber={f.sumber === 'ibs' ? 'pe' : f.sumber === 'ebs' ? 'ebs' : 'all'}
+            sinyal={
+              <SpatialOutbreakMap
+                countries={[{ name: 'Indonesia', cases: kpiData.totalIbs, deaths: 0 }]}
+                locations={[]}
+                highlightCountry="Indonesia"
+                boundaryScope="indonesia"
+                initialCenter={[118, -2.5]}
+                initialZoom={5}
+                sourceMode={f.sumber === 'ibs' ? 'pe' : f.sumber === 'ebs' ? 'ebs' : 'all'}
+              />
+            }
+          />
         </div>
       </div>
 

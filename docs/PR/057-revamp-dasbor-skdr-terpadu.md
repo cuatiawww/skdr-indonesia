@@ -29,6 +29,9 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
    - Filtering tidak lagi otomatis terpicu di setiap klik input. Panel filter kini memiliki state lokal (*draft*) dengan tombol utama **"Terapkan Filter"** bertanda badge perubahan; data dasbor baru direfresh setelah tombol ditekan.
 5. **Sentralisasi Filter Dinamis (Pembersihan Kontrol di Kartu)**:
    - Melepas dropdown/kontrol ganda di dalam kartu (dropdown ganti penyakit, tipe grafik, dan lag) dan memindahkannya seluruhnya ke dalam panel filter samping dinamis. Kartu di sisi konten kini murni menampilkan data visual, kurva, dan tabel tanpa gangguan elemen input ganda.
+6. **Peta Spasial Full 1 Section & Pelepasan Status Respon Sinyal**:
+   - Bagian Peta Spasial Klaster Surveilans Nasional pada sub-view Ringkasan Utama (`SkdrRingkasanView.tsx`) diubah menjadi lebar penuh 1 section (100% width, tinggi `min-h-[540px]`), bukan lagi terbagi 2 kolom (`grid-cols-12` 8:4).
+   - Kartu *"MANAJEMEN ALERT - Status Respon Sinyal SKDR"* yang sebelumnya berada di sisi kanan peta dilepas seluruhnya sesuai instruksi pengguna, memberikan ruang maksimal bagi peta klaster fasyankes OpenLayers dan kontrol lapisan spasialnya.
 
 ## Berkas yang Diubah / Dibuat
 - `database/init/071_dasbor_skdr_unified_submenus.sql`: Migrasi SQL idempoten mendaftarkan 6 subItems di bawah `mod_main_dashboard` pada `app_settings.navigation_menu`.
