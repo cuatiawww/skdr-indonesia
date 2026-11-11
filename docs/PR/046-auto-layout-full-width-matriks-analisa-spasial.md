@@ -15,3 +15,4 @@ Menghapus pembatasan lebar tetap `max-w-[1760px] mx-auto` pada halaman **Matriks
 - Halaman langsung mengembang penuh (*auto-layout fluid width*) mengikuti lebar viewport yang tersedia, serasi dengan `Breadcrumbs`, header, dan halaman dasbor lainnya di SKDR.
 - Saat sidebar navigasi utama diciutkan (`collapsed`), konten memanfaatkan tambahan ruang 208 px secara penuh tanpa celah margin di samping.
 - Saat panel filter disembunyikan (*toggle* "Sembunyikan filter"), tabel analisa dan peta OpenLayers langsung mengisi lebar penuh layar secara otomatis.
+
