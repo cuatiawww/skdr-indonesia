@@ -1,10 +1,7 @@
 'use client'
-// PR 036: Halaman Pengawasan Gizi MBG (langsung dari transaksi `mbg_kunjungan` & `mbg_form` Form 1–13).
-// PR 052: filter di panel samping bersama; tren skor SOP, distribusi kesimpulan, temuan "Tidak Sesuai", SPPG skor terendah.
-// PR 052b: dirancang ulang dari sudut pandang analis mengikuti isi formulir F1–F13:
-//   1 cakupan → 2 peta 2 kolom → 3 hasil penilaian (sebaran skor, kesimpulan per formulir) → 4 aspek lemah (kepatuhan per
-//   aspek/formulir + heatmap SPPG × formulir) → 5 butir tersering Tidak Sesuai (+ F1 ketenagaan, F2 SOP) → 6 SPPG perlu
-//   tindak lanjut (alasan eksplisit) → 7 tren. Panel PR 036 lainnya tetap ada di bagian lipat "detail lanjutan".
+// PR 054: Dasbor Audit Kepatuhan Standar & Pembinaan Pengawasan Gizi SPPG (Formulir 1–13) dengan
+// kajian eksekutif pembinaan terarah, peta tunggal khusus capaian skor SOP & standar gizi, serta
+// matriks scorecard dan daftar prioritas tindak lanjut berbasis risiko.
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Award, Building2, CheckCircle2, ClipboardCheck, ClipboardList } from 'lucide-react'
 import {
@@ -15,8 +12,8 @@ import type { GiziDashData, KeracunanDashData } from '@/lib/dasbor-mbg-api'
 import { GiziMatrixHeatmap } from '@/components/dasbor-mbg/MbgHeatmap'
 import { EmptyBox, KpiCard, RatioBar, RekapBadge, nf, pf } from '@/components/dasbor-mbg/MbgUi'
 import { SkorTrend } from '@/components/dasbor-mbg/MbgCharts'
-import MbgMapSection, { MoreDetails, SectionHead } from '@/components/dasbor-mbg/MbgSections'
-import { Interpretasi, Panel } from '@/components/analisa/ui'
+import { MbgGiziMap, MoreDetails, SectionHead } from '@/components/dasbor-mbg/MbgSections'
+import { Panel } from '@/components/analisa/ui'
 import { ErrorState, SkeletonChart, SkeletonKpiRow, SkeletonMap } from '@/components/ui/Skeleton'
 import { CEK_NASKAH, F9, FORM_GROUPS, FORM_TITLES } from '@/lib/pengawasan-gizi/naskah'
 import { GRAN_OPTS, type MapState, type MbgFilter } from '@/lib/dasbor-mbg-filter'
@@ -109,7 +106,13 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
         </div>
       ) : data && k ? (
         <>
-          <SectionHead no={1} id="cakupan" title="Cakupan & hasil pengawasan" desc="Berapa SPPG yang sudah diawasi dan seberapa baik hasilnya menurut Formulir 1–13." />
+          <SectionHead
+            no={1}
+            id="cakupan"
+            badge="AUDIT KEPATUHAN & PEMBINAAN SPPG"
+            title="Indikator Cakupan Audit, Kepatuhan Standar Gizi & Arahan Pembinaan SPPG"
+            desc="Rekapitulasi cakupan kunjungan pengawasan Formulir 1–13, capaian skor penerapan SOP (ambang ≥ 80), kesimpulan standar gizi (F12) & daya terima (F13), serta arahan pengerahan Tim Pembina Gizi (TPG)."
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" data-testid="gizi-kpi">
             <KpiCard icon={ClipboardCheck} label="Kunjungan Pengawasan" value={nf(k.total_kunjungan)} tone="emerald"
               sub={`${nf(k.dikirim)} dikirim · ${nf(k.draf)} draf · ${nf(k.total_formulir_dikirim)} formulir dikirim`} />
@@ -124,20 +127,122 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
             <KpiCard icon={AlertTriangle} label="SPPG Perlu Tindak Lanjut" value={nf(tl.length)} tone={tl.length ? 'red' : 'emerald'}
               sub={`${nf(tl.filter((x) => x.alasan.some((a) => a.startsWith('Ada '))).length)} di antaranya pernah keracunan · wilayah 3T ${nf(k.wilayah_3t_ya)}`} />
           </div>
-          <Interpretasi lines={[
-            k.total_kunjungan ? `${nf(k.total_kunjungan)} kunjungan ke ${nf(k.sppg_unik)} SPPG.` : null,
-            k.avg_skor_sop != null ? `Skor penerapan SOP rata-rata ${pf(k.avg_skor_sop)}${k.avg_skor_sop < 80 ? ' — di bawah ambang 80.' : ' — memenuhi ambang 80'}${nScored ? `, namun ${pf((nLow * 100) / nScored)} kunjungan masih < 80.` : '.'}` : null,
-            weakest ? `Aspek terlemah: F${weakest.form_no} ${FORM_TITLES[weakest.form_no]?.short || weakest.short} (${pf((weakest.sesuai * 100) / (weakest.sesuai + weakest.tidak_sesuai))} sesuai).` : null,
-            temuan[0] ? `Butir tersering Tidak Sesuai: ${temuanLabel(temuan[0].form_no, temuan[0].kode, temuan[0].label)} (F${temuan[0].form_no}).` : null,
-            tl.length ? `${nf(tl.length)} SPPG perlu tindak lanjut (lihat bagian 6).` : null,
-          ]} />
 
-          <SectionHead no={2} id="peta" title="Di mana SPPG yang lemah?" desc="Peta kanan: skor pengawasan per wilayah & titik SPPG (oranye = perlu perbaikan). Peta kiri: kejadian keracunan di wilayah yang sama — wilayah lemah yang juga punya kejadian adalah prioritas." />
-          <MbgMapSection ker={ker} gizi={data} kMap={kMap || { level: 'prov', parent: null }} setKMap={setKMap || (() => {})} gMap={map} setGMap={setMap} />
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="gizi-executive-brief">
+            <div className="mb-2.5 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <div className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                Kajian Audit Standar &amp; Arahan Pengerahan Tim Pembina Gizi (TPG Puskesmas / Dinkes)
+              </div>
+              <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                Instrumen Formulir 1–13
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 text-xs leading-relaxed text-slate-700 md:grid-cols-3">
+              <div className="rounded-lg bg-slate-50 p-3">
+                <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                  1. Evaluasi Cakupan &amp; Mutu Kepatuhan SOP
+                </div>
+                <p>
+                  Tercatat <b>{nf(k.total_kunjungan)} kunjungan</b> pada <b>{nf(k.sppg_unik)} SPPG</b> dengan rata-rata skor SOP <b>{pf(k.avg_skor_sop)}</b>{' '}
+                  {(k.avg_skor_sop ?? 100) < 80 ? '(di bawah ambang standar 80)' : '(memenuhi ambang standar ≥ 80)'}.{' '}
+                  {nScored > 0 ? <>Sebanyak <b>{nf(nLow)} kunjungan ({pf((nLow * 100) / nScored)})</b> masih memperoleh skor &lt; 80 dan </> : null}
+                  <b>{nf(k.rekap12_belum_baik)} kunjungan</b> berkesimpulan Standar Gizi (F12) <b>BELUM BAIK</b>.
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3">
+                <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                  2. Titik Kritis Rantai Pasok &amp; Ketenagaan (F1–F11)
+                </div>
+                <p>
+                  {weakest ? (
+                    <>Aspek dengan tingkat kepatuhan terendah adalah <b>F{weakest.form_no} ({FORM_TITLES[weakest.form_no]?.short || weakest.short})</b> sebesar <b>{pf((weakest.sesuai * 100) / (weakest.sesuai + weakest.tidak_sesuai))} Sesuai</b>. </>
+                  ) : (
+                    <>Belum ada formulir yang dinilai pada periode terfilter. </>
+                  )}
+                  {temuan[0] ? (
+                    <>Butir ketidakpatuhan tertinggi: <b>{temuanLabel(temuan[0].form_no, temuan[0].kode, temuan[0].label)}</b> (F{temuan[0].form_no}, {nf(temuan[0].jumlah)} temuan).</>
+                  ) : null}
+                </p>
+              </div>
+              <div className="rounded-lg bg-emerald-50/70 p-3 text-emerald-950">
+                <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-wider text-emerald-800">
+                  3. Prioritas Pengerahan Pembinaan Terarah
+                </div>
+                <p>
+                  Fokuskan supervisi ulang dan pendampingan teknis TPG Puskesmas pada <b>{nf(tl.length)} SPPG prioritas tindak lanjut</b>{' '}
+                  ({nf(tl.filter((x) => x.alasan.some((a) => a.startsWith('Ada '))).length)} SPPG riwayat KLB keracunan, sisanya skor SOP &lt; 80 / F12 BELUM BAIK / &gt;90 hari belum diaudit ulang).
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <SectionHead no={3} id="hasil" title="Bagaimana hasil penilaiannya?" desc="Sebaran skor per kunjungan dan kesimpulan tiap formulir (Sesuai/BAIK vs Tidak Sesuai/BELUM BAIK)." />
+          <SectionHead
+            no={2}
+            id="peta"
+            badge="ANALISIS GEOSPASIAL AUDIT"
+            title="Distribusi Geospasial Kepatuhan Pengawasan & Rekapitulasi Wilayah"
+            desc="Peta tunggal capaian skor SOP & cakupan pengawasan gizi per provinsi/kabupaten-kota beserta titik lokasi SPPG (hijau = F12 BAIK, oranye = perlu perbaikan), disandingkan dengan tabel rekapitulasi wilayah."
+          />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="xl:col-span-2">
+              <MbgGiziMap gizi={data} gMap={map} setGMap={setMap} />
+            </div>
+            <Panel
+              title={`Rekap Pengawasan per ${data.map.level === 'kab' ? 'Kabupaten/Kota' : 'Provinsi'}`}
+              desc={data.map.level === 'prov' ? 'Klik baris provinsi untuk memfokuskan peta ke level kabupaten/kota.' : 'Rekapitulasi kunjungan, jumlah SPPG, kesimpulan F12, dan rata-rata skor SOP.'}
+              testId="panel-rekap-wilayah-gizi"
+            >
+              {!data.map.regions.length ? (
+                <EmptyBox msg="Belum ada wilayah pada transaksi Pengawasan Gizi MBG." />
+              ) : (
+                <div className="max-h-[440px] flex-1 overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-white text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-slate-200">
+                        <th className="py-2 pr-2">Wilayah</th>
+                        <th className="py-2 text-right">Kunj</th>
+                        <th className="py-2 text-right">SPPG</th>
+                        <th className="py-2 text-right">F12 Baik</th>
+                        <th className="py-2 text-right">Blm</th>
+                        <th className="py-2 text-right">Skor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {data.map.regions.map((r) => (
+                        <tr
+                          key={r.key}
+                          className={data.map.level === 'prov' ? 'cursor-pointer hover:bg-emerald-50/50' : 'hover:bg-slate-50'}
+                          onClick={() => {
+                            if (data.map.level === 'prov') {
+                              const id = Number(r.key)
+                              if (Number.isFinite(id) && id > 0) setMapParent({ id, name: r.name })
+                            }
+                          }}
+                        >
+                          <td className="py-2 pr-2 font-semibold text-slate-800">{r.name}</td>
+                          <td className="py-2 text-right font-bold tabular-nums text-emerald-800">{nf(r.kunjungan)}</td>
+                          <td className="py-2 text-right tabular-nums text-slate-700">{nf(r.sppg_unik)}</td>
+                          <td className="py-2 text-right tabular-nums text-emerald-700">{nf(r.rekap12_baik)}</td>
+                          <td className="py-2 text-right tabular-nums text-amber-700">{nf(r.rekap12_belum_baik)}</td>
+                          <td className="py-2 text-right tabular-nums text-slate-600">{pf(r.avg_skor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Panel>
+          </div>
+
+          <SectionHead
+            no={3}
+            id="hasil"
+            badge="EVALUASI SKOR & KESIMPULAN"
+            title="Distribusi Mutu Skor Kunjungan & Proporsi Kesimpulan per Formulir (F1–F13)"
+            desc="Sebaran rata-rata skor penerapan SOP (F3–F11) per kunjungan terhadap ambang batas 80, serta komposisi kesimpulan Sesuai/BAIK vs Tidak Sesuai/BELUM BAIK pada tiap instrumen formulir."
+          />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Panel title="Sebaran Skor SOP per Kunjungan" desc="Rata-rata skor F3–F11 tiap kunjungan; merah/oranye = di bawah ambang 80." testId="panel-sebaran-skor"
+            <Panel title="Sebaran Skor SOP per Kunjungan" desc="Rata-rata skor F3–F11 tiap kunjungan; merah/oranye = di bawah ambang standar 80." testId="panel-sebaran-skor"
               tip="Skor kunjungan = rata-rata skor Formulir 3–11 yang terisi pada kunjungan itu. 'Belum ada skor' = kunjungan tanpa formulir F3–F11 berskor.">
               {!dist.some((x) => x.kunjungan > 0) ? <EmptyBox msg="Belum ada kunjungan dengan skor." /> : (
                 <div className="h-[260px] w-full">
@@ -155,7 +260,7 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
                 </div>
               )}
             </Panel>
-            <Panel title="Kesimpulan per Formulir" desc="Jumlah formulir menurut kesimpulan; abu-abu = belum dinilai." testId="panel-kesimpulan">
+            <Panel title="Proporsi Kesimpulan per Formulir (F1–F13)" desc="Jumlah formulir menurut status kesimpulan audit; abu-abu = tersimpan namun belum dinilai." testId="panel-kesimpulan">
               {!formDist.some((x) => x.tersimpan > 0) ? <EmptyBox msg="Belum ada pengisian Formulir 1–13 pada kunjungan terfilter." /> : (
                 <div className="h-[260px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -175,9 +280,15 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
             </Panel>
           </div>
 
-          <SectionHead no={4} id="aspek" title="Aspek mana yang lemah?" desc="Persentase formulir berkesimpulan Sesuai/BAIK per aspek, lalu rinciannya per SPPG (heatmap)." />
+          <SectionHead
+            no={4}
+            id="aspek"
+            badge="DIAGNOSTIK ASPEK & MATRIKS SPPG"
+            title="Evaluasi Indeks Kepatuhan per Aspek Rantai Pasok & Matriks Scorecard SPPG × Formulir"
+            desc="Pemetaan kelemahan struktural dari tahap persiapan, pengolahan, distribusi hingga evaluasi (target kepatuhan ≥ 80%), disandingkan dengan matriks diagnostik per unit SPPG."
+          />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Panel title="Kepatuhan per Aspek" desc="% formulir Sesuai/BAIK; garis putus = target 80%." testId="panel-kepatuhan-aspek">
+            <Panel title="Indeks Kepatuhan per Aspek Pengawasan" desc="% formulir Sesuai/BAIK per tahapan; garis putus = target 80%." testId="panel-kepatuhan-aspek">
               {!(data.by_formulir || []).some((x) => x.sesuai + x.tidak_sesuai > 0) ? <EmptyBox msg="Belum ada formulir yang dinilai." /> : (
                 <div className="space-y-3">
                   {FORM_GROUPS.map((g) => {
@@ -208,8 +319,8 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
                 </div>
               )}
             </Panel>
-            <Panel className="xl:col-span-2" title="Heatmap SPPG × Formulir" testId="panel-heatmap-sppg"
-              desc="Setiap sel = % formulir Sesuai/BAIK untuk SPPG itu; hijau ≥ 80, kuning 60–79, merah < 60, abu = belum diisi. Diurutkan dari SPPG terlemah."
+            <Panel className="xl:col-span-2" title="Matriks Scorecard Kepatuhan SPPG × Formulir (F1–F13)" testId="panel-heatmap-sppg"
+              desc="Setiap sel = % formulir Sesuai/BAIK untuk SPPG tersebut; hijau ≥ 80%, kuning 60–79%, merah < 60%, abu = belum diisi. Diurutkan dari SPPG dengan skor terendah."
               actions={matrix.length > 20 ? <button type="button" onClick={() => setAllHm((x) => !x)} className="text-[11px] font-bold text-primary hover:underline">{allHm ? 'Tampilkan 20 terlemah' : `Tampilkan semua (${nf(matrix.length)})`}</button> : null}>
               {!matrix.length ? <EmptyBox msg="Belum ada formulir dikirim per SPPG." /> : (
                 <div className="max-h-[520px] overflow-auto">
@@ -242,14 +353,20 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
             </Panel>
           </div>
 
-          <SectionHead no={5} id="temuan" title="Butir apa yang paling sering tidak sesuai?" desc="Materi pembinaan paling dibutuhkan: butir penilaian yang paling sering gagal, plus ketenagaan (F1) dan ketersediaan SOP (F2)." />
+          <SectionHead
+            no={5}
+            id="temuan"
+            badge="ANALISIS AKAR MASALAH (ROOT-CAUSE)"
+            title="Analisis Akar Masalah: Butir Ketidakpatuhan Tertinggi (F1–F11), Ketenagaan (F1) & Ketersediaan SOP (F2)"
+            desc="Daftar temuan butir pemeriksaan yang paling sering tidak terpenuhi sebagai dasar penyusunan kurikulum bimbingan teknis penjamah makanan dan pengelola SPPG."
+          />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Panel className="xl:col-span-2" title="Temuan “Tidak Sesuai” Terbanyak" desc="Butir F1–F11 yang paling sering Tidak Sesuai pada formulir yang dikirim; % = dari formulir yang sama." testId="panel-temuan">
+            <Panel className="xl:col-span-2" title="Peringkat Temuan Butir “Tidak Sesuai” Tertinggi (F1–F11)" desc="Butir pemeriksaan pada Formulir 1–11 dengan frekuensi ketidakpatuhan tertinggi dari seluruh formulir terkirim." testId="panel-temuan">
               {!temuan.length ? <EmptyBox msg="Belum ada temuan Tidak Sesuai pada formulir yang dikirim." /> : (
                 <div className="max-h-[360px] overflow-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                      <tr className="border-b border-slate-200"><th className="py-2 pr-2 text-left">Form</th><th className="py-2 pr-2 text-left">Butir</th><th className="py-2 text-right">Jumlah</th><th className="py-2 text-right">% form</th></tr>
+                      <tr className="border-b border-slate-200"><th className="py-2 pr-2 text-left">Form</th><th className="py-2 pr-2 text-left">Butir Pemeriksaan</th><th className="py-2 text-right">Frekuensi</th><th className="py-2 text-right">% Form</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {temuan.slice(0, 25).map((t) => (
@@ -266,64 +383,70 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
               )}
             </Panel>
             <div className="space-y-4">
-              <Panel title="F1 · Ketenagaan" desc="Kualifikasi pengawas/TPG dan kecukupan & pelatihan penjamah makanan." testId="panel-f1">
-            {!data.f1_ketenagaan.total ? (
-              <EmptyBox msg="Belum ada pengisian Form 1 Ketenagaan." />
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-lg bg-slate-50 px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Form F1 Terisi</div>
-                    <div className="mt-0.5 text-lg font-black text-slate-900 tabular-nums">{nf(data.f1_ketenagaan.total)}</div>
-                  </div>
-                  <div className="rounded-lg bg-emerald-50 px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase text-emerald-700">Avg Penjamah / SPPG</div>
-                    <div className="mt-0.5 text-lg font-black text-emerald-900 tabular-nums">
-                      {data.f1_ketenagaan.avg_penjamah != null ? data.f1_ketenagaan.avg_penjamah.toFixed(1) : '—'}
+              <Panel title="F1 · Kualifikasi Ketenagaan & Penjamah" desc="Kualifikasi pengawas/TPG serta kecukupan rasio & sertifikasi penjamah makanan." testId="panel-f1">
+                {!data.f1_ketenagaan.total ? (
+                  <EmptyBox msg="Belum ada pengisian Form 1 Ketenagaan." />
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="text-[10px] font-bold uppercase text-slate-500">Form F1 Terisi</div>
+                        <div className="mt-0.5 text-lg font-black text-slate-900 tabular-nums">{nf(data.f1_ketenagaan.total)}</div>
+                      </div>
+                      <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                        <div className="text-[10px] font-bold uppercase text-emerald-700">Avg Penjamah / SPPG</div>
+                        <div className="mt-0.5 text-lg font-black text-emerald-900 tabular-nums">
+                          {data.f1_ketenagaan.avg_penjamah != null ? data.f1_ketenagaan.avg_penjamah.toFixed(1) : '—'}
+                        </div>
+                      </div>
                     </div>
+                    <RatioBar label="A. Pengawas/TPG Memenuhi Syarat" good={data.f1_ketenagaan.pengawas_sesuai} total={data.f1_ketenagaan.total} />
+                    <RatioBar label="B.1 Rasio Penjamah Cukup" good={data.f1_ketenagaan.penjamah_b1_sesuai} total={data.f1_ketenagaan.total} barCls="bg-teal-600" />
+                    <RatioBar label="B.2 Penjamah Terlatih/Sertifikat" good={data.f1_ketenagaan.pelatihan_b2_sesuai} total={data.f1_ketenagaan.total} barCls="bg-blue-600" />
                   </div>
-                </div>
-                <RatioBar label="A. Pengawas/TPG Memenuhi Syarat" good={data.f1_ketenagaan.pengawas_sesuai} total={data.f1_ketenagaan.total} />
-                <RatioBar label="B.1 Rasio Penjamah Cukup" good={data.f1_ketenagaan.penjamah_b1_sesuai} total={data.f1_ketenagaan.total} barCls="bg-teal-600" />
-                <RatioBar label="B.2 Penjamah Terlatih/Sertifikat" good={data.f1_ketenagaan.pelatihan_b2_sesuai} total={data.f1_ketenagaan.total} barCls="bg-blue-600" />
-              </div>
-            )}
+                )}
               </Panel>
-              <Panel title="F2 · Ketersediaan 8 SOP" desc="SOP tersedia di dapur dan sudah disosialisasikan ke petugas." testId="panel-f2">
-            {!data.f2_sop.some((x) => x.sosialisasi_total > 0 || (x.tersedia_total ?? 0) > 0) ? (
-              <EmptyBox msg="Belum ada pengisian Form 2 SOP." />
-            ) : (
-              <div className="max-h-[300px] overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                    <tr className="border-b border-slate-200">
-                      <th className="py-1.5 text-left">SOP</th>
-                      <th className="py-1.5 text-right">Tersedia</th>
-                      <th className="py-1.5 text-right">Sosialisasi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {data.f2_sop.map((s, idx) => (
-                      <tr key={s.nama} className="hover:bg-slate-50">
-                        <td className="py-1.5 pr-2 font-medium text-slate-700">{idx + 1}. {s.nama}</td>
-                        <td className="py-1.5 text-right tabular-nums text-slate-700">
-                          {s.tersedia_total != null ? `${nf(s.tersedia_sesuai)}/${nf(s.tersedia_total)}` : '—'}
-                        </td>
-                        <td className="py-1.5 text-right font-semibold tabular-nums text-emerald-700">
-                          {nf(s.sosialisasi_sesuai)}/{nf(s.sosialisasi_total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <Panel title="F2 · Ketersediaan & Sosialisasi 8 SOP" desc="Ketersediaan dokumen SOP di dapur SPPG dan pelaksanaan sosialisasi ke petugas." testId="panel-f2">
+                {!data.f2_sop.some((x) => x.sosialisasi_total > 0 || (x.tersedia_total ?? 0) > 0) ? (
+                  <EmptyBox msg="Belum ada pengisian Form 2 SOP." />
+                ) : (
+                  <div className="max-h-[300px] overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <tr className="border-b border-slate-200">
+                          <th className="py-1.5 text-left">Dokumen SOP</th>
+                          <th className="py-1.5 text-right">Tersedia</th>
+                          <th className="py-1.5 text-right">Sosialisasi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {data.f2_sop.map((s, idx) => (
+                          <tr key={s.nama} className="hover:bg-slate-50">
+                            <td className="py-1.5 pr-2 font-medium text-slate-700">{idx + 1}. {s.nama}</td>
+                            <td className="py-1.5 text-right tabular-nums text-slate-700">
+                              {s.tersedia_total != null ? `${nf(s.tersedia_sesuai)}/${nf(s.tersedia_total)}` : '—'}
+                            </td>
+                            <td className="py-1.5 text-right font-semibold tabular-nums text-emerald-700">
+                              {nf(s.sosialisasi_sesuai)}/{nf(s.sosialisasi_total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </Panel>
             </div>
           </div>
 
-          <SectionHead no={6} id="tindak-lanjut" title="SPPG mana yang perlu ditindaklanjuti?" desc="Daftar prioritas pembinaan dengan alasannya: pernah keracunan, skor < 80, F12/F13 BELUM BAIK, atau lama tidak dikunjungi." />
-          <Panel title="SPPG Perlu Tindak Lanjut" testId="panel-tindak-lanjut" desc={`${nf(tl.length)} SPPG memenuhi minimal satu kriteria; diurutkan dari prioritas tertinggi.`}
+          <SectionHead
+            no={6}
+            id="tindak-lanjut"
+            badge="DAFTAR TARGET OPERASIONAL"
+            title="Daftar Prioritas Pembinaan & Tindak Lanjut SPPG Berbasis Risiko"
+            desc="Urutan prioritas pengerahan supervisi ulang SPPG berdasarkan bobot risiko: riwayat KLB keracunan pangan, kesimpulan F12/F13 BELUM BAIK, skor penerapan SOP < 80, atau jeda kunjungan > 90 hari."
+          />
+          <Panel title="Register SPPG Prioritas Pembinaan & Tindak Lanjut" testId="panel-tindak-lanjut" desc={`${nf(tl.length)} SPPG memenuhi minimal satu kriteria ketidakpatuhan/risiko; diurutkan dari bobot risiko tertinggi.`}
             tip="Bobot prioritas: kejadian keracunan 3, F12 BELUM BAIK 2, skor < 60 = 2 / skor 60–79 = 1, F13 BELUM BAIK 1, tidak dikunjungi ulang > 90 hari (dihitung dari tanggal kunjungan terakhir pada data) 1. Pencocokan kejadian berdasarkan nama SPPG."
             actions={tl.length > 12 ? <button type="button" onClick={() => setAllTl((x) => !x)} className="text-[11px] font-bold text-primary hover:underline">{allTl ? 'Tampilkan 12 teratas' : `Tampilkan semua (${nf(tl.length)})`}</button> : null}>
             {!tl.length ? <EmptyBox msg="Tidak ada SPPG yang memenuhi kriteria tindak lanjut pada filter ini." /> : (
@@ -331,8 +454,8 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
                 <table className="w-full min-w-[720px] text-xs">
                   <thead className="bg-slate-50 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
                     <tr className="border-b border-slate-200">
-                      <th className="px-2 py-2 text-left">#</th><th className="px-2 py-2 text-left">SPPG & wilayah</th><th className="px-2 py-2 text-left">Alasan</th>
-                      <th className="px-2 py-2 text-right">Skor</th><th className="px-2 py-2 text-center">F12</th><th className="px-2 py-2 text-center">F13</th><th className="px-2 py-2 text-right">Kunjungan terakhir</th>
+                      <th className="px-2 py-2 text-left">#</th><th className="px-2 py-2 text-left">SPPG &amp; Wilayah</th><th className="px-2 py-2 text-left">Indikator Risiko / Alasan Tindak Lanjut</th>
+                      <th className="px-2 py-2 text-right">Skor SOP</th><th className="px-2 py-2 text-center">F12</th><th className="px-2 py-2 text-center">F13</th><th className="px-2 py-2 text-right">Kunjungan Terakhir</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -353,179 +476,142 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
             )}
           </Panel>
 
-          <SectionHead no={7} id="tren" title="Bagaimana trennya?" desc="Apakah skor dan hasil standar gizi membaik dari waktu ke waktu." />
+          <SectionHead
+            no={7}
+            id="tren"
+            badge="EVALUASI LONGITUDINAL"
+            title="Dinamika Tren Skor Kepatuhan SOP & Volume Kunjungan Pengawasan"
+            desc="Pemantauan perkembangan rata-rata skor SOP terhadap target ≥ 80 serta tren volume kunjungan dan proporsi kesimpulan Standar Gizi (F12) per minggu epidemiologi."
+          />
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Panel title={`Skor SOP Rata-rata per ${granLabel}`} desc="Garis merah = ambang 80; ubah granularitas di panel filter." testId="panel-skor-trend">
+            <Panel title={`Tren Skor SOP Rata-rata per ${granLabel}`} desc="Garis putus merah = ambang batas standar 80; granularitas waktu mengikuti pengaturan filter." testId="panel-skor-trend">
               <SkorTrend series={data.daily_series} gran={f.gran} />
             </Panel>
-            <Panel title="Kunjungan & Hasil F12 per Minggu Epid" desc="Jumlah kunjungan (batang) dan kesimpulan standar gizi F12 (garis)." testId="panel-tren-kunjungan">
-            {!data.weekly_trend.length ? (
-              <EmptyBox msg="Belum ada data tren mingguan kunjungan pengawasan." />
-            ) : (
-              <div className="h-[290px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={data.weekly_trend} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="kunjungan" name="Total Kunjungan" fill="#a7f3d0" stroke="#059669" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="rekap12_baik" name="F12 BAIK" stroke="#047857" strokeWidth={2.5} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="rekap12_belum_baik" name="F12 BELUM BAIK" stroke="#d97706" strokeWidth={2} dot={{ r: 3 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <Panel title="Tren Volume Kunjungan & Kesimpulan Standar Gizi (F12) Mingguan" desc="Jumlah kunjungan pengawasan (batang) dan capaian kesimpulan F12 BAIK vs BELUM BAIK (garis)." testId="panel-tren-kunjungan">
+              {!data.weekly_trend.length ? (
+                <EmptyBox msg="Belum ada data tren mingguan kunjungan pengawasan." />
+              ) : (
+                <div className="h-[290px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={data.weekly_trend} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="kunjungan" name="Total Kunjungan" fill="#a7f3d0" stroke="#059669" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="rekap12_baik" name="F12 BAIK" stroke="#047857" strokeWidth={2.5} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="rekap12_belum_baik" name="F12 BELUM BAIK" stroke="#d97706" strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </Panel>
           </div>
 
-          <MoreDetails label="detail lanjutan (heatmap mingguan, rekap wilayah, ringkasan F1–F13, rekap per SPPG, kunjungan terbaru)" testId="detail-gizi">
+          <MoreDetails label="tabel register & matriks lanjutan (heatmap mingguan wilayah, ringkasan F1–F13, rekap seluruh SPPG, log kunjungan terbaru)" testId="detail-gizi">
             <GiziMatrixHeatmap heatmap={data.heatmap} />
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <Panel title={`Rekap ${data.map.level === 'kab' ? 'Kab/Kota' : 'Provinsi'} Pengawasan`} desc="Klik provinsi untuk melihat kab/kota di peta." testId="panel-rekap-wilayah-gizi">
-            {!data.map.regions.length ? (
-              <EmptyBox msg="Belum ada wilayah pada transaksi Pengawasan Gizi MBG." />
-            ) : (
-              <div className="max-h-[440px] flex-1 overflow-auto">
+            <Panel title="Tabel Rekapitulasi Instrumen Formulir 1–13" desc="Jumlah formulir tersimpan, dikirim, distribusi kesimpulan, dan skor rata-rata tiap formulir." testId="panel-ringkasan-form">
+              <div className="overflow-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                  <thead className="bg-slate-50 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
                     <tr className="border-b border-slate-200">
-                      <th className="py-2 pr-2">Wilayah</th>
-                      <th className="py-2 text-right">Kunj</th>
-                      <th className="py-2 text-right">SPPG</th>
-                      <th className="py-2 text-right">F12 Baik</th>
-                      <th className="py-2 text-right">Blm</th>
-                      <th className="py-2 text-right">Skor</th>
+                      <th className="px-2.5 py-2 text-left">Kode</th>
+                      <th className="px-2.5 py-2 text-left">Formulir Pengawasan</th>
+                      <th className="px-2.5 py-2 text-right">Tersimpan</th>
+                      <th className="px-2.5 py-2 text-right">Dikirim</th>
+                      <th className="px-2.5 py-2 text-right">Sesuai/BAIK</th>
+                      <th className="px-2.5 py-2 text-right">Tdk Sesuai</th>
+                      <th className="px-2.5 py-2 text-right">Skor Avg</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {data.map.regions.map((r) => (
-                      <tr
-                        key={r.key}
-                        className={data.map.level === 'prov' ? 'cursor-pointer hover:bg-emerald-50/50' : 'hover:bg-slate-50'}
-                        onClick={() => {
-                          if (data.map.level === 'prov') {
-                            const id = Number(r.key)
-                            if (Number.isFinite(id) && id > 0) setMapParent({ id, name: r.name })
-                          }
-                        }}
-                      >
-                        <td className="py-2 pr-2 font-semibold text-slate-800">{r.name}</td>
-                        <td className="py-2 text-right font-bold tabular-nums text-emerald-800">{nf(r.kunjungan)}</td>
-                        <td className="py-2 text-right tabular-nums text-slate-700">{nf(r.sppg_unik)}</td>
-                        <td className="py-2 text-right tabular-nums text-emerald-700">{nf(r.rekap12_baik)}</td>
-                        <td className="py-2 text-right tabular-nums text-amber-700">{nf(r.rekap12_belum_baik)}</td>
-                        <td className="py-2 text-right tabular-nums text-slate-600">{pf(r.avg_skor)}</td>
+                    {data.by_formulir.map((bf) => (
+                      <tr key={bf.form_no} className="hover:bg-slate-50">
+                        <td className="px-2.5 py-2 font-extrabold text-emerald-800">F{bf.form_no}</td>
+                        <td className="px-2.5 py-2 font-medium text-slate-800">{bf.title}</td>
+                        <td className="px-2.5 py-2 text-right tabular-nums text-slate-700">{nf(bf.tersimpan)}</td>
+                        <td className="px-2.5 py-2 text-right tabular-nums text-slate-600">{nf(bf.dikirim)}</td>
+                        <td className="px-2.5 py-2 text-right font-semibold tabular-nums text-emerald-700">{nf(bf.sesuai)}</td>
+                        <td className="px-2.5 py-2 text-right font-semibold tabular-nums text-amber-700">{nf(bf.tidak_sesuai)}</td>
+                        <td className="px-2.5 py-2 text-right font-mono tabular-nums text-slate-700">{pf(bf.avg_skor)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-              </Panel>
-              <Panel className="xl:col-span-2" title="Ringkasan Formulir 1–13" desc="Jumlah tersimpan, dikirim, kesimpulan, dan skor rata-rata tiap formulir." testId="panel-ringkasan-form">
-            <div className="overflow-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                  <tr className="border-b border-slate-200">
-                    <th className="px-2.5 py-2 text-left">Kode</th>
-                    <th className="px-2.5 py-2 text-left">Formulir Pengawasan</th>
-                    <th className="px-2.5 py-2 text-right">Tersimpan</th>
-                    <th className="px-2.5 py-2 text-right">Dikirim</th>
-                    <th className="px-2.5 py-2 text-right">Sesuai/BAIK</th>
-                    <th className="px-2.5 py-2 text-right">Tdk Sesuai</th>
-                    <th className="px-2.5 py-2 text-right">Skor Avg</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {data.by_formulir.map((bf) => (
-                    <tr key={bf.form_no} className="hover:bg-slate-50">
-                      <td className="px-2.5 py-2 font-extrabold text-emerald-800">F{bf.form_no}</td>
-                      <td className="px-2.5 py-2 font-medium text-slate-800">{bf.title}</td>
-                      <td className="px-2.5 py-2 text-right tabular-nums text-slate-700">{nf(bf.tersimpan)}</td>
-                      <td className="px-2.5 py-2 text-right tabular-nums text-slate-600">{nf(bf.dikirim)}</td>
-                      <td className="px-2.5 py-2 text-right font-semibold tabular-nums text-emerald-700">{nf(bf.sesuai)}</td>
-                      <td className="px-2.5 py-2 text-right font-semibold tabular-nums text-amber-700">{nf(bf.tidak_sesuai)}</td>
-                      <td className="px-2.5 py-2 text-right font-mono tabular-nums text-slate-700">{pf(bf.avg_skor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-              </Panel>
-            </div>
+            </Panel>
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <Panel title="Rekap per SPPG" desc="Status F12 & F13 terakhir dan skor rata-rata tiap SPPG." testId="panel-rekap-sppg">
-            {!data.sppg_summary.length ? (
-              <EmptyBox msg="Belum ada data SPPG pada transaksi Pengawasan Gizi MBG." />
-            ) : (
-              <div className="max-h-[360px] overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                    <tr className="border-b border-slate-200">
-                      <th className="py-2 pr-2 text-left">SPPG &amp; Wilayah</th>
-                      <th className="py-2 text-right">Kunj</th>
-                      <th className="py-2 text-center">F12 Gizi</th>
-                      <th className="py-2 text-center">F13 Terima</th>
-                      <th className="py-2 text-right">Skor Avg</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {data.sppg_summary.map((s, idx) => (
-                      <tr key={`${s.nama_sppg}-${idx}`} className="hover:bg-slate-50">
-                        <td className="py-2 pr-2">
-                          <div className="font-bold text-slate-800">{s.nama_sppg}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {[s.puskesmas ? `PKM ${s.puskesmas}` : null, s.kabkota_name, s.province_name].filter(Boolean).join(' · ')}
-                          </div>
-                        </td>
-                        <td className="py-2 text-right font-bold tabular-nums text-slate-800">{nf(s.kunjungan)}</td>
-                        <td className="py-2 text-center"><RekapBadge value={s.last_rekap12} /></td>
-                        <td className="py-2 text-center"><RekapBadge value={s.last_rekap13} /></td>
-                        <td className="py-2 text-right font-mono tabular-nums text-slate-700">{pf(s.avg_skor)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <Panel title="Rekapitulasi Seluruh SPPG Terdaftar" desc="Status kesimpulan F12 & F13 terakhir serta skor rata-rata tiap SPPG." testId="panel-rekap-sppg">
+                {!data.sppg_summary.length ? (
+                  <EmptyBox msg="Belum ada data SPPG pada transaksi Pengawasan Gizi MBG." />
+                ) : (
+                  <div className="max-h-[360px] overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <tr className="border-b border-slate-200">
+                          <th className="py-2 pr-2 text-left">SPPG &amp; Wilayah</th>
+                          <th className="py-2 text-right">Kunj</th>
+                          <th className="py-2 text-center">F12 Gizi</th>
+                          <th className="py-2 text-center">F13 Terima</th>
+                          <th className="py-2 text-right">Skor Avg</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {data.sppg_summary.map((s, idx) => (
+                          <tr key={`${s.nama_sppg}-${idx}`} className="hover:bg-slate-50">
+                            <td className="py-2 pr-2">
+                              <div className="font-bold text-slate-800">{s.nama_sppg}</div>
+                              <div className="text-[11px] text-slate-500">
+                                {[s.puskesmas ? `PKM ${s.puskesmas}` : null, s.kabkota_name, s.province_name].filter(Boolean).join(' · ')}
+                              </div>
+                            </td>
+                            <td className="py-2 text-right font-bold tabular-nums text-slate-800">{nf(s.kunjungan)}</td>
+                            <td className="py-2 text-center"><RekapBadge value={s.last_rekap12} /></td>
+                            <td className="py-2 text-center"><RekapBadge value={s.last_rekap13} /></td>
+                            <td className="py-2 text-right font-mono tabular-nums text-slate-700">{pf(s.avg_skor)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </Panel>
-              <Panel title="Kunjungan Terbaru" desc="Maksimal 50 kunjungan terakhir sesuai filter (tanpa data pribadi petugas)." testId="panel-kunjungan-terbaru">
-            {!data.recent_kunjungan.length ? (
-              <EmptyBox msg="Belum ada transaksi kunjungan pada filter ini." />
-            ) : (
-              <div className="max-h-[360px] overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                    <tr className="border-b border-slate-200">
-                      <th className="py-2 pr-2 text-left">No. Kunjungan &amp; SPPG</th>
-                      <th className="py-2 text-center">Tanggal</th>
-                      <th className="py-2 text-center">Form</th>
-                      <th className="py-2 text-center">F12</th>
-                      <th className="py-2 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {data.recent_kunjungan.map((k) => (
-                      <tr key={k.id} className="hover:bg-slate-50">
-                        <td className="py-2 pr-2">
-                          <div className="font-mono text-[11px] font-bold text-slate-800">{k.no_kunjungan}</div>
-                          <div className="text-[11px] text-slate-600">{k.nama_sppg || '—'}</div>
-                          <div className="text-[10px] text-slate-400">
-                            {[k.kabkota_name, k.province_name].filter(Boolean).join(', ')}
-                          </div>
-                        </td>
-                        <td className="py-2 text-center font-mono text-[11px] text-slate-600">{k.tanggal}</td>
-                        <td className="py-2 text-center tabular-nums text-slate-700">{k.forms_sent}/{k.forms_saved}</td>
-                        <td className="py-2 text-center"><RekapBadge value={k.rekap12} /></td>
-                        <td className="py-2 text-center"><RekapBadge value={k.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <Panel title="Log Transaksi Kunjungan Terbaru" desc="Maksimal 50 kunjungan terakhir sesuai filter (tanpa data pribadi petugas)." testId="panel-kunjungan-terbaru">
+                {!data.recent_kunjungan.length ? (
+                  <EmptyBox msg="Belum ada transaksi kunjungan pada filter ini." />
+                ) : (
+                  <div className="max-h-[360px] overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-white text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <tr className="border-b border-slate-200">
+                          <th className="py-2 pr-2 text-left">No. Kunjungan &amp; SPPG</th>
+                          <th className="py-2 text-center">Tanggal</th>
+                          <th className="py-2 text-center">Form</th>
+                          <th className="py-2 text-center">F12</th>
+                          <th className="py-2 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {data.recent_kunjungan.map((k) => (
+                          <tr key={k.id} className="hover:bg-slate-50">
+                            <td className="py-2 pr-2">
+                              <div className="font-mono text-[11px] font-bold text-slate-800">{k.no_kunjungan}</div>
+                              <div className="text-[11px] text-slate-600">{k.nama_sppg || '—'}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {[k.kabkota_name, k.province_name].filter(Boolean).join(', ')}
+                              </div>
+                            </td>
+                            <td className="py-2 text-center font-mono text-[11px] text-slate-600">{k.tanggal}</td>
+                            <td className="py-2 text-center tabular-nums text-slate-700">{k.forms_sent}/{k.forms_saved}</td>
+                            <td className="py-2 text-center"><RekapBadge value={k.rekap12} /></td>
+                            <td className="py-2 text-center"><RekapBadge value={k.status} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </Panel>
             </div>
           </MoreDetails>

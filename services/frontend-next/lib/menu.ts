@@ -178,20 +178,57 @@ export type SidebarGroup = {
 // Form PE sub-items per disease come from the PE form registry.
 const it = (id: string, label: string, href: string, icon: string, order: number, extra: Partial<SidebarItemConfig> = {}): SidebarItemConfig =>
   ({ id, label, href, icon, order, enabled: true, ...extra })
+
+export const DASBOR_MBG_SUB_ITEMS: SidebarSubItemConfig[] = [
+  {
+    id: 'mod_dasbor_mbg_ringkasan',
+    label: 'Ringkasan Eksekutif',
+    href: '/dashboard/mbg/ringkasan',
+    icon: 'LayoutDashboard',
+    order: 1,
+    enabled: true,
+    description: 'Kajian eksekutif pimpinan, rekomendasi pengerahan sumber daya, korelasi risiko pengawasan × kejadian, dan peta komparasi spasial',
+  },
+  {
+    id: 'mod_dasbor_mbg_keracunan',
+    label: 'Keracunan Pangan',
+    href: '/dashboard/mbg/keracunan',
+    icon: 'AlertTriangle',
+    order: 2,
+    enabled: true,
+    description: 'Analisa epidemiologi KLB keracunan pangan: beban kasus/CFR, peta sebaran, kurva epidemi, ketepatan respons 24 jam, etiologi lab & lingkungan dapur',
+  },
+  {
+    id: 'mod_dasbor_mbg_pengawasan',
+    label: 'Pengawasan Gizi',
+    href: '/dashboard/mbg/pengawasan',
+    icon: 'ClipboardCheck',
+    order: 3,
+    enabled: true,
+    description: 'Analisa kepatuhan standar gizi & audit SPPG (Formulir 1–13): cakupan, aspek terlemah, matriks SPPG × formulir, temuan & daftar prioritas pembinaan',
+  },
+]
+
+export const DASBOR_MBG_MENU_ITEM: SidebarItemConfig = {
+  id: 'mod_dasbor_mbg',
+  label: 'Dasbor MBG',
+  href: '#',
+  icon: 'Utensils',
+  order: 1.9,
+  enabled: true,
+  description: 'Dasbor analitik Program Makan Bergizi Gratis (MBG): Ringkasan Eksekutif, Analisa Keracunan Pangan, dan Analisa Pengawasan Gizi',
+  subItems: DASBOR_MBG_SUB_ITEMS,
+}
+
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   { id: 'grp_beranda', title: 'Beranda', order: 1, enabled: true, area: 'home', items: [it('mod_beranda', 'Beranda', '/beranda', 'Home', 1)] },
   { id: 'grp_dasbor', title: 'Dasbor', order: 2, enabled: true, area: 'dashboard', items: [
     it('mod_dashboard_home', 'Ringkasan Dasbor', '/dashboard', 'LayoutDashboard', 0),
     it('mod_main_dashboard', 'Dasbor SKDR', '/main-dashboard', 'LayoutDashboard', 1),
     it('mod_dasbor_ebs_ibs', 'Dasbor SKDR EBS & IBS', '/dasbor/ebs-ibs', 'BarChart3', 1.8, { enabled: false, description: 'Dasbor analitik dari Transaksi Form Laporan EBS, Entri Data Agregat IBS, dan Form Individu IBS' }),
+    DASBOR_MBG_MENU_ITEM,
     it('mod_penyakit', 'Penyakit', '/penyakit', 'Stethoscope', 2),
     it('mod_tv', 'Mode TV', '/tv', 'Tv', 3),
-  ] },
-  // PR 052b (migrasi 068): "Dasbor MBG" jadi kategori sidebar sendiri dengan 3 halaman (sebelumnya 1 item + tab)
-  { id: 'grp_dasbor_mbg', title: 'Dasbor MBG', order: 2.5, enabled: true, area: 'dashboard', items: [
-    it('mod_dasbor_mbg_ringkasan', 'Ringkasan', '/dashboard/mbg/ringkasan', 'LayoutDashboard', 1, { description: 'Ringkasan Keracunan Pangan MBG × Pengawasan Gizi MBG, peta 2 kolom, tautan risiko SPPG' }),
-    it('mod_dasbor_mbg_keracunan', 'Keracunan', '/dashboard/mbg/keracunan', 'AlertTriangle', 2, { description: 'Dasbor Keracunan Pangan MBG: angka utama, peta, kurva epidemi, wilayah terdampak, daftar kejadian' }),
-    it('mod_dasbor_mbg_pengawasan', 'Pengawasan', '/dashboard/mbg/pengawasan', 'ClipboardCheck', 3, { description: 'Dasbor Pengawasan Gizi MBG: cakupan, skor, aspek lemah F1–F13, SPPG perlu tindak lanjut' }),
   ] },
   { id: 'grp_dasbor_limited', title: 'Dasbor Limited', order: 3, enabled: true, area: 'dashboard', requiresAuth: true, items: [
     it('mod_spasial', 'Spasial', '/dashboard/spasial', 'MapPin', 1),
@@ -227,8 +264,32 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   ] },
 ]
 
+export function normalizeDasborMbgMenu(config: SidebarGroupConfig[]): SidebarGroupConfig[] {
+  const withoutStandaloneMbgGrp = config.filter((grp) => grp.id !== 'grp_dasbor_mbg')
+  return withoutStandaloneMbgGrp.map((grp) => {
+    const isDasborGrp =
+      grp.id === 'grp_dasbor' || (grp.items || []).some((it) => it.id === 'mod_main_dashboard' || it.href === '/main-dashboard')
+    if (!isDasborGrp) return grp
+    const items = [...(grp.items || [])]
+    const idx = items.findIndex((it) => it.id === 'mod_dasbor_mbg' || it.href === '/dasbor/mbg')
+    if (idx >= 0) {
+      const existing = items[idx]
+      items[idx] = {
+        ...DASBOR_MBG_MENU_ITEM,
+        ...existing,
+        href: '#',
+        icon: existing.icon || 'Utensils',
+        subItems: existing.subItems?.length ? existing.subItems : DASBOR_MBG_SUB_ITEMS,
+      }
+    } else {
+      items.push(DASBOR_MBG_MENU_ITEM)
+    }
+    return { ...grp, items }
+  })
+}
+
 export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): SidebarGroup[] {
-  return config
+  return normalizeDasborMbgMenu(config)
     .filter((grp) => grp.enabled)
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((grp) => ({
