@@ -34,3 +34,4 @@ Menindaklanjuti kebutuhan presentasi eksekutif (*"tolong segera di rampungkan pe
   - `wildlife`: HTTP 200 OK, 150 observasi satwa liar burung GBIF.
   - `vectors`: HTTP 200 OK, 10 pengamatan vektor entomologi iNaturalist.
 - Validasi tipe frontend: `npx tsc --noEmit` bersih dengan 0 error.
+
