@@ -110,4 +110,4 @@ Sesuai arahan pengguna, arsitektur dasbor dirombak secara menyeluruh menjadi **1
   - `/skdr/dashboard/skdr/deteksi` -> HTTP 200
   - `/skdr/dashboard/skdr/buletin` -> HTTP 200
   - `/skdr/main-dashboard` -> HTTP 200
-- **Status Git**: Seluruh perubahan tersimpan secara lokal tanpa push ke remote / Gitea sesuai instruksi pengguna.
+- **Status Git**: Seluruh perubahan telah di-push secara aman ke remote repository Gitea (`gitea/main`).
