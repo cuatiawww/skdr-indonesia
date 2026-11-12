@@ -1,9 +1,15 @@
--- PR 061: Hapus isian data Form PE & audit Dasbor Zoonosis Lite
+-- PR 061: Hapus isian data Form PE & audit pemetaan diagnosa EBS Zoonosis
 -- 1. Hapus semua entri transaksi dari Form PE (pe_cases, pe_case_events, pe_clusters, case_reports)
 --    sesuai instruksi: "SAY AINGIN AD MIGRASI DELETE ISIAN YG DARI FORM pe".
--- 2. Update view dash_ibs_cases & surveillance_reports agar penyakit ber-Form PE
---    (Rabies, Antraks, Leptospirosis, Flu Burung) secara konsisten bersumber dari pe_cases murni,
---    bukan data agregat IBS mingguan yang memicu angka 215k Rabies dan titik wajik semu pada peta.
+-- 2. Pemetaan alias diagnosa EBS ke master_diseases untuk 4 penyakit zoonosis:
+--    - Rabies/GHPR: 'gigitan hewan penular rabies (ghpr)', 'rabies konfirmasi' -> disease_id = 41
+--    - Antraks: 'konfirmasi anthraks' -> disease_id = 15
+--    - Flu Burung: 'suspek avian influenza', 'konfirmasi avian influenza' -> disease_id = 27
+-- 3. Update view dash_ebs_reports agar fallback ke ebs_diagnosa_alias bila dsb_impor_disease_id kosong,
+--    sehingga seluruh laporan EBS Rabies (54k+), Leptospirosis (2k+), Flu Burung (30), dan Antraks (7)
+--    muncul secara lengkap dan alami dari API EBS Kemenkes.
+-- 4. Update view dash_ibs_cases & surveillance_reports agar penyakit ber-Form PE
+--    secara konsisten bersumber dari pe_cases murni dan tidak tercampur data agregat mingguan IBS.
 -- Rollback: rollback/073_rollback.sql
 BEGIN;
 
@@ -17,7 +23,66 @@ ALTER SEQUENCE IF EXISTS pe_cases_id_seq RESTART WITH 1;
 ALTER SEQUENCE IF EXISTS pe_clusters_id_seq RESTART WITH 1;
 ALTER SEQUENCE IF EXISTS case_reports_id_seq RESTART WITH 1;
 
--- 2. Update dash_ibs_cases: penyakit ber-Form PE membaca pe_cases murni
+-- 2. Pemetaan alias diagnosa EBS Zoonosis
+INSERT INTO ebs_diagnosa_alias (diagnosa, disease_id, match_source, updated_at)
+VALUES
+  ('gigitan hewan penular rabies (ghpr)', 41, 'manual', now()),
+  ('rabies konfirmasi', 41, 'manual', now()),
+  ('konfirmasi anthraks', 15, 'manual', now()),
+  ('suspek avian influenza', 27, 'manual', now()),
+  ('konfirmasi avian influenza', 27, 'manual', now())
+ON CONFLICT (diagnosa) DO UPDATE
+SET disease_id = EXCLUDED.disease_id,
+    match_source = EXCLUDED.match_source,
+    updated_at = now();
+
+-- 3. Update dash_ebs_reports: fallback ke ebs_diagnosa_alias
+CREATE OR REPLACE VIEW dash_ebs_reports AS
+SELECT l.id,
+   - l.id AS id_ebs,
+   l.no_laporan AS no_ebs,
+   p.name AS propinsi,
+   k.name AS kota,
+   l.dsb_kecamatan_nama AS distrik,
+   l.dsb_jenis_unit AS kel_unit,
+   NULLIF(TRIM(BOTH FROM l.unit_nama), ''::text) AS unit,
+   p.code AS kode_depdagri_prop,
+   k.kemendagri_code AS kode_depdagri_kota,
+   l.dsb_kecamatan AS kode_depdagri_distrik,
+   l.dsb_status AS sts_rumor,
+   NULLIF(TRIM(BOTH FROM l.penyakit_rumor), ''::text) AS diagnosa,
+   l.dsb_verifikasi AS verifikasi,
+   GREATEST(COALESCE(l.jml_kasus, 0), 0) AS jml_kasus,
+   LEAST(GREATEST(COALESCE(l.jml_kematian, 0), 0), GREATEST(COALESCE(l.jml_kasus, 0), 0)) AS jml_kematian,
+   NULLIF(TRIM(BOTH FROM l.data ->> 'kronologi'::text), ''::text) AS kronologi,
+   COALESCE(NULLIF(TRIM(BOTH FROM l.data ->> 'pfr_uraian'::text), ''::text), NULLIF(TRIM(BOTH FROM l.data #>> '{_impor,tindakan}'::text[]), ''::text)) AS tindakan,
+   NULLIF(TRIM(BOTH FROM l.data #>> '{_impor,saran}'::text[]), ''::text) AS saran,
+   l.dsb_klb AS klb,
+   COALESCE(k.latitude, p.latitude) AS latitude,
+   COALESCE(k.longitude, p.longitude) AS longitude,
+   COALESCE(l.tgl_laporan, (l.submitted_at AT TIME ZONE 'Asia/Jakarta'::text)::date) AS tgl_laporan,
+   (COALESCE(l.submitted_at, l.created_at) AT TIME ZONE 'Asia/Jakarta'::text) AS create_date,
+       CASE
+           WHEN l.dsb_impor_id IS NOT NULL THEN NULLIF(l.dsb_impor_update, ''::text)::timestamp without time zone
+           WHEN l.updated_at > (COALESCE(l.submitted_at, l.created_at) + '00:01:00'::interval) THEN (l.updated_at AT TIME ZONE 'Asia/Jakarta'::text)
+           ELSE NULL::timestamp without time zone
+       END AS update_date,
+   l.province_id,
+   l.kabkota_id,
+   COALESCE(
+       l.dsb_impor_disease_id,
+       (SELECT a.disease_id FROM ebs_diagnosa_alias a WHERE a.diagnosa = lower(l.dsb_verifikasi) LIMIT 1),
+       (SELECT a.disease_id FROM ebs_diagnosa_alias a WHERE a.diagnosa = lower(TRIM(BOTH FROM l.penyakit_rumor)) LIMIT 1)
+   ) AS disease_id,
+   l.data AS raw,
+   l.created_at AS first_synced_at,
+   l.updated_at AS synced_at
+FROM laporan_ebs l
+LEFT JOIN master_locations p ON p.id = l.province_id
+LEFT JOIN master_kabkota k ON k.id = l.kabkota_id
+WHERE l.status = 'dikirim'::text AND l.deleted_at IS NULL;
+
+-- 4. Update dash_ibs_cases: penyakit ber-Form PE membaca pe_cases murni
 CREATE OR REPLACE VIEW dash_ibs_cases AS
 SELECT c.id,
        c.no_pe,
@@ -81,7 +146,7 @@ WHERE r.kasus > 0 AND o.n > 0
     SELECT disease_id FROM pe_form_definitions WHERE is_active
   );
 
--- 3. Update surveillance_reports: penyakit ber-Form PE hanya memetakan EBS & pe_cases
+-- 5. Update surveillance_reports: penyakit ber-Form PE hanya memetakan EBS & pe_cases
 CREATE OR REPLACE VIEW surveillance_reports AS
 SELECT 'form'::text AS source, r.id::text AS id, r.disease_id, NULL::text AS diagnosa, r.location_id, r.kabkota_id, r.location_name,
        r.latitude, r.longitude, r.report_date, r.cases, r.deaths, r.is_reviewed, r.created_at, r.notes, NULL::text AS unit_name

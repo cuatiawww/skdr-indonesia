@@ -1,5 +1,53 @@
--- Rollback 073: Kembalikan dash_ibs_cases (062) dan surveillance_reports (066)
+-- Rollback 073: Kembalikan dash_ebs_reports, dash_ibs_cases (062) dan surveillance_reports (066)
 BEGIN;
+
+CREATE OR REPLACE VIEW dash_ebs_reports AS
+SELECT l.id,
+   - l.id AS id_ebs,
+   l.no_ebs,
+   p.name AS propinsi,
+   k.name AS kota,
+   l.dsb_kecamatan_nama AS distrik,
+   l.dsb_jenis_unit AS kel_unit,
+   NULLIF(TRIM(BOTH FROM l.unit_nama), ''::text) AS unit,
+   p.code AS kode_depdagri_prop,
+   k.kemendagri_code AS kode_depdagri_kota,
+   l.dsb_kecamatan AS kode_depdagri_distrik,
+   l.dsb_status AS sts_rumor,
+   NULLIF(TRIM(BOTH FROM l.penyakit_rumor), ''::text) AS diagnosa,
+   l.dsb_verifikasi AS verifikasi,
+   GREATEST(COALESCE(l.jml_kasus, 0), 0) AS jml_kasus,
+   LEAST(GREATEST(COALESCE(l.jml_kematian, 0), 0), GREATEST(COALESCE(l.jml_kasus, 0), 0)) AS jml_kematian,
+   NULLIF(TRIM(BOTH FROM l.data ->> 'kronologi'::text), ''::text) AS kronologi,
+   COALESCE(NULLIF(TRIM(BOTH FROM l.data ->> 'pfr_uraian'::text), ''::text), NULLIF(TRIM(BOTH FROM l.data #>> '{_impor,tindakan}'::text[]), ''::text)) AS tindakan,
+   NULLIF(TRIM(BOTH FROM l.data #>> '{_impor,saran}'::text[]), ''::text) AS saran,
+   l.dsb_klb AS klb,
+   COALESCE(k.latitude, p.latitude) AS latitude,
+   COALESCE(k.longitude, p.longitude) AS longitude,
+   COALESCE(l.tgl_laporan, (l.submitted_at AT TIME ZONE 'Asia/Jakarta'::text)::date) AS tgl_laporan,
+   (COALESCE(l.submitted_at, l.created_at) AT TIME ZONE 'Asia/Jakarta'::text) AS create_date,
+       CASE
+           WHEN l.dsb_impor_id IS NOT NULL THEN NULLIF(l.dsb_impor_update, ''::text)::timestamp without time zone
+           WHEN l.updated_at > (COALESCE(l.submitted_at, l.created_at) + '00:01:00'::interval) THEN (l.updated_at AT TIME ZONE 'Asia/Jakarta'::text)
+           ELSE NULL::timestamp without time zone
+       END AS update_date,
+   l.province_id,
+   l.kabkota_id,
+       CASE
+           WHEN l.dsb_impor_id IS NOT NULL THEN l.dsb_impor_disease_id
+           ELSE COALESCE(( SELECT a.disease_id
+              FROM ebs_diagnosa_alias a
+             WHERE a.diagnosa = lower(l.dsb_verifikasi)), ( SELECT a.disease_id
+              FROM ebs_diagnosa_alias a
+             WHERE a.diagnosa = lower(TRIM(BOTH FROM l.penyakit_rumor))))
+       END AS disease_id,
+   l.data AS raw,
+   l.created_at AS first_synced_at,
+   l.updated_at AS synced_at
+FROM laporan_ebs l
+    LEFT JOIN master_locations p ON p.id = l.province_id
+    LEFT JOIN master_kabkota k ON k.id = l.kabkota_id
+WHERE l.status = 'dikirim'::text AND l.deleted_at IS NULL;
 
 CREATE OR REPLACE VIEW dash_ibs_cases AS
 SELECT (r.laporan_id * 1000 + r.urutan * 10 + o.k)::bigint AS id,
