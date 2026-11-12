@@ -75,6 +75,7 @@ export default function NavigasiManager() {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
     mod_main_dashboard: true,
     mod_dasbor_mbg: true,
+    mod_dasbor_kategori: true,
     mod_form_pe: true,
     mod_program_mbg: true,
   })

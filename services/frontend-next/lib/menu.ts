@@ -328,6 +328,51 @@ export const DASBOR_ZOONOSIS_SUB_ITEMS: SidebarSubItemConfig[] = [
     enabled: true,
     description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
   },
+  {
+    id: 'sub_kategori_pd3i',
+    label: 'PD3I',
+    href: '/dasbor/kategori/pd3i',
+    icon: 'Shield',
+    order: 3,
+    enabled: true,
+    description: 'Penyakit yang Dapat Dicegah Dengan Imunisasi (PD3I)',
+  },
+  {
+    id: 'sub_kategori_tular_vektor',
+    label: 'Tular Vektor',
+    href: '/dasbor/kategori/tular-vektor',
+    icon: 'Bug',
+    order: 4,
+    enabled: true,
+    description: 'Penyakit Tular Vektor dan Zoonotik',
+  },
+  {
+    id: 'sub_kategori_menular_langsung',
+    label: 'Menular Langsung',
+    href: '/dasbor/kategori/menular-langsung',
+    icon: 'Users',
+    order: 5,
+    enabled: true,
+    description: 'Penyakit Menular Langsung',
+  },
+  {
+    id: 'sub_kategori_tular_makanan_air',
+    label: 'Tular Makanan & Air',
+    href: '/dasbor/kategori/tular-makanan-air',
+    icon: 'Layers',
+    order: 6,
+    enabled: true,
+    description: 'Penyakit Tular Makanan dan Air Terkontaminasi',
+  },
+  {
+    id: 'sub_kategori_pie',
+    label: 'PIE',
+    href: '/dasbor/kategori/pie',
+    icon: 'AlertTriangle',
+    order: 7,
+    enabled: true,
+    description: 'Penyakit Infeksi Emerging (PIE)',
+  },
 ]
 
 export const DASBOR_ZOONOSIS_MENU_ITEM: SidebarItemConfig = {
@@ -337,10 +382,17 @@ export const DASBOR_ZOONOSIS_MENU_ITEM: SidebarItemConfig = {
   icon: 'Bug',
   order: 1.7,
   enabled: true,
-  source: 'disease_categories',
   description: 'Dasbor analitik penyakit zoonosis dan per kategori',
   subItems: DASBOR_ZOONOSIS_SUB_ITEMS,
 }
+
+export const FORM_PE_SUB_ITEMS: SidebarSubItemConfig[] = [
+  { id: 'sub_pe_daftar', label: 'Daftar PE', href: '/pe', icon: 'FileSpreadsheet', order: 1, enabled: true, description: 'Daftar dan ringkasan penyelidikan epidemiologi semua penyakit' },
+  { id: 'sub_pe_lepto', label: 'Leptospirosis', href: '/pe/lepto', icon: 'FileText', order: 2, enabled: true, description: 'Formulir PE Leptospirosis' },
+  { id: 'sub_pe_rabies', label: 'Rabies', href: '/pe/rabies', icon: 'FileText', order: 3, enabled: true, description: 'Formulir PE Rabies / GHPR' },
+  { id: 'sub_pe_antraks', label: 'Antraks', href: '/pe/antraks', icon: 'FileText', order: 4, enabled: true, description: 'Formulir PE Antraks' },
+  { id: 'sub_pe_ai', label: 'Flu Burung', href: '/pe/ai', icon: 'FileText', order: 5, enabled: true, description: 'Formulir PE Flu Burung / Avian Influenza' },
+]
 
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   { id: 'grp_beranda', title: 'Beranda', order: 1, enabled: true, area: 'home', items: [it('mod_beranda', 'Beranda', '/beranda', 'Home', 1)] },
@@ -362,9 +414,7 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_navigasi', 'Modul & Navigasi', '/tatakelola/navigasi', 'SlidersHorizontal', 2, { description: 'Pengaturan dinamis nama navigasi, menu, dan sub-menu sidebar' }),
   ] },
   { id: 'grp_transaksi', title: 'Transaksi', order: 5, enabled: true, area: 'tatakelola', items: [
-    it('mod_form_pe', 'Form PE', '#', 'FileText', 1, { source: 'pe_forms', subItems: [
-      { id: 'sub_pe_daftar', label: 'Daftar PE', href: '/pe', icon: 'FileSpreadsheet', order: 99, enabled: true },
-    ] }),
+    it('mod_form_pe', 'Form PE', '#', 'FileText', 1, { subItems: FORM_PE_SUB_ITEMS }),
     it('mod_laporan_ebs', 'Laporan EBS', '/ebs/laporan', 'Radio', 2, { description: 'Laporan kejadian/rumor penyakit di masyarakat — jumlah kasus & kematian per kelompok usia dan jenis kelamin' }), // PR 030, label PR 035
     it('mod_laporan_ibs', 'Laporan Agregat IBS', '/ibs/laporan', 'FileSpreadsheet', 3, { description: 'Rekap mingguan Puskesmas/unit — jumlah kasus, kematian, dan lab per penyakit + total kunjungan' }), // PR 030, label PR 031/035
     it('mod_laporan_individu', 'Laporan Individu IBS', '/ibs/individu', 'Stethoscope', 4, { description: 'Data satu pasien per laporan — diagnosa, pemeriksaan, dan status akhir pasien' }), // PR 031, label PR 035
@@ -389,31 +439,11 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
 ]
 
 export function normalizeDasborMbgMenu(config: SidebarGroupConfig[]): SidebarGroupConfig[] {
-  const withoutStandaloneMbgGrp = config.filter((grp) => grp.id !== 'grp_dasbor_mbg')
-  return withoutStandaloneMbgGrp.map((grp) => {
-    const isDasborGrp =
-      grp.id === 'grp_dasbor' || (grp.items || []).some((it) => it.id === 'mod_main_dashboard' || it.href === '/main-dashboard')
-    if (!isDasborGrp) return grp
-    const items = [...(grp.items || [])]
-    const idx = items.findIndex((it) => it.id === 'mod_dasbor_mbg' || it.href === '/dasbor/mbg')
-    if (idx >= 0) {
-      const existing = items[idx]
-      items[idx] = {
-        ...DASBOR_MBG_MENU_ITEM,
-        ...existing,
-        href: '#',
-        icon: existing.icon || 'Utensils',
-        subItems: existing.subItems?.length ? existing.subItems : DASBOR_MBG_SUB_ITEMS,
-      }
-    } else {
-      items.push(DASBOR_MBG_MENU_ITEM)
-    }
-    return { ...grp, items }
-  })
+  return config
 }
 
 export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): SidebarGroup[] {
-  return normalizeDasborMbgMenu(config)
+  return config
     .filter((grp) => grp.enabled)
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((grp) => ({
@@ -424,18 +454,17 @@ export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): Side
       requiresAuth: grp.requiresAuth,
       permission: grp.permission,
       items: (grp.items || [])
-        .filter((item) => item.enabled && item.id !== 'mod_dasbor_ebs_ibs')
+        .filter((item) => item.enabled)
         .sort((a, b) => (a.order || 0) - (b.order || 0))
         .map((item) => ({
           id: item.id,
-          label: item.id === 'mod_main_dashboard' && (item.label === 'Dasbor Utama' || !item.label) ? 'Dasbor SKDR' : item.label,
+          label: item.label,
           labelKey: item.labelKey,
           icon: resolveMenuIcon(item.icon),
           iconName: item.icon,
           href: item.href,
           badge: item.badge,
           description: item.description,
-          source: item.source,
           subItems: item.subItems
             ?.filter((sub) => sub.enabled)
             .sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -453,65 +482,12 @@ export function convertConfigToSidebarGroups(config: SidebarGroupConfig[]): Side
     }))
 }
 
-// Standard Dashboard Menu (Fallback)
-const BORDER_COUNTRIES_MENU_ITEM: SidebarItemConfig = {
-  id: 'mod_border_countries',
-  label: 'Border Countries',
-  icon: 'Waypoints',
-  href: '/border-countries',
-  order: 3,
-  enabled: true,
-}
-
 export function ensureBorderCountriesMenu(menu: SidebarGroupConfig[]): SidebarGroupConfig[] {
-  if (menu.some((group) => (group.items || []).some((item) => item.href === '/border-countries' || item.id === 'mod_border_countries'))) {
-    return menu
-  }
-  let inserted = false
-  const withMaster = menu.map((group) => {
-    if (inserted) return group
-    const items = group.items || []
-    const masterIndex = items.findIndex((item) => item.href === '/master-countries' || item.id === 'mod_master_countries')
-    if (masterIndex < 0) return group
-    inserted = true
-    const next = [...items]
-    next.splice(masterIndex + 1, 0, BORDER_COUNTRIES_MENU_ITEM)
-    return { ...group, items: next }
-  })
-  if (inserted) return withMaster
-  return withMaster.map((group) => {
-    if (inserted) return group
-    if (group.id === 'grp_configuration' || group.title === 'CONFIGURATION') {
-      inserted = true
-      return { ...group, items: [...(group.items || []), BORDER_COUNTRIES_MENU_ITEM] }
-    }
-    return group
-  })
-}
-
-// PR 027 / PR 058: "Zoonosis Lite" is now a sub-item under "Dasbor Zoonosis" (mod_dasbor_kategori).
-export const ZOONOSIS_LITE_MENU_ITEM: SidebarItemConfig = {
-  id: 'sub_zoonosis_lite',
-  label: 'Zoonosis Lite',
-  labelKey: 'skdr.lite.menu',
-  icon: 'Activity',
-  href: '/dasbor/zoonosis-lite',
-  description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
-  order: 1,
-  enabled: true,
+  return menu
 }
 
 export function ensureZoonosisLiteMenu(menu: SidebarGroupConfig[]): SidebarGroupConfig[] {
-  // PR 058: Clean up any legacy loose root-level mod_zoonosis_lite from grp_dasbor
-  return menu.map((group) => {
-    if (group.id !== 'grp_dasbor') return group
-    return {
-      ...group,
-      items: (group.items || []).filter(
-        (item) => item.id !== 'mod_zoonosis_lite' && item.href !== '/dasbor/zoonosis-lite'
-      ),
-    }
-  })
+  return menu
 }
 
 export const sidebarMenu: SidebarGroup[] = convertConfigToSidebarGroups(DEFAULT_NAVIGATION_CONFIG)

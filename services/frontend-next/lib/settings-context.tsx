@@ -1,6 +1,6 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { SidebarGroupConfig, DEFAULT_NAVIGATION_CONFIG, ensureBorderCountriesMenu } from '@/lib/menu';
+import { SidebarGroupConfig, DEFAULT_NAVIGATION_CONFIG } from '@/lib/menu';
 import { setNavigationCache } from '@/lib/auth';
 import { PUBLIC_BASE_PATH } from '@/lib/public-path';
 import { applyPalette } from '@/lib/theme';
@@ -64,7 +64,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (json.success && json.data?.config_data) {
           const config = json.data.config_data;
           const navMenu = Array.isArray(config.navigation_menu) && config.navigation_menu.length > 0
-            ? ensureBorderCountriesMenu(config.navigation_menu)
+            ? config.navigation_menu
             : DEFAULT_SETTINGS.navigation_menu;
           setNavigationCache(navMenu);
           // PR 016: theme colours live in app_settings.theme_palette (migration 024); CSS defaults in globals.css.

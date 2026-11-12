@@ -331,3 +331,4 @@ export default function ModulBaruPage() {
 - **JANGAN** memasang teks *eyebrow* kecil di atas judul modul.
 - **JANGAN** menggunakan *web scraping*, crawling, atau NLP di proyek ini (data murni berasal dari form pelaporan kasus fasyankes & API SKDR).
 - **JANGAN** meng-hardcode rahasia atau konfigurasi lingkungan (gunakan `.env` dan tabel `app_settings`).
+

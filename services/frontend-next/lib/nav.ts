@@ -1,103 +1,47 @@
 'use client'
-// PR 017: grouped main navigation (DB-driven app_settings.navigation_menu) + PE form registry expansion.
-import { useEffect, useMemo, useState } from 'react'
+// PR 017 / PR 070: DB-driven navigation (app_settings.navigation_menu) tanpa hardcoded override.
+import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { Activity, FileText, Layers, LayoutDashboard } from 'lucide-react'
-import { convertConfigToSidebarGroups, ensureZoonosisLiteMenu, type SidebarGroup, type SidebarItem } from '@/lib/menu'
+import { convertConfigToSidebarGroups, DEFAULT_NAVIGATION_CONFIG, type SidebarGroup, type SidebarItem } from '@/lib/menu'
 import { useSettings } from '@/lib/settings-context'
-import { peFetch } from '@/lib/pe-api'
-import { useCategories, kategoriSlug } from '@/lib/kategori'
-import { MENU_ICON_MAP } from '@/lib/menu'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
 
-type PeFormRow = { form_key: string; title: string; version: number }
-
 const PE_TITLE_PREFIX = /^Formulir\s+Penyelidikan\s+Epidemiologi\s*\(PE\)\s*/i
-
-let peFormsCache: PeFormRow[] | null = null
-let peFormsPromise: Promise<PeFormRow[]> | null = null
-function loadPeForms(): Promise<PeFormRow[]> {
-  if (peFormsCache) return Promise.resolve(peFormsCache)
-  if (!peFormsPromise) {
-    peFormsPromise = peFetch<{ data: PeFormRow[] }>('/api/v1/pe/forms')
-      .then((j) => (peFormsCache = j.data || []))
-      .catch(() => { peFormsPromise = null; return [] })
-  }
-  return peFormsPromise
-}
 
 export function peFormLabel(title: string) {
   return title.replace(PE_TITLE_PREFIX, '').trim() || title
 }
 
-/** Menu groups with Form PE sub-items expanded from the PE form registry (no hardcoded disease list). */
+/** Navigasi sidebar sepenuhnya dinamis dari database (app_settings.navigation_menu). */
 export function useNavGroups(): SidebarGroup[] {
   const { settings } = useSettings()
-  const [forms, setForms] = useState<PeFormRow[]>(peFormsCache || [])
-  useEffect(() => { let on = true; loadPeForms().then((f) => on && setForms(f)); return () => { on = false } }, [])
-  const categories = useCategories()
   const { t } = useTranslation()
+
   return useMemo(() => {
-    const groups = convertConfigToSidebarGroups(ensureZoonosisLiteMenu(settings.navigation_menu || []))
+    const rawConfig = settings.navigation_menu && settings.navigation_menu.length > 0
+      ? settings.navigation_menu
+      : DEFAULT_NAVIGATION_CONFIG
+
+    const groups = convertConfigToSidebarGroups(rawConfig)
+
     return groups.map((g) => ({
       ...g,
       items: g.items.map((item) => {
-        // PR 027: injected Dasbor Zoonosis Lite item carries an i18n key
-        if (item.id === 'mod_zoonosis_lite' && item.labelKey) return { ...item, label: t(item.labelKey) }
-        // PR 021 / PR 058 / PR 060: "Dasbor Zoonosis" sub-menu = Zoonosis General + Zoonosis Lite + active categories from master_disease_categories
-        if (item.source === 'disease_categories' || item.id === 'mod_dasbor_kategori') {
-          const generalSub: SidebarItem = {
-            id: 'sub_zoonosis_general',
-            label: 'Zoonosis General',
-            icon: LayoutDashboard,
-            href: '/dasbor/zoonosis-general',
-            description: 'Sintesis komprehensif penyakit zoonosis: beban kasus, CFR, kurva tren, alert SKDR, dan peta sebaran',
-          }
-          const liteSub: SidebarItem = {
-            id: 'sub_zoonosis_lite',
-            label: 'Zoonosis Lite',
-            icon: Activity,
-            href: '/dasbor/zoonosis-lite',
-            description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
-          }
-          const subs: SidebarItem[] = categories
-            .filter((c) => c.code !== 'ZOONOSIS')
-            .map((c) => ({
-              id: `sub_kategori_${c.code.toLowerCase()}`,
-              label: c.short_name,
-              icon: (c.icon && MENU_ICON_MAP[c.icon]) || Layers,
-              href: `/dasbor/kategori/${kategoriSlug(c.code)}`,
-              description: c.name,
-            }))
-          return {
-            ...item,
-            subItems: [
-              generalSub,
-              liteSub,
-              ...subs,
-              ...(item.subItems || []).filter(
-                (s) =>
-                  s.id !== 'sub_zoonosis_general' &&
-                  s.id !== 'sub_zoonosis_lite' &&
-                  !subs.some((x) => x.id === s.id)
-              ),
-            ],
-          }
+        const itemLabel = item.labelKey ? t(item.labelKey) || item.label : item.label
+        return {
+          ...item,
+          label: itemLabel,
+          subItems: item.subItems?.map((sub) => {
+            const subLabel = sub.labelKey ? t(sub.labelKey) || sub.label : sub.label
+            return {
+              ...sub,
+              label: subLabel,
+            }
+          }),
         }
-        if (item.source !== 'pe_forms') return item
-        const generated: SidebarItem[] = [...forms]
-          .sort((a, b) => peFormLabel(a.title).localeCompare(peFormLabel(b.title), 'id'))
-          .map((f) => ({
-            id: `sub_pe_${f.form_key}`,
-            label: peFormLabel(f.title),
-            icon: FileText,
-            href: `/pe/${f.form_key}`,
-            description: `Daftar dan input PE ${peFormLabel(f.title)}`,
-          }))
-        return { ...item, subItems: [...generated, ...(item.subItems || [])] }
       }),
     }))
-  }, [settings.navigation_menu, forms, categories, t])
+  }, [settings.navigation_menu, t])
 }
 
 const under = (p: string, h: string) => p === h || p.startsWith(h.endsWith('/') ? h : `${h}/`)
@@ -109,7 +53,10 @@ export function useNavMatch(groups: SidebarGroup[]) {
     let best: { group: SidebarGroup; item: SidebarItem; sub?: SidebarItem; len: number } | null = null
     for (const group of groups) {
       for (const item of group.items) {
-        const cands: [SidebarItem | undefined, string | undefined][] = [[undefined, item.href], ...(item.subItems || []).map((s) => [s, s.href] as [SidebarItem, string | undefined])]
+        const cands: [SidebarItem | undefined, string | undefined][] = [
+          [undefined, item.href],
+          ...(item.subItems || []).map((s) => [s, s.href] as [SidebarItem, string | undefined]),
+        ]
         for (const [sub, href] of cands) {
           if (!href || href === '#') continue
           const ok = href === '/' ? pathname === '/' : under(pathname, href)
