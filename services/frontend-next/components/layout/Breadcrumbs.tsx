@@ -1,5 +1,6 @@
 'use client'
 // PR 017: breadcrumb reflects the nav group (Beranda › Grup › Menu › Sub-menu › Detail).
+// PR 065: Audit warna dasar & penyelarasan pill container breadcrumb agar elegan dan selaras tanpa tabrakan warna.
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, Home } from 'lucide-react'
@@ -22,14 +23,29 @@ export default function Breadcrumbs({ match }: { match: Match }) {
   if (rest.length) crumbs.push({ label: rest[rest.length - 1] === 'baru' ? addLabel : 'Detail' })
   const last = crumbs.length - 1
   return (
-    <nav aria-label="Breadcrumb" data-testid="breadcrumbs" className="px-4 pt-3 text-xs sm:px-6 lg:px-8">
-      <ol className="flex flex-wrap items-center gap-1.5 text-slate-500">
-        <li><Link href="/beranda" className="inline-flex items-center gap-1 hover:text-primary"><Home className="h-3.5 w-3.5" />Beranda</Link></li>
+    <nav aria-label="Breadcrumb" data-testid="breadcrumbs" className="px-4 pt-3.5 sm:px-6 lg:px-8">
+      <ol className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50/90 px-3.5 py-1.5 text-xs text-slate-600 shadow-2xs backdrop-blur-xs">
+        <li>
+          <Link href="/beranda" className="inline-flex items-center gap-1.5 font-medium text-slate-600 transition-colors hover:text-primary">
+            <Home className="h-3.5 w-3.5 text-slate-400 group-hover:text-primary" />
+            <span>Beranda</span>
+          </Link>
+        </li>
         {crumbs.map((c, i) => (
           <li key={i} className="inline-flex items-center gap-1.5">
-            <ChevronRight className="h-3 w-3 text-slate-300" />
-            {c.href && i !== last ? <Link href={c.href} className="hover:text-primary">{c.label}</Link>
-              : <span className={i === last ? 'font-semibold text-slate-700' : ''} aria-current={i === last ? 'page' : undefined}>{c.label}</span>}
+            <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" aria-hidden="true" />
+            {c.href && i !== last ? (
+              <Link href={c.href} className="font-medium text-slate-600 transition-colors hover:text-primary">
+                {c.label}
+              </Link>
+            ) : (
+              <span
+                className={i === last ? 'font-semibold text-slate-900' : 'font-medium text-slate-600'}
+                aria-current={i === last ? 'page' : undefined}
+              >
+                {c.label}
+              </span>
+            )}
           </li>
         ))}
       </ol>

@@ -18,7 +18,7 @@
   --brand-accent: 56 153 254; /* SATUSEHAT Blue 500 #3899FE */
   --brand-lime: 144 200 33;   /* SATUSEHAT Lime 500 #90C821 */
   /* SATUSEHAT surface & border tokens */
-  --page-bg: 241 242 243;     /* SATUSEHAT Neutral 50 #F1F2F3 */
+  --page-bg: 255 255 255;     /* Pure White #FFFFFF (PR 065 audit warna dasar halaman) */
   --card-bg: 255 255 255;
   --card-border: 228 229 231; /* SATUSEHAT Neutral 100 #E4E5E7 */
   --section-pad: 1rem;
@@ -31,10 +31,11 @@
   --scale-all-0: 225 251 250; --scale-all-1: 184 237 234; --scale-all-2: 22 179 172; --scale-all-3: 13 107 103; --scale-all-4: 6 47 45;
 }
 
-/* SATUSEHAT Design System typography */
+/* SATUSEHAT Design System typography & base canvas */
 html, body {
   font-family: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: #141313;
+  background-color: #ffffff;
 }
 
 .reports-page .font-sans,

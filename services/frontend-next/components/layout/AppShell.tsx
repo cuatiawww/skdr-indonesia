@@ -82,11 +82,11 @@ export default function AppShell({
 
   if (tvMode)
     return (
-      <main className="h-screen w-screen overflow-hidden bg-[#f8fafc] text-slate-900">{children}</main>
+      <main className="h-screen w-screen overflow-hidden bg-white text-slate-900">{children}</main>
     );
 
   return (
-    <main className={`flex min-h-screen flex-col bg-[#f8fafc] text-slate-900 transition-[padding] duration-300 print:pl-0 ${collapsed ? "lg:pl-[72px]" : "lg:pl-[280px]"}`}>
+    <main className={`flex min-h-screen flex-col bg-white text-slate-900 transition-[padding] duration-300 print:pl-0 ${collapsed ? "lg:pl-[72px]" : "lg:pl-[280px]"}`}>
       {sidebarOpen && (
         <button
           type="button"
