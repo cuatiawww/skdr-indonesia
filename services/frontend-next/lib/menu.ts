@@ -434,7 +434,20 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
     it('mod_log_akses', 'Log Akses', '/tatakelola/log-akses', 'History', 3),
   ] },
   { id: 'grp_bantuan', title: 'Lainnya', order: 9, enabled: true, area: 'dashboard', items: [
-    it('mod_dokumentasi', 'Dokumentasi', '/dokumentasi', 'BookText', 1),
+    {
+      id: 'mod_dokumentasi',
+      label: 'Dokumentasi',
+      href: '/dokumentasi',
+      icon: 'BookText',
+      order: 1,
+      enabled: true,
+      description: 'Dokumentasi komparasi sistem lama vs baru SKDR, MBG, dan Zoonosis',
+      subItems: [
+        { id: 'sub_dok_skdr', label: 'Dokumentasi SKDR', href: '/dokumentasi/skdr', icon: 'Activity', order: 1, enabled: true, description: 'Sistem lama vs baru IBS dan EBS, form mingguan, dan dasbor SKDR' },
+        { id: 'sub_dok_mbg', label: 'Dokumentasi MBG', href: '/dokumentasi/mbg', icon: 'Utensils', order: 2, enabled: true, description: 'Sistem lama vs baru Program MBG: Pengawasan Gizi SPPG dan Keracunan Pangan' },
+        { id: 'sub_dok_zoonosis', label: 'Dokumentasi Zoonosis', href: '/dokumentasi/zoonosis', icon: 'Bug', order: 3, enabled: true, description: 'Sistem baru Form PE Zoonosis One Health dan Dasbor Analitik Zoonosis' },
+      ],
+    },
   ] },
 ]
 
