@@ -27,8 +27,8 @@ const toChannels = (hex: string) => {
 
 /** Resolve a theme variable to a concrete colour (for canvas renderers such as OpenLayers). */
 export function themeRgb(name: string, alpha = 1): string {
-  if (typeof window === 'undefined') return `rgba(4, 122, 111, ${alpha})`
-  const v = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || '4 122 111'
+  if (typeof window === 'undefined') return `rgba(13, 107, 103, ${alpha})`
+  const v = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || '13 107 103'
   const [r, g, b] = v.split(/\s+/)
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

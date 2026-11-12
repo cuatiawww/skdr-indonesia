@@ -1,37 +1,40 @@
 import type { Config } from "tailwindcss";
 
-// PR 016: Kemenkes logo palette via CSS variables (lib/theme.ts, app/globals.css, DB app_settings.theme_palette).
-// `blue` and `sky` are remapped to the brand scale so existing utility classes follow the theme.
+// PR 064: SATUSEHAT / TTDK Design System integration
 const v = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
 const BRAND = Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900].map((k) => [k, v(`brand-${k}`)]));
 
 const config: Config = {
+  presets: [
+    require("@ttdk-design-system/library-react/tailwind-preset.cjs"),
+  ],
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
+    "./node_modules/@ttdk-design-system/library-react/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
       colors: {
         brand: BRAND,
-        // PR 018 surface tokens (globals.css)
         page: 'rgb(var(--page-bg) / <alpha-value>)',
         card: 'rgb(var(--card-bg) / <alpha-value>)',
         line: 'rgb(var(--card-border) / <alpha-value>)',
         rule: 'rgb(var(--rule) / <alpha-value>)',
         blue: BRAND,
         sky: BRAND,
-        primary: { DEFAULT: v("brand-700"), dark: v("brand-800"), light: v("brand-500") },
-        secondary: { DEFAULT: v("brand-lime"), dark: v("brand-800"), light: v("brand-200") },
-        accent: { DEFAULT: "#ED2939", dark: "#c61f2d", light: "#f15462" },
+        primary: { DEFAULT: v("brand-500"), dark: v("brand-700"), light: v("brand-400") },
+        secondary: { DEFAULT: v("brand-lime"), dark: v("brand-700"), light: v("brand-200") },
+        accent: { DEFAULT: "#3899fe", dark: "#1e81e8", light: "#ebf3ff" },
         ebs: v("src-ebs"),
         pe: v("src-pe"),
-        asean: { blue: v("brand-700"), red: "#ED2939", gold: v("brand-lime"), sky: v("brand-600") },
+        asean: { blue: v("brand-700"), red: "#F02D2D", gold: v("brand-lime"), sky: v("brand-accent") },
       },
       fontFamily: {
-        manrope: ["var(--font-roboto)", "sans-serif"],
-        roboto: ["var(--font-roboto)", "sans-serif"],
+        sans: ["var(--font-manrope)", "Manrope", "var(--font-roboto)", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        manrope: ["var(--font-manrope)", "Manrope", "sans-serif"],
+        roboto: ["var(--font-manrope)", "var(--font-roboto)", "sans-serif"],
       },
     },
   },

@@ -1,42 +1,47 @@
+@import "@ttdk-design-system/library-react/theme/tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* PR 016: theme tokens — Kemenkes logo palette (logo teal #06B8A5, cyan #05BBCC, lime #D7DF21).
-   Channels "R G B"; overridden at runtime from app_settings.theme_palette (migration 024). */
+/* PR 064: SATUSEHAT / TTDK Design System Core Tokens (SATUSEHAT Green #16B3AC, Blue #3899FE, Lime #90C821).
+   Channels "R G B"; overridden at runtime from app_settings.theme_palette (migration 074). */
 :root {
-  --brand-50: 236 250 248;
-  --brand-100: 207 243 238;
-  --brand-200: 159 230 220;
-  --brand-300: 99 211 197;
-  --brand-400: 44 195 177;
-  --brand-500: 6 184 165;
-  --brand-600: 4 153 138;
-  --brand-700: 4 122 111;
-  --brand-800: 5 94 86;
-  --brand-900: 6 69 64;
-  --brand-accent: 5 187 204;
-  --brand-lime: 215 223 33;
-  /* PR 018: editorial surface tokens — page, card and hairline (light neutral close to the page) */
-  --page-bg: 247 249 249;
+  --brand-50: 240 252 251;
+  --brand-100: 225 251 250;
+  --brand-200: 184 237 234;
+  --brand-300: 128 220 216;
+  --brand-400: 32 214 205;
+  --brand-500: 22 179 172; /* SATUSEHAT Brand Green #16B3AC */
+  --brand-600: 18 143 138; /* SATUSEHAT Brand Strong #128F8A */
+  --brand-700: 13 107 103; /* SATUSEHAT Brand Dark #0D6B67 */
+  --brand-800: 9 72 69;    /* #094845 */
+  --brand-900: 6 47 45;    /* #062F2D */
+  --brand-accent: 56 153 254; /* SATUSEHAT Blue 500 #3899FE */
+  --brand-lime: 144 200 33;   /* SATUSEHAT Lime 500 #90C821 */
+  /* SATUSEHAT surface & border tokens */
+  --page-bg: 241 242 243;     /* SATUSEHAT Neutral 50 #F1F2F3 */
   --card-bg: 255 255 255;
-  --card-border: 228 234 233;
+  --card-border: 228 229 231; /* SATUSEHAT Neutral 100 #E4E5E7 */
   --section-pad: 1rem;
-    --section-gap: 2rem;
-    --rule: 221 228 227;
-  --src-ebs: 232 113 10;
-  --src-pe: 10 143 163;
-  --scale-ebs-0: 255 241 230; --scale-ebs-1: 253 186 116; --scale-ebs-2: 249 115 22; --scale-ebs-3: 194 65 12; --scale-ebs-4: 124 45 18;
-  --scale-pe-0: 224 246 249; --scale-pe-1: 158 227 236; --scale-pe-2: 63 195 212; --scale-pe-3: 10 143 163; --scale-pe-4: 7 94 107;
-  --scale-all-0: 207 243 238; --scale-all-1: 99 211 197; --scale-all-2: 6 184 165; --scale-all-3: 4 122 111; --scale-all-4: 6 69 64;
+  --section-gap: 2rem;
+  --rule: 202 204 207;        /* SATUSEHAT Neutral 200 #CACCCF */
+  --src-ebs: 236 115 3;       /* SATUSEHAT Coral 500 #EC7303 */
+  --src-pe: 22 179 172;       /* SATUSEHAT Brand 500 #16B3AC */
+  --scale-ebs-0: 255 234 211; --scale-ebs-1: 255 167 138; --scale-ebs-2: 255 106 56; --scale-ebs-3: 236 115 3; --scale-ebs-4: 193 81 0;
+  --scale-pe-0: 225 251 250; --scale-pe-1: 184 237 234; --scale-pe-2: 128 220 216; --scale-pe-3: 22 179 172; --scale-pe-4: 13 107 103;
+  --scale-all-0: 225 251 250; --scale-all-1: 184 237 234; --scale-all-2: 22 179 172; --scale-all-3: 13 107 103; --scale-all-4: 6 47 45;
 }
 
-/* Keep the reports matrix typography consistent with the main dashboard.
-   The page still uses utility classes such as font-sans/font-mono for layout
-   semantics, but both resolve to the application Roboto family here. */
+/* SATUSEHAT Design System typography */
+html, body {
+  font-family: var(--font-manrope), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #141313;
+}
+
 .reports-page .font-sans,
 .reports-page .font-mono {
-  font-family: var(--font-roboto), sans-serif;
+  font-family: var(--font-manrope), var(--font-roboto), sans-serif;
 }
 
 @keyframes marquee {

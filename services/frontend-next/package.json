@@ -9,6 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^2.11.7",
+    "@tiptap/extension-link": "^2.11.7",
+    "@tiptap/extension-placeholder": "^2.11.7",
+    "@tiptap/extension-underline": "^2.11.7",
+    "@tiptap/pm": "^2.11.7",
+    "@tiptap/react": "^2.11.7",
+    "@tiptap/starter-kit": "^2.11.7",
+    "@ttdk-design-system/library-react": "^1.0.1",
     "clsx": "^2.1.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
@@ -22,13 +30,6 @@
     "react-dom": "19.0.0",
     "recharts": "^2.15.0",
     "sonner": "^1.7.0",
-    "@tiptap/react": "^2.11.7",
-    "@tiptap/pm": "^2.11.7",
-    "@tiptap/starter-kit": "^2.11.7",
-    "@tiptap/extension-placeholder": "^2.11.7",
-    "@tiptap/extension-underline": "^2.11.7",
-    "@tiptap/extension-link": "^2.11.7",
-    "@tiptap/extension-image": "^2.11.7",
     "tailwind-merge": "^2.6.0",
     "zustand": "^5.0.12"
   },
