@@ -285,21 +285,15 @@ export default function KpWizard({ rid, stepId = 's1', viewOnly = false }: { rid
 
   return (
     <div className="w-full space-y-5 bg-page px-3 py-5 pb-24 sm:px-6 sm:py-6 md:pb-6 lg:px-8">
-      <header className="skdr-section-head flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-testid="page-header">
-        <div className="flex items-center gap-3">
-          <Link href={rec ? `${KP_HREF}/${rec.id}` : KP_HREF} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title={rec ? 'Kembali ke ringkasan kejadian' : 'Kembali ke daftar'}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className="min-w-0">
-            <div className="skdr-eyebrow">Program MBG · Keracunan Pangan{rec ? ` · ${rec.no_laporan}` : ''}</div>
-            <h1 className="skdr-section-title">{rec ? (data.nama_sppg || 'Laporan Kejadian') : 'Laporan Kejadian Baru'}</h1>
-            <p className="skdr-section-desc">
-              {rec ? <>{[rec.kabkota, rec.provinsi].filter(Boolean).join(', ') || 'Wilayah belum diisi'}{data.tgl_kejadian ? ` · ${String(data.tgl_kejadian).replace('T', ' ')}` : ''}</> : 'Draf dibuat otomatis setelah 4 isian wajib terisi'}
-              {' · '}<span className={badge(STATUS_CLS[vs] || '')}>{STATUS_LABEL[vs] || vs}</span>
-            </p>
-          </div>
+      <header className="skdr-section-head grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center lg:gap-6" data-testid="page-header">
+        <div className="min-w-0 lg:col-span-8">
+          <h1 className="skdr-section-title text-xl sm:text-2xl font-bold tracking-tight text-slate-900">{rec ? (data.nama_sppg || 'Laporan Kejadian') : 'Laporan Kejadian Baru'}</h1>
+          <p className="skdr-section-desc mt-1.5 text-xs sm:text-sm leading-relaxed text-slate-600">
+            {rec ? <>{[rec.kabkota, rec.provinsi].filter(Boolean).join(', ') || 'Wilayah belum diisi'}{data.tgl_kejadian ? ` · ${String(data.tgl_kejadian).replace('T', ' ')}` : ''}</> : 'Draf dibuat otomatis setelah 4 isian wajib terisi'}
+            {' · '}<span className={badge(STATUS_CLS[vs] || '')}>{STATUS_LABEL[vs] || vs}</span>
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center justify-start gap-3 text-xs lg:col-span-4 lg:justify-end shrink-0">
           <span className="text-slate-500" aria-live="polite">
             {saveState === 'saving' && <span className="inline-flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Menyimpan…</span>}
             {saveState === 'saved' && <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />{isDraf ? 'Draf tersimpan' : 'Tersimpan'}</span>}

@@ -348,22 +348,16 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
 
   return (
     <div className="w-full space-y-5 bg-page px-3 py-5 pb-24 sm:px-6 sm:py-6 md:pb-6 lg:px-8">
-      <header className="skdr-section-head flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-testid="page-header">
-        <div className="flex items-center gap-3">
-          <Link href={def.listHref} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title="Kembali ke daftar">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className="min-w-0">
-            <div className="skdr-eyebrow">{def.eyebrow}</div>
-            <h1 className="skdr-section-title">{def.title}</h1>
-            <p className="skdr-section-desc max-w-3xl" data-testid="lap-desc">{def.description}</p>
-            <p className="skdr-section-desc">
-              {rec ? <span className="font-mono font-semibold text-slate-700">{rec.no_laporan}</span> : 'Draf baru (nomor dibuat saat pertama tersimpan)'}
-              {rec && <> · <span className={badge(STATUS_CLS[rec.status] || '')}>{STATUS_LABEL[rec.status] || rec.status}</span></>}
-            </p>
+      <header className="skdr-section-head grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center lg:gap-6" data-testid="page-header">
+        <div className="min-w-0 lg:col-span-8">
+          <h1 className="skdr-section-title text-xl sm:text-2xl font-bold tracking-tight text-slate-900">{def.title}</h1>
+          <p className="skdr-section-desc mt-1.5 text-xs sm:text-sm leading-relaxed text-slate-600" data-testid="lap-desc">{def.description}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-mono font-semibold text-slate-700">{rec ? rec.no_laporan : 'Draf baru (nomor dibuat saat pertama tersimpan)'}</span>
+            {rec && <span className={badge(STATUS_CLS[rec.status] || '')}>{STATUS_LABEL[rec.status] || rec.status}</span>}
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center justify-start gap-3 text-xs lg:col-span-4 lg:justify-end shrink-0">
           <span className="text-slate-500" aria-live="polite">
             {saveState === 'saving' && <span className="inline-flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Menyimpan…</span>}
             {saveState === 'saved' && <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />Draf tersimpan {rec?.updated_at?.slice(11, 16) || ''}</span>}

@@ -3,7 +3,7 @@
 // tautan Pengawasan Gizi SPPG yang sama, kelengkapan per langkah, tutup / buka kembali kejadian.
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CalendarPlus, Check, ClipboardCheck, Eye, FlaskConical, History, Loader2, Lock, LockOpen, Paperclip, Pencil, Send, Trash2, TrendingUp } from 'lucide-react'
+import { CalendarPlus, Check, ClipboardCheck, Eye, FlaskConical, History, Loader2, Lock, LockOpen, Paperclip, Pencil, Send, Trash2, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import Modal from '@/components/Modal'
 import { inputCls } from '@/components/master/MasterUi'
@@ -48,16 +48,13 @@ export default function KpDetail({ id }: { id: number }) {
 
   return (
     <div className="w-full space-y-5 bg-page px-3 py-5 sm:px-6 sm:py-6 lg:px-8">
-      <header className="skdr-section-head flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-testid="page-header">
-        <div className="flex items-center gap-3">
-          <Link href={KP_HREF} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title="Kembali ke daftar"><ArrowLeft className="h-4 w-4" /></Link>
-          <div className="min-w-0">
-            <div className="skdr-eyebrow">Program MBG · Keracunan Pangan · {rec.no_laporan}</div>
-            <h1 className="skdr-section-title">{d.nama_sppg || 'Kejadian keracunan pangan'}</h1>
-            <p className="skdr-section-desc">{[d.kecamatan_nama, rec.kabkota, rec.provinsi].filter(Boolean).join(', ') || 'Wilayah belum diisi'}{d.tgl_kejadian ? ` · kejadian ${String(d.tgl_kejadian).replace('T', ' ')} WIB` : ''} · <span className={badge(STATUS_CLS[vs] || '')}>{STATUS_LABEL[vs]}</span></p>
-          </div>
+      {/* header: PR 067 - 2-grid (~70% judul & deskripsi, ~30% tombol aksi), tanpa eyebrow, tombol back di breadcrumb */}
+      <header className="skdr-section-head grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center lg:gap-6" data-testid="page-header">
+        <div className="min-w-0 lg:col-span-7">
+          <h1 className="skdr-section-title">{d.nama_sppg || 'Kejadian keracunan pangan'}</h1>
+          <p className="skdr-section-desc">{[d.kecamatan_nama, rec.kabkota, rec.provinsi].filter(Boolean).join(', ') || 'Wilayah belum diisi'}{d.tgl_kejadian ? ` · kejadian ${String(d.tgl_kejadian).replace('T', ' ')} WIB` : ''} · <span className={badge(STATUS_CLS[vs] || '')}>{STATUS_LABEL[vs]}</span></p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:col-span-5 lg:justify-end">
           <Link href={`${KP_HREF}/${id}/s1?mode=lihat`} className={`${btn} border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`}><Eye className="h-3.5 w-3.5" /> Lihat isian</Link>
           {input && rec.status !== 'ditutup' && <Link href={`${KP_HREF}/${id}/s1`} className={`${btn} border border-primary/30 bg-white text-primary hover:bg-primary/5`} data-testid="kp-lengkapi"><Pencil className="h-3.5 w-3.5" /> {rec.status === 'draf' ? 'Lanjutkan pengisian' : 'Lengkapi laporan'}</Link>}
           {input && rec.status === 'draf' && <Link href={`${KP_HREF}/${id}/s6`} className={`${btn} bg-primary font-bold text-white hover:bg-primary-dark`}><Send className="h-3.5 w-3.5" /> Tinjau & kirim</Link>}

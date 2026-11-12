@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, ChevronRight, CircleAlert, Eye, History, Loader2, Pencil, Send, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronRight, CircleAlert, Eye, History, Loader2, Pencil, Send, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import Modal from '@/components/Modal'
 import { ApiError } from '@/lib/pe-api'
@@ -60,17 +60,14 @@ export default function MbgHub({ id, viewOnly }: { id: number; viewOnly: boolean
 
   return (
     <div className="w-full space-y-5 bg-page px-3 py-5 sm:px-6 sm:py-6 lg:px-8">
-      <header className="skdr-section-head flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-testid="page-header">
-        <div className="flex items-center gap-3">
-          <Link href={MBG_HREF} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title="Kembali ke daftar"><ArrowLeft className="h-4 w-4" /></Link>
-          <div className="min-w-0">
-            <div className="skdr-eyebrow">Pengawasan Gizi MBG</div>
-            <h1 className="skdr-section-title">{d.nama_sppg || 'SPPG belum diisi'}</h1>
-            <p className="skdr-section-desc"><span className="font-mono font-semibold text-slate-700">{k.no_kunjungan}</span>{d.tanggal ? ` · ${d.tanggal}` : ''} · <span className={badge(STATUS_CLS[k.status] || '')}>{STATUS_LABEL[k.status]}</span></p>
-          </div>
+      {/* header: PR 067 - 2-grid (~70% judul & deskripsi, ~30% tombol aksi), tanpa eyebrow, tombol back di breadcrumb */}
+      <header className="skdr-section-head grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center lg:gap-6" data-testid="page-header">
+        <div className="min-w-0 lg:col-span-8">
+          <h1 className="skdr-section-title">{d.nama_sppg || 'SPPG belum diisi'}</h1>
+          <p className="skdr-section-desc"><span className="font-mono font-semibold text-slate-700">{k.no_kunjungan}</span>{d.tanggal ? ` · ${d.tanggal}` : ''} · <span className={badge(STATUS_CLS[k.status] || '')}>{STATUS_LABEL[k.status]}</span></p>
         </div>
         {editable && (
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs lg:col-span-4 lg:justify-end">
             <button onClick={() => setDel(true)} disabled={busy} data-testid="mbg-hapus" className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> Hapus draf</button>
             <button onClick={kirim} disabled={busy || !siap} data-testid="mbg-kirim-kunjungan" title={siap ? 'Kirim kunjungan' : 'Semua formulir harus dikirim dulu'}
               className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 font-bold uppercase tracking-wider text-white hover:bg-primary-dark disabled:opacity-40">

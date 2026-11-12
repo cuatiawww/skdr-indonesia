@@ -236,22 +236,16 @@ export default function PeFormEditor({ formKey, caseId, viewOnly = false }: { fo
 
   return (
     <div className="w-full space-y-5 bg-page px-4 py-6 sm:px-6 lg:px-8">
-      {/* header */}
-      <header className="skdr-section-head flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-testid="page-header">
-        <div className="flex items-center gap-3">
-          <Link href={`/pe/${formKey}`} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title={t('skdr.pe.backToList')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <div className="skdr-eyebrow">{t('skdr.eyebrow.peForm')}</div>
-            <h1 className="skdr-section-title">{schema.title}</h1>
-            <p className="skdr-section-desc">
-              {rec ? <span className="font-mono font-semibold text-slate-700">{rec.no_pe}</span> : t('skdr.pe.newDraft')} · {t('skdr.pe.formVersion', { v: rec?.form_version ?? def.version })}
-              {rec && <> · <span className={badge(STATUS_STYLE[rec.status] || '')}>{statusLabel(rec.status)}</span></>}
-            </p>
-          </div>
+      {/* header: PR 067 - 2-grid (~70% judul & deskripsi, ~30% tombol aksi), tanpa eyebrow, tombol back di breadcrumb */}
+      <header className="skdr-section-head grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center lg:gap-6" data-testid="page-header">
+        <div className="lg:col-span-8">
+          <h1 className="skdr-section-title">{schema.title}</h1>
+          <p className="skdr-section-desc">
+            {rec ? <span className="font-mono font-semibold text-slate-700">{rec.no_pe}</span> : t('skdr.pe.newDraft')} · {t('skdr.pe.formVersion', { v: rec?.form_version ?? def.version })}
+            {rec && <> · <span className={badge(STATUS_STYLE[rec.status] || '')}>{statusLabel(rec.status)}</span></>}
+          </p>
         </div>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs lg:col-span-4 lg:justify-end">
           <span className="text-slate-500">
             {saveState === 'saving' && <span className="inline-flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />{t('skdr.pe.saving')}</span>}
             {saveState === 'saved' && <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />{t('skdr.pe.autosaved', { at: rec?.updated_at?.slice(11) || '' })}</span>}
