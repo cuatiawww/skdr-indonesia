@@ -202,12 +202,17 @@ export default function ZoonosisLite() {
   useEffect(() => { if (sel.length === 1 && sel[0] === 'AVIAN_INFLUENZA') setLayers((l) => ({ ...l, birds: true })) }, [sel])
 
   const selNames = useMemo(() => new Set(LITE_DISEASES.filter((d) => sel.includes(d.code)).map((d) => d.name as string)), [sel])
-  const locations = useMemo(() => (map?.locations ?? []).filter((l) => selNames.has(l.disease)
-    && (src === 'all' || String((l as { source_type?: string | null }).source_type ?? '').toLowerCase() === src)), [map?.locations, selNames, src])
+  const locations = useMemo(() => (map?.locations ?? []).filter((l) => {
+    if (!selNames.has(l.disease)) return false
+    const st = String((l as { source_type?: string | null }).source_type ?? '').toLowerCase()
+    if (st !== 'ebs' && st !== 'pe') return false
+    return src === 'all' || st === src
+  }), [map?.locations, selNames, src])
   const locSplit = useMemo(() => {
     let ebs = 0, pe = 0, cases = 0
     for (const l of locations) {
-      if (String((l as { source_type?: string | null }).source_type ?? '').toUpperCase() === 'PE') pe += 1; else ebs += 1
+      const st = String((l as { source_type?: string | null }).source_type ?? '').toLowerCase()
+      if (st === 'pe') pe += 1; else if (st === 'ebs') ebs += 1
       cases += Number(l.cases) || 0
     }
     return { ebs, pe, cases }
