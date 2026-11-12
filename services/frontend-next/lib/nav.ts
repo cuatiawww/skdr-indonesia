@@ -2,7 +2,7 @@
 // PR 017: grouped main navigation (DB-driven app_settings.navigation_menu) + PE form registry expansion.
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Activity, FileText, Layers } from 'lucide-react'
+import { Activity, FileText, Layers, LayoutDashboard } from 'lucide-react'
 import { convertConfigToSidebarGroups, ensureZoonosisLiteMenu, type SidebarGroup, type SidebarItem } from '@/lib/menu'
 import { useSettings } from '@/lib/settings-context'
 import { peFetch } from '@/lib/pe-api'
@@ -44,8 +44,15 @@ export function useNavGroups(): SidebarGroup[] {
       items: g.items.map((item) => {
         // PR 027: injected Dasbor Zoonosis Lite item carries an i18n key
         if (item.id === 'mod_zoonosis_lite' && item.labelKey) return { ...item, label: t(item.labelKey) }
-        // PR 021 / PR 058: "Dasbor Zoonosis" (former Dasbor Kategori) sub-menu = Zoonosis Lite + active categories from master_disease_categories
+        // PR 021 / PR 058 / PR 060: "Dasbor Zoonosis" sub-menu = Zoonosis General + Zoonosis Lite + active categories from master_disease_categories
         if (item.source === 'disease_categories' || item.id === 'mod_dasbor_kategori') {
+          const generalSub: SidebarItem = {
+            id: 'sub_zoonosis_general',
+            label: 'Zoonosis General',
+            icon: LayoutDashboard,
+            href: '/dasbor/zoonosis-general',
+            description: 'Sintesis komprehensif penyakit zoonosis: beban kasus, CFR, kurva tren, alert SKDR, dan peta sebaran',
+          }
           const liteSub: SidebarItem = {
             id: 'sub_zoonosis_lite',
             label: 'Zoonosis Lite',
@@ -53,19 +60,27 @@ export function useNavGroups(): SidebarGroup[] {
             href: '/dasbor/zoonosis-lite',
             description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
           }
-          const subs: SidebarItem[] = categories.map((c) => ({
-            id: `sub_kategori_${c.code.toLowerCase()}`,
-            label: c.code === 'ZOONOSIS' ? 'Zoonosis (Semua)' : c.short_name,
-            icon: (c.icon && MENU_ICON_MAP[c.icon]) || Layers,
-            href: `/dasbor/kategori/${kategoriSlug(c.code)}`,
-            description: c.name,
-          }))
+          const subs: SidebarItem[] = categories
+            .filter((c) => c.code !== 'ZOONOSIS')
+            .map((c) => ({
+              id: `sub_kategori_${c.code.toLowerCase()}`,
+              label: c.short_name,
+              icon: (c.icon && MENU_ICON_MAP[c.icon]) || Layers,
+              href: `/dasbor/kategori/${kategoriSlug(c.code)}`,
+              description: c.name,
+            }))
           return {
             ...item,
             subItems: [
+              generalSub,
               liteSub,
               ...subs,
-              ...(item.subItems || []).filter((s) => s.id !== 'sub_zoonosis_lite' && !subs.some((x) => x.id === s.id)),
+              ...(item.subItems || []).filter(
+                (s) =>
+                  s.id !== 'sub_zoonosis_general' &&
+                  s.id !== 'sub_zoonosis_lite' &&
+                  !subs.some((x) => x.id === s.id)
+              ),
             ],
           }
         }

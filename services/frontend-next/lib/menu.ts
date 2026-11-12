@@ -288,6 +288,28 @@ export const DASBOR_MBG_MENU_ITEM: SidebarItemConfig = {
   subItems: DASBOR_MBG_SUB_ITEMS,
 }
 
+export const DASBOR_ZOONOSIS_SUB_ITEMS: SidebarSubItemConfig[] = [
+  {
+    id: 'sub_zoonosis_general',
+    label: 'Zoonosis General',
+    href: '/dasbor/zoonosis-general',
+    icon: 'LayoutDashboard',
+    order: 1,
+    enabled: true,
+    description: 'Sintesis komprehensif penyakit zoonosis: beban kasus, CFR, kurva tren, alert SKDR, dan peta sebaran',
+  },
+  {
+    id: 'sub_zoonosis_lite',
+    label: 'Zoonosis Lite',
+    labelKey: 'skdr.lite.menu',
+    href: '/dasbor/zoonosis-lite',
+    icon: 'Activity',
+    order: 2,
+    enabled: true,
+    description: 'Antraks, Rabies, Leptospirosis, Flu Burung: CFR dan peta sebaran',
+  },
+]
+
 export const DASBOR_ZOONOSIS_MENU_ITEM: SidebarItemConfig = {
   id: 'mod_dasbor_kategori',
   label: 'Dasbor Zoonosis',
@@ -297,6 +319,7 @@ export const DASBOR_ZOONOSIS_MENU_ITEM: SidebarItemConfig = {
   enabled: true,
   source: 'disease_categories',
   description: 'Dasbor analitik penyakit zoonosis dan per kategori',
+  subItems: DASBOR_ZOONOSIS_SUB_ITEMS,
 }
 
 export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [

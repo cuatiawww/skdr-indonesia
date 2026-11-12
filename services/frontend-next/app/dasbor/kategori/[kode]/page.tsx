@@ -1,2 +1,8 @@
-// PR 021: dasbor per kategori penyakit = Dasbor Utama yang otomatis terfilter ke kategori di URL (/dasbor/kategori/<kode>).
-export { default } from '@/app/main-dashboard/page'
+'use client'
+
+// PR 060: Dasbor per kategori penyakit menggunakan tampilan analitik komprehensif (ZoonosisGeneralView) terfilter ke kategori di URL.
+import ZoonosisGeneralView from '@/components/dashboard/ZoonosisGeneralView'
+
+export default function DasborKategoriPage() {
+  return <ZoonosisGeneralView />
+}
