@@ -188,3 +188,4 @@ export function getSatusehatButtonClass(
 
   return `inline-flex items-center justify-center gap-2 cursor-pointer ${sizeClasses} ${variantClasses}`;
 }
+

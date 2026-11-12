@@ -34,10 +34,20 @@ const roboto = localFont({
   display: 'swap',
 })
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
+
 // SKDR: metadata text from the language file (default locale id).
 export const metadata: Metadata = {
   title: idDict.skdr.meta.title,
   description: idDict.skdr.meta.description,
+  icons: {
+    icon: [
+      { url: `${basePath}/logo_kemkes.webp`, type: 'image/webp' },
+      { url: `${basePath}/favicon.png`, sizes: '32x32', type: 'image/png' },
+    ],
+    shortcut: `${basePath}/logo_kemkes.webp`,
+    apple: `${basePath}/logo_kemkes.webp`,
+  },
 }
 
 export default function RootLayout({

@@ -28,7 +28,13 @@ Menyelaraskan seluruh antarmuka sistem SKDR Indonesia dengan **SATUSEHAT / TTDK 
    - **Teks & Kontras WCAG AAA**:
      - `text-primary`: `#141313` (Neutral Black)
      - `text-secondary`: `#62686F` (Neutral 600)
-4. **Modul Integrasi & Komponen Reusable**:
+4. **Preservasi 100% Desain Kartu & Layout Komponen Asli**:
+   - Menghapus preset Tailwind eksternal TTDK (`tailwind-preset.cjs`) agar skala spacing bawaan (`p-4`, `p-6`, `gap-4`) dan radius kartu tidak terganggu atau mengecil, sehingga seluruh tata letak kartu, grafik, dan panel surveilans lama tetap 100% utuh dan proporsional.
+   - Perubahan hanya terbatas murni pada **Warna** (SATUSEHAT Green `#16B3AC`, Blue `#3899FE`, Teks `#141313`) dan **Font** (Manrope).
+5. **Implementasi Favicon Resmi Kemenkes**:
+   - Memasang berkas `logo_kemkes.webp` (emblem resmi Kemenkes) di `public/logo_kemkes.webp` dan menghasilkan varian `app/icon.png` serta `public/favicon.png`.
+   - Mengarahkan metadata `<link rel="icon">`, `<link rel="shortcut icon">`, dan `<link rel="apple-touch-icon">` pada `app/layout.tsx` ke logo tersebut.
+6. **Modul Integrasi & Komponen Reusable**:
    - `lib/satusehat-theme.ts`: Menyediakan konstanta bertipe kuat (`SATUSEHAT_TOKENS`), helper konversi warna (`hexToRgbTriplet`), helper badge class (`getSatusehatBadgeClass`), dan helper tombol standar TTDK (`getSatusehatButtonClass`).
    - `components/ui/Satusehat.tsx`: Wrapper reusable untuk komponen UI TTDK (`TtdkButton`, `TtdkBadge`, `TtdkChip`, `TtdkCard`, `TtdkTooltip`, `TtdkAlert`) dengan stylesheet otomatis terpasang.
 5. **Database Migration**:
@@ -55,3 +61,4 @@ Menyelaraskan seluruh antarmuka sistem SKDR Indonesia dengan **SATUSEHAT / TTDK 
   - `GET /skdr` (Landing Page): HTTP 200 OK dengan font Manrope preloaded.
   - `GET /skdr/login`: HTTP 200 OK dengan palet dan font Manrope aktif.
   - `GET /skdr/dashboard/skdr/ringkasan`: HTTP 307 Redirect ke `/skdr/login` (proteksi auth terjaga).
+

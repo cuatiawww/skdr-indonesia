@@ -10,3 +10,4 @@ SET value = EXCLUDED.value,
     updated_at = NOW();
 
 DELETE FROM app_settings WHERE key = 'satusehat_design_system_status';
+

@@ -1,10 +1,8 @@
-@import "@ttdk-design-system/library-react/theme/tokens.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* PR 064: SATUSEHAT / TTDK Design System Core Tokens (SATUSEHAT Green #16B3AC, Blue #3899FE, Lime #90C821).
+/* PR 064: SATUSEHAT Official Palette (#16B3AC Teal, #3899FE Blue, #141313 Text) & Manrope Typography.
    Channels "R G B"; overridden at runtime from app_settings.theme_palette (migration 074). */
 :root {
   --brand-50: 240 252 251;
