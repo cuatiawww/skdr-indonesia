@@ -38,6 +38,22 @@ html, body {
   background-color: #ffffff;
 }
 
+/* SATUSEHAT Progress Bar (PR 066: #16B3AC Teal, #128F8A Dark Teal, #3899FE Blue) */
+@keyframes peShine {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.pe-bar {
+  background: linear-gradient(90deg, #16B3AC 0%, #128F8A 35%, #3899FE 70%, #16B3AC 100%);
+  background-size: 200% 100%;
+  animation: peShine 6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pe-bar {
+    animation: none;
+  }
+}
+
 .reports-page .font-sans,
 .reports-page .font-mono {
   font-family: var(--font-manrope), var(--font-roboto), sans-serif;

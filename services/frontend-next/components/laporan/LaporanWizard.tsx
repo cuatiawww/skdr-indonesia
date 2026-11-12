@@ -398,10 +398,10 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
 
       <style>{`
         @keyframes peShine { 0% { background-position: 0% 50% } 100% { background-position: 200% 50% } }
-        .pe-bar { background: linear-gradient(90deg, #0060A9, #00A3AD, #10b981, #00A3AD, #0060A9); background-size: 200% 100%; animation: peShine 6s linear infinite; }
+        .pe-bar { background: linear-gradient(90deg, #16B3AC 0%, #128F8A 35%, #3899FE 70%, #16B3AC 100%); background-size: 200% 100%; animation: peShine 6s linear infinite; }
         @media (prefers-reduced-motion: reduce) { .pe-bar { animation: none } }
         .pe-flash { animation: peFlash 1.4s ease-out } @keyframes peFlash { 0%,40% { box-shadow: 0 0 0 4px rgba(245,158,11,.35); border-radius: 12px } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0) } }
-        [data-field] { scroll-margin-top: 240px }
+        [data-field] { scroll-margin-top: 100px }
       `}</style>
       <div id="lap-form-top" className="scroll-mt-4" />
       <Stepper def={def} stats={stats} tot={tot} stepIdx={stepIdx} goto={goto} errorsCount={errors.length} jumpNext={jumpNext} editable={editable} />
@@ -487,79 +487,122 @@ export default function LaporanWizard({ def, id, viewOnly = false }: { def: Form
   )
 }
 
-/** PR 033: exported — also used by the Pengawasan Gizi MBG wizard (same look & interaction) */
+/** PR 033: exported — also used by the Pengawasan Gizi MBG wizard & Keracunan Pangan MBG
+ *  PR 066: Redesign compact, non-sticky (tetap di atas kanvas tanpa mengambang saat scroll),
+ *  serta bar progres menggunakan palet resmi SATUSEHAT Design System (#16B3AC / #3899FE)
+ */
 export function Stepper({ def, stats, tot, stepIdx, goto, errorsCount, jumpNext, editable }: {
   def: Pick<FormDef, 'steps'>; stats: ReturnType<typeof stepStats>; tot: ReturnType<typeof overall>; stepIdx: number; goto: (i: number) => void
   errorsCount: number; jumpNext: () => void; editable: boolean
 }) {
   const steps = def.steps
   return (
-    <div className={`${card} sticky top-0 z-30 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/95 sm:p-4`} data-testid="lap-stepper">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-bold uppercase tracking-wider text-slate-500">Kemajuan</span>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="font-semibold text-slate-600" data-testid="lap-progress-text">{tot.done}/{tot.total} wajib terisi · {tot.pct}%</span>
-          {editable && (
-            <button type="button" onClick={jumpNext} data-testid="lap-jump-invalid" disabled={!errorsCount}
-              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-700">
-              {errorsCount ? <><ChevronsRight className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lompat ke isian berikutnya yang belum valid</span><span className="sm:hidden">Isian belum valid</span> ({errorsCount})</> : <><Check className="h-3.5 w-3.5" /> Semua isian valid</>}
-            </button>
-          )}
+    <div className={`${card} relative p-3 sm:px-4 sm:py-3 shadow-2xs`} data-testid="lap-stepper">
+      {/* Baris 1: Status kemajuan ringkas & tombol pintas validasi */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Kemajuan</span>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-xs font-bold text-slate-700" data-testid="lap-progress-text">
+            {tot.done}/{tot.total} wajib terisi <span className="font-sans font-normal text-slate-400">·</span> {tot.pct}%
+          </span>
         </div>
+        {editable && (
+          <button type="button" onClick={jumpNext} data-testid="lap-jump-invalid" disabled={!errorsCount}
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-700 shadow-2xs">
+            {errorsCount ? (
+              <>
+                <ChevronsRight className="h-3.5 w-3.5 text-amber-600" />
+                <span className="hidden sm:inline">Lompat ke isian belum valid</span>
+                <span className="sm:hidden">Belum valid</span>
+                <span className="ml-0.5 rounded-full bg-amber-200/90 px-1 text-[10px] font-bold text-amber-900">{errorsCount}</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5 text-emerald-600" /> Semua isian valid
+              </>
+            )}
+          </button>
+        )}
       </div>
-      <div className="mb-3 flex items-center gap-3 sm:mb-4">
-        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={tot.pct} aria-valuemin={0} aria-valuemax={100} aria-label="Kemajuan pengisian">
-          <div className="pe-bar h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${tot.pct}%` }} />
+
+      {/* Baris 2: Slim progress bar bernuansa SATUSEHAT Design System */}
+      <div className="my-2 flex items-center gap-2.5">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={tot.pct} aria-valuemin={0} aria-valuemax={100} aria-label="Kemajuan pengisian">
+          <div className="pe-bar h-full rounded-full transition-[width] duration-500 ease-out" style={{ width: `${tot.pct}%` }} />
         </div>
-        <span className="w-10 text-right font-mono text-xs font-bold text-slate-700">{tot.pct}%</span>
+        <span className="font-mono text-[11px] font-bold text-slate-600 tabular-nums">{tot.pct}%</span>
       </div>
-      {/* mobile: compact dots + current title */}
-      <div className="flex items-center gap-2 sm:hidden">
+
+      {/* Mobile: compact dots + current title */}
+      <div className="flex items-center gap-2 sm:hidden pt-0.5">
         <div className="flex gap-1">
           {steps.map((s, i) => {
             const done = (s.review ? errorsCount : stats[i].errs.length) === 0
-            return <button key={s.id} type="button" onClick={() => goto(i)} aria-label={`Langkah ${i + 1}: ${s.title}`}
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${i === stepIdx ? 'bg-primary text-white ring-2 ring-primary/30' : done ? 'bg-emerald-500 text-white' : 'bg-white text-slate-600 ring-1 ring-amber-300'}`}>
-              {done && i !== stepIdx ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}</button>
+            return (
+              <button key={s.id} type="button" onClick={() => goto(i)} aria-label={`Langkah ${i + 1}: ${s.title}`}
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
+                  i === stepIdx
+                    ? 'bg-primary text-white ring-2 ring-primary/30'
+                    : done
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-white text-slate-600 ring-1 ring-amber-300'
+                }`}>
+                {done && i !== stepIdx ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
+              </button>
+            )
           })}
         </div>
         <div className="min-w-0 text-[11px] leading-tight">
           <p className="truncate font-semibold text-primary">{steps[stepIdx].title}</p>
-          <p className={stats[stepIdx].errs.length ? 'text-amber-600' : 'text-emerald-600'}>{stats[stepIdx].total ? `${stats[stepIdx].done}/${stats[stepIdx].total} wajib` : 'tanpa isian wajib'}</p>
+          <p className={stats[stepIdx].errs.length ? 'text-amber-600' : 'text-emerald-600'}>
+            {stats[stepIdx].total ? `${stats[stepIdx].done}/${stats[stepIdx].total} wajib` : 'tanpa isian wajib'}
+          </p>
         </div>
       </div>
-      <ol className="-mx-1 hidden snap-x gap-0 overflow-x-auto px-1 pb-1 pt-1 sm:flex xl:overflow-visible">
+
+      {/* Tablet & Desktop: connected compact steps */}
+      <ol className="-mx-1 hidden snap-x gap-0 overflow-x-auto px-1 sm:flex xl:overflow-visible">
         {steps.map((s, i) => {
-          const st = stats[i]; const n = s.review ? errorsCount : st.errs.length; const done = n === 0
+          const st = stats[i]
+          const n = s.review ? errorsCount : st.errs.length
+          const done = n === 0
           const active = i === stepIdx
-          const R = 9, C = 2 * Math.PI * R
+          const R = 8, C = 2 * Math.PI * R
           return (
-            <li key={s.id} className="group relative flex min-w-[120px] flex-1 snap-start items-start">
+            <li key={s.id} className="group relative flex min-w-[110px] flex-1 snap-start items-start">
               {i > 0 && (
-                <span aria-hidden className="absolute right-1/2 top-[24px] h-0.5 w-full overflow-hidden bg-slate-200">
-                  <span className="block h-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${Math.round(stats[i - 1].pct * 100)}%` }} />
+                <span aria-hidden className="absolute right-1/2 top-[15px] h-0.5 w-full overflow-hidden bg-slate-200">
+                  <span className="block h-full bg-[#16B3AC] transition-[width] duration-500" style={{ width: `${Math.round(stats[i - 1].pct * 100)}%` }} />
                 </span>
               )}
               <button type="button" onClick={() => goto(i)} aria-current={active ? 'step' : undefined} data-testid={`lap-step-${i + 1}`}
                 aria-label={`Langkah ${i + 1}: ${s.title}. ${done ? 'Lengkap' : `${n} isian belum valid`}`}
-                className={`relative z-10 mx-auto flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-1.5 text-center transition duration-200 ${active ? 'scale-[1.04] bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-slate-50'}`}>
-                <span className="relative flex h-9 w-9 items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="absolute inset-0 h-9 w-9 -rotate-90" aria-hidden>
-                    <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2.5" className="stroke-slate-200" />
-                    <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - st.pct)}
-                      className={`transition-[stroke-dashoffset] duration-500 ${done ? 'stroke-emerald-500' : 'stroke-primary'}`} />
+                className={`relative z-10 mx-auto flex w-full flex-col items-center gap-1 rounded-xl px-1.5 py-1 text-center transition duration-200 ${
+                  active
+                    ? 'bg-brand-50/80 border border-brand-300/80 shadow-2xs'
+                    : 'border border-transparent hover:bg-slate-50/80'
+                }`}>
+                <span className="relative flex h-7 w-7 items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="absolute inset-0 h-7 w-7 -rotate-90" aria-hidden>
+                    <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2" className="stroke-slate-200" />
+                    <circle cx="12" cy="12" r={R} fill="none" strokeWidth="2" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - st.pct)}
+                      className={`transition-[stroke-dashoffset] duration-500 ${done ? 'stroke-emerald-500' : 'stroke-brand-500'}`} />
                   </svg>
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${done ? 'bg-emerald-500 text-white' : active ? 'bg-primary text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>
-                    {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
+                    done ? 'bg-emerald-500 text-white' : active ? 'bg-brand-500 text-white shadow-2xs' : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                  }`}>
+                    {done ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
                   </span>
-                  {!done && (
-                    <span className="absolute -right-1.5 -top-1 inline-flex items-center gap-0.5 rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-4 text-white shadow" title={`${n} isian belum valid`}>
-                      <TriangleAlert className="h-2.5 w-2.5" />{n}
+                  {!done && n > 0 && (
+                    <span className="absolute -right-1 -top-1 inline-flex items-center gap-0.5 rounded-full bg-amber-500 px-1 text-[8px] font-bold leading-3.5 text-white shadow" title={`${n} isian belum valid`}>
+                      <TriangleAlert className="h-2 w-2" />{n}
                     </span>
                   )}
                 </span>
-                <span className={`line-clamp-2 text-[11px] font-semibold leading-tight ${active ? 'text-primary' : 'text-slate-700'}`}>{s.title}</span>
-                <span className={`text-[10px] ${done ? 'text-emerald-600' : 'text-amber-600'}`}>{s.review ? (done ? 'siap dikirim' : 'periksa') : st.total ? `${st.done}/${st.total} wajib` : 'tanpa isian wajib'}</span>
+                <span className={`line-clamp-1 truncate text-[11px] font-semibold leading-tight ${active ? 'text-brand-700 font-bold' : 'text-slate-700'}`}>{s.title}</span>
+                <span className={`text-[9.5px] leading-tight ${done ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {s.review ? (done ? 'siap dikirim' : 'periksa') : st.total ? `${st.done}/${st.total} wajib` : 'tanpa wajib'}
+                </span>
               </button>
               <div role="tooltip" className="pointer-events-none invisible absolute left-1/2 top-full z-40 mt-1 w-64 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] opacity-0 shadow-lg transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
                 <p className="mb-1 font-bold text-slate-800">{s.title}</p>

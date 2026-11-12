@@ -360,10 +360,10 @@ export default function MbgWizard({ kid, target, viewOnly = false }: { kid: numb
 
       <style>{`
         @keyframes peShine { 0% { background-position: 0% 50% } 100% { background-position: 200% 50% } }
-        .pe-bar { background: linear-gradient(90deg, #0060A9, #00A3AD, #10b981, #00A3AD, #0060A9); background-size: 200% 100%; animation: peShine 6s linear infinite; }
+        .pe-bar { background: linear-gradient(90deg, #16B3AC 0%, #128F8A 35%, #3899FE 70%, #16B3AC 100%); background-size: 200% 100%; animation: peShine 6s linear infinite; }
         @media (prefers-reduced-motion: reduce) { .pe-bar { animation: none } }
         .pe-flash { animation: peFlash 1.4s ease-out } @keyframes peFlash { 0%,40% { box-shadow: 0 0 0 4px rgba(245,158,11,.35); border-radius: 12px } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0) } }
-        [data-field] { scroll-margin-top: 240px }
+        [data-field] { scroll-margin-top: 100px }
       `}</style>
       <div id="mbg-form-top" className="scroll-mt-4" />
       <Stepper def={{ steps }} stats={stats} tot={tot} stepIdx={stepIdx} goto={goto} errorsCount={errors.length} jumpNext={jumpNext} editable={editable} />
