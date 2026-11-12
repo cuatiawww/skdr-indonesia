@@ -181,17 +181,11 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
             id="peta"
             badge="ANALISIS GEOSPASIAL AUDIT"
             title="Distribusi Geospasial Kepatuhan Pengawasan & Rekapitulasi Wilayah"
-            desc="Peta tunggal capaian skor SOP & cakupan pengawasan gizi per provinsi/kabupaten-kota beserta titik lokasi SPPG (hijau = F12 BAIK, oranye = perlu perbaikan), disandingkan dengan tabel rekapitulasi wilayah."
+            desc="Peta spasial capaian skor SOP & cakupan pengawasan gizi per provinsi/kabupaten-kota beserta titik lokasi SPPG dengan panel analisa wilayah dan pengaturan lapisan terpadu."
           />
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="xl:col-span-2">
-              <MbgGiziMap gizi={data} gMap={map} setGMap={setMap} />
-            </div>
-            <Panel
-              title={`Rekap Pengawasan per ${data.map.level === 'kab' ? 'Kabupaten/Kota' : 'Provinsi'}`}
-              desc={data.map.level === 'prov' ? 'Klik baris provinsi untuk memfokuskan peta ke level kabupaten/kota.' : 'Rekapitulasi kunjungan, jumlah SPPG, kesimpulan F12, dan rata-rata skor SOP.'}
-              testId="panel-rekap-wilayah-gizi"
-            >
+          <div className="w-full space-y-3">
+            <MbgGiziMap gizi={data} gMap={map} setGMap={setMap} />
+            <MoreDetails label={`Tabel Rekapitulasi Pengawasan per ${data.map.level === 'kab' ? 'Kabupaten/Kota' : 'Provinsi'}`}>
               {!data.map.regions.length ? (
                 <EmptyBox msg="Belum ada wilayah pada transaksi Pengawasan Gizi MBG." />
               ) : (
@@ -231,7 +225,7 @@ export default function GiziDashboardView({ data, loading, error, reload, f, map
                   </table>
                 </div>
               )}
-            </Panel>
+            </MoreDetails>
           </div>
 
           <SectionHead

@@ -155,17 +155,11 @@ export default function KeracunanDashboardView({
             no={2}
             id="peta"
             title="Distribusi Geospasial Insiden KLB & Peringkat Beban Wilayah Terdampak"
-            desc="Pemetaan choropleth intensitas kasus dan kluster titik lokasi SPPG terdampak, disandingkan dengan tabel peringkat epidemiologi per wilayah."
+            desc="Pemetaan choropleth intensitas kasus dan kluster titik lokasi SPPG terdampak dengan panel analisa wilayah dan pengaturan lapisan interaktif."
           />
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="xl:col-span-2">
-              <MbgKeracunanMap ker={data} kMap={map} setKMap={setMap} />
-            </div>
-            <Panel
-              title={`Peringkat Wilayah Terdampak (${LEVEL_TXT[lvl]})`}
-              desc="Urutan wilayah berdasarkan jumlah kasus sakit, kematian, CFR (%), dan Attack Rate (AR %)."
-              testId="panel-rekap-wilayah"
-            >
+          <div className="w-full space-y-3">
+            <MbgKeracunanMap ker={data} kMap={map} setKMap={setMap} />
+            <MoreDetails label={`Tabel Lengkap Peringkat Wilayah Terdampak (${LEVEL_TXT[lvl]})`}>
               {!rank.length ? (
                 <EmptyBox msg="Belum ada data wilayah terdampak pada filter aktif." />
               ) : (
@@ -207,7 +201,7 @@ export default function KeracunanDashboardView({
                   </table>
                 </div>
               )}
-            </Panel>
+            </MoreDetails>
           </div>
 
           {/* BAGIAN 3: DINAMIKA TEMPORAL (KURVA EPIDEMI, PEMANTAUAN HARIAN & KOMPARASI WILAYAH) */}

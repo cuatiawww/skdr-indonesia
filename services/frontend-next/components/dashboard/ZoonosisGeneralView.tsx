@@ -1,6 +1,5 @@
 'use client'
 
-import PetaMultiMode from "@/components/dashboard/PetaMultiMode";
 import { tr } from "@/lib/i18n/LanguageContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -26,9 +25,9 @@ import EpiCurve from "@/components/dashboard/EpiCurve";
 import { SectionHeader } from "@/components/analytics/SourceBadge";
 import { kategoriCode, useCategories } from "@/lib/kategori";
 
-const SpatialOutbreakMap = dynamic(
-  () => import("@/components/SpatialOutbreakMap"),
-  { ssr: false },
+const EbsIbsLayerMap = dynamic(
+  () => import("@/components/dasbor-ebs-ibs/EbsIbsLayerMap"),
+  { ssr: false, loading: () => <SkeletonMap height={640} /> }
 );
 
 export interface ZoonosisGeneralViewProps {
@@ -173,6 +172,50 @@ export default function ZoonosisGeneralView({
     [data?.kpis.cases, data?.kpis.deaths]
   );
 
+  const zoonosisRegions = useMemo(() => {
+    return (data?.by_province || []).map((p, idx) => {
+      const cases = p.cases || 0;
+      const deaths = p.deaths || 0;
+      const cfr = cases > 0 ? Number(((deaths / cases) * 100).toFixed(1)) : 0;
+      return {
+        id: (p as any).id || idx + 1,
+        key: p.name,
+        name: p.name,
+        geo: p.name,
+        lat: null,
+        lng: null,
+        kasus: cases,
+        kematian: deaths,
+        cfr,
+        alert: p.events || 0,
+        sppg_unik: 0,
+      } as any;
+    });
+  }, [data?.by_province]);
+
+  const zoonosisPoints = useMemo(() => {
+    return (data?.locations || [])
+      .filter((l) => l.latitude != null && l.longitude != null && (Number(l.latitude) !== 0 || Number(l.longitude) !== 0))
+      .map((l) => ({
+        unit_nama: l.location_name || "Fasyankes Terkait",
+        nama_sppg: null,
+        province_name: l.province || null,
+        kabkota_name: l.city || null,
+        lat: Number(l.latitude),
+        lng: Number(l.longitude),
+        coord_source: "faskes",
+        last_date: l.published_date || l.latest_date || null,
+        kasus: l.cases || 1,
+        kematian: l.deaths || 0,
+        cfr:
+          (l.cases || 1) > 0 && (l.deaths || 0) > 0
+            ? Number((((l.deaths || 0) / (l.cases || 1)) * 100).toFixed(1))
+            : 0,
+        alert: l.has_alert || (l.event_count || 0) > 0 ? 1 : 0,
+        label: l.disease ? `${l.disease}: ${l.location_name}` : l.location_name,
+      } as any));
+  }, [data?.locations]);
+
   const fitTo = useMemo<[number, number, number, number] | null>(() => {
     if (!applied.provinceIds.length && !applied.kabkotaIds.length) return null;
     const pts = mapLocations
@@ -267,64 +310,32 @@ export default function ZoonosisGeneralView({
           ),
         }}
         afterCards={
-          <section className="skdr-section w-full">
-            <div className="w-full">
-              <article className="flex flex-col xl:h-[700px] 2xl:h-[760px]">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="flex-1">
-                    <div className="skdr-eyebrow">{t("skdr.exec.eyebrowMap")}</div>
-                    <h2 className="skdr-section-title">
-                      {t("dashboard.spatialTitle")}
-                    </h2>
-                    <p className="skdr-section-desc">
-                      {t("dashboard.spatialDesc")}
-                    </p>
-                    {data ? (
-                      <div className="mt-2 inline-flex max-w-full items-center gap-1.5 truncate rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-bold text-primary">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
-                        <span className="truncate">
-                          {t("skdr.mapScopeLocations", {
-                            scope: data?.filters?.scope || "Indonesia",
-                            count: data?.kpis.locations ?? 0,
-                          })}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                <div
-                  className="skdr-card mt-4 min-h-[460px] w-full flex-1 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
-                  data-testid="map-card"
-                >
-                  <PetaMultiMode
-                    query={dashboardApiFilters(applied) as Record<string, unknown>}
-                    sinyal={
-                      !data ? (
-                        error ? null : (
-                          <SkeletonMap height={520} />
-                        )
-                      ) : (
-                        <SpatialOutbreakMap
-                          countries={countryData}
-                          locations={mapLocations}
-                          highlightCountry="Indonesia"
-                          boundaryScope="indonesia"
-                          initialCenter={[118, -2.5]}
-                          initialZoom={5}
-                          sourceMode={sumber}
-                          fitTo={fitTo}
-                          markerPeriod={
-                            data.filters?.start_date && data.filters?.end_date
-                              ? { start: data.filters.start_date, end: data.filters.end_date }
-                              : null
-                          }
-                        />
-                      )
-                    }
-                  />
-                </div>
-              </article>
-            </div>
+          <section className="skdr-section w-full" data-testid="zoonosis-map-section">
+            {!data ? (
+              <SkeletonMap height={640} />
+            ) : (
+              <EbsIbsLayerMap
+                mode="zoonosis"
+                title={`Peta Sebaran ${displayTitle}`}
+                eyebrow="PETA SPASIAL ZOONOSIS ONE HEALTH"
+                level={applied.provinceIds.length === 1 ? "kab" : "prov"}
+                parentName={
+                  applied.provinceIds.length === 1
+                    ? data.by_province?.find((p) => applied.provinceIds.includes((p as any).id))?.name || "Provinsi Terpilih"
+                    : null
+                }
+                regions={zoonosisRegions}
+                points={zoonosisPoints}
+                onDrillDown={(id, name) => {
+                  setFilters((prev) => ({ ...prev, provinceIds: [id] }));
+                  setApplied((prev) => ({ ...prev, provinceIds: [id] }));
+                }}
+                onResetLevel={() => {
+                  setFilters((prev) => ({ ...prev, provinceIds: [] }));
+                  setApplied((prev) => ({ ...prev, provinceIds: [] }));
+                }}
+              />
+            )}
           </section>
         }
       />

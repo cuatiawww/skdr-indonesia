@@ -143,8 +143,11 @@ export function MbgGiziMap({
   )
 }
 
-/** Komparasi spasial 2 kolom khusus halaman Ringkasan Eksekutif:
- *  Kiri = Distribusi Kejadian Keracunan Pangan | Kanan = Cakupan & Skor Pengawasan Gizi SPPG */
+import { useState } from 'react'
+
+/** Komparasi spasial khusus halaman Ringkasan Eksekutif:
+ *  Secara default menampilkan Peta Spasial Terpadu 2-Dock Layar Penuh dengan pilihan Keracunan vs Pengawasan Gizi,
+ *  serta tombol opsi untuk membandingkan 2 kolom berdampingan. */
 export default function MbgMapSection({
   ker,
   gizi,
@@ -160,57 +163,81 @@ export default function MbgMapSection({
   gMap: MapState
   setGMap: (m: MapState) => void
 }) {
+  const [activeTab, setActiveTab] = useState<'keracunan' | 'gizi'>('keracunan')
+  const [compare2Col, setCompare2Col] = useState(false)
+
   return (
-    <section className="grid grid-cols-1 gap-4 xl:grid-cols-2" data-testid="mbg-map-section">
-      <MapCol
-        tone="red"
-        testId="map-keracunan"
-        title="Peta Distribusi Insiden Keracunan Pangan MBG"
-        desc={`Choropleth intensitas kasus & titik lokasi SPPG terdampak (merah tua = terdapat korban meninggal).${
-          ker ? ` Tercatat ${nf(ker.kpis.total_kejadian)} kejadian di ${nf(ker.map.regions.length)} wilayah.` : ''
-        }`}
-      >
-        {ker == null ? (
-          <SkeletonMap />
-        ) : (
-          <EbsIbsLayerMap
-            compact
-            mode="keracunan"
-            title="Distribusi Kejadian & Kasus"
-            level={ker.map.level}
-            parentName={kMap.parent?.name}
-            regions={ker.map.regions}
-            points={ker.map.points}
-            onDrillDown={(id, name) => setKMap({ level: 'kab', parent: { id, name } })}
-            onResetLevel={() => setKMap({ level: 'prov', parent: null })}
-          />
-        )}
-      </MapCol>
-      <MapCol
-        tone="emerald"
-        testId="map-pengawasan"
-        title="Peta Cakupan & Skor Kepatuhan Pengawasan Gizi SPPG"
-        desc={`Choropleth rata-rata skor SOP (F3–F11) & titik SPPG diawasi (oranye = skor < 80 atau F12 BELUM BAIK).${
-          gizi ? ` Tercakup ${nf(gizi.kpis.sppg_unik)} SPPG.` : ''
-        }`}
-      >
-        {gizi == null ? (
-          <SkeletonMap />
-        ) : (
-          <EbsIbsLayerMap
-            compact
-            mode="gizi"
-            initialMetric="avg_skor"
-            title="Skor Kepatuhan & Cakupan SPPG"
-            level={gizi.map.level}
-            parentName={gMap.parent?.name}
-            regions={gizi.map.regions}
-            points={gizi.map.points}
-            onDrillDown={(id, name) => setGMap({ level: 'kab', parent: { id, name } })}
-            onResetLevel={() => setGMap({ level: 'prov', parent: null })}
-          />
-        )}
-      </MapCol>
+    <section className="w-full space-y-3" data-testid="mbg-map-section">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Toggle Mode Keracunan vs Gizi */}
+        <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setActiveTab('keracunan')}
+            className={`rounded-lg px-3 py-1.5 transition flex items-center gap-1.5 ${
+              activeTab === 'keracunan'
+                ? 'bg-white text-orange-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span className="h-2 w-2 rounded-full bg-orange-600" />
+            Distribusi Kejadian Keracunan Pangan
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('gizi')}
+            className={`rounded-lg px-3 py-1.5 transition flex items-center gap-1.5 ${
+              activeTab === 'gizi'
+                ? 'bg-white text-emerald-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-600" />
+            Cakupan & Skor Pengawasan Gizi SPPG
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setCompare2Col(!compare2Col)}
+          className="text-xs font-semibold text-slate-500 hover:text-teal-700 hover:underline"
+        >
+          {compare2Col ? 'Tampilkan Mode Peta Layar Penuh (2-Dock)' : 'Bandingkan Berdampingan (2 Kolom)'}
+        </button>
+      </div>
+
+      {!compare2Col ? (
+        <div className="w-full">
+          {activeTab === 'keracunan' ? (
+            <MbgKeracunanMap ker={ker} kMap={kMap} setKMap={setKMap} />
+          ) : (
+            <MbgGiziMap gizi={gizi} gMap={gMap} setGMap={setGMap} />
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <MapCol
+            tone="red"
+            testId="map-keracunan"
+            title="Peta Distribusi Insiden Keracunan Pangan MBG"
+            desc={`Choropleth intensitas kasus & titik lokasi SPPG terdampak.${
+              ker ? ` Tercatat ${nf(ker.kpis.total_kejadian)} kejadian di ${nf(ker.map.regions.length)} wilayah.` : ''
+            }`}
+          >
+            <MbgKeracunanMap ker={ker} kMap={kMap} setKMap={setKMap} />
+          </MapCol>
+          <MapCol
+            tone="emerald"
+            testId="map-pengawasan"
+            title="Peta Cakupan & Skor Kepatuhan Pengawasan Gizi SPPG"
+            desc={`Choropleth rata-rata skor SOP (F3–F11) & titik SPPG diawasi.${
+              gizi ? ` Tercakup ${nf(gizi.kpis.sppg_unik)} SPPG.` : ''
+            }`}
+          >
+            <MbgGiziMap gizi={gizi} gMap={gMap} setGMap={setGMap} />
+          </MapCol>
+        </div>
+      )}
     </section>
   )
 }
