@@ -113,7 +113,7 @@ export function defaultSkdrFilter(): SkdrFilter {
     ew: week,
     prov: [],
     kab: [],
-    penyakit: ['01AWD'], // Default Diare Akut
+    penyakit: [], // Default Semua Penyakit (Nasional)
     modeTren: 'tahunan',
     komparasiWilayah: [],
     iklimOverlay: false,

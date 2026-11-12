@@ -218,7 +218,17 @@ pub fn facts(f: &F, p: &mut P, a: NaiveDate, b: NaiveDate, usia: bool) -> String
     if !f.prov.is_empty() { w.push(format!("f.prov = ANY({})", p.add(f.prov.clone()))); }
     if !f.kab.is_empty() { w.push(format!("f.kab = ANY({})", p.add(f.kab.clone()))); }
     if let Some(k) = &f.kec { w.push(format!("f.kec = {}", p.add(k.clone()))); }
-    if !f.penyakit.is_empty() { w.push(format!("f.pkey = ANY({})", p.add(f.penyakit.clone()))); }
+    if !f.penyakit.is_empty() {
+        let pk = p.add(f.penyakit.clone());
+        w.push(format!(
+            "f.pkey IN (
+                SELECT 'd' || disease_id FROM skdr_penyakit_map WHERE kode_penyakit = ANY({pk}) AND disease_id IS NOT NULL
+                UNION SELECT 'k' || kode_penyakit FROM skdr_penyakit_map WHERE kode_penyakit = ANY({pk})
+                UNION SELECT 'd' || id FROM master_diseases WHERE code = ANY({pk}) OR id::text = ANY({pk}) OR lower(name) = ANY(SELECT lower(x) FROM unnest({pk}) AS x)
+                UNION SELECT unnest({pk})
+            )"
+        ));
+    }
     for (col, vals) in [("jenis_unit", &f.jenis_unit), ("kelompok", &f.kelompok), ("status_rumor", &f.status_rumor), ("klb", &f.klb),
                         ("klb_status", &f.klb_status), ("w1", &f.w1), ("sumber_info", &f.sumber_info), ("spesimen", &f.spesimen),
                         ("respon", &f.respon), ("verif", &f.verif)] {

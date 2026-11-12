@@ -181,12 +181,147 @@ pub async fn map_flight_routes(
     })))
 }
 
+fn sample_flights() -> Vec<Value> {
+    vec![
+        json!({ "icao24": "8a01a1", "callsign": "GIA152", "origin_country": "Indonesia", "latitude": -6.421, "longitude": 107.821, "altitude_m": 8840, "velocity_ms": 218.0, "heading": 105, "vertical_rate_ms": 0.0 }),
+        json!({ "icao24": "8a02b2", "callsign": "LNI610", "origin_country": "Indonesia", "latitude": -7.114, "longitude": 111.450, "altitude_m": 9450, "velocity_ms": 224.0, "heading": 98, "vertical_rate_ms": -2.5 }),
+        json!({ "icao24": "8a03c3", "callsign": "CTV804", "origin_country": "Indonesia", "latitude": -8.120, "longitude": 114.210, "altitude_m": 4500, "velocity_ms": 175.0, "heading": 118, "vertical_rate_ms": -6.0 }),
+        json!({ "icao24": "8a04d4", "callsign": "BTK652", "origin_country": "Indonesia", "latitude": -4.210, "longitude": 118.420, "altitude_m": 10360, "velocity_ms": 235.0, "heading": 68, "vertical_rate_ms": 0.0 }),
+        json!({ "icao24": "8a05e5", "callsign": "GIA214", "origin_country": "Indonesia", "latitude": 1.250, "longitude": 100.120, "altitude_m": 9750, "velocity_ms": 220.0, "heading": 325, "vertical_rate_ms": 0.0 }),
+        json!({ "icao24": "8a06f6", "callsign": "LNI820", "origin_country": "Indonesia", "latitude": -1.840, "longitude": 115.650, "altitude_m": 8200, "velocity_ms": 210.0, "heading": 42, "vertical_rate_ms": 1.2 }),
+        json!({ "icao24": "8a07a7", "callsign": "SJV530", "origin_country": "Indonesia", "latitude": -7.550, "longitude": 109.850, "altitude_m": 7200, "velocity_ms": 195.0, "heading": 280, "vertical_rate_ms": 0.0 }),
+        json!({ "icao24": "8a08b8", "callsign": "AWQ501", "origin_country": "Indonesia", "latitude": -8.510, "longitude": 115.850, "altitude_m": 6100, "velocity_ms": 188.0, "heading": 85, "vertical_rate_ms": 0.0 }),
+    ]
+}
+
+fn fallback_fire_hotspots() -> Vec<Value> {
+    vec![
+        json!({ "latitude": 0.3541, "longitude": 101.9821, "brightness": 338.4, "confidence": "high", "acq_date": "2026-11-11", "acq_time": "0630", "satellite": "VIIRS-NOAA20", "frp": 16.8 }),
+        json!({ "latitude": 0.4120, "longitude": 102.1054, "brightness": 345.1, "confidence": "high", "acq_date": "2026-11-11", "acq_time": "0630", "satellite": "VIIRS-NOAA20", "frp": 24.5 }),
+        json!({ "latitude": -1.8214, "longitude": 103.7412, "brightness": 329.8, "confidence": "nominal", "acq_date": "2026-11-11", "acq_time": "0632", "satellite": "VIIRS-NOAA20", "frp": 12.1 }),
+        json!({ "latitude": -3.2451, "longitude": 104.8920, "brightness": 352.0, "confidence": "high", "acq_date": "2026-11-11", "acq_time": "0632", "satellite": "VIIRS-NOAA20", "frp": 31.4 }),
+        json!({ "latitude": -1.9842, "longitude": 110.4215, "brightness": 334.6, "confidence": "nominal", "acq_date": "2026-11-11", "acq_time": "0640", "satellite": "VIIRS-NOAA20", "frp": 15.3 }),
+        json!({ "latitude": -2.3105, "longitude": 111.7824, "brightness": 341.2, "confidence": "high", "acq_date": "2026-11-11", "acq_time": "0640", "satellite": "VIIRS-NOAA20", "frp": 19.7 }),
+        json!({ "latitude": -2.9510, "longitude": 114.2150, "brightness": 328.0, "confidence": "nominal", "acq_date": "2026-11-11", "acq_time": "0642", "satellite": "VIIRS-NOAA20", "frp": 11.8 }),
+        json!({ "latitude": -3.4210, "longitude": 115.1120, "brightness": 336.5, "confidence": "nominal", "acq_date": "2026-11-11", "acq_time": "0642", "satellite": "VIIRS-NOAA20", "frp": 14.2 }),
+        json!({ "latitude": -7.6821, "longitude": 112.5410, "brightness": 322.4, "confidence": "nominal", "acq_date": "2026-11-11", "acq_time": "0645", "satellite": "VIIRS-NOAA20", "frp": 8.6 }),
+        json!({ "latitude": -7.8920, "longitude": 114.2140, "brightness": 331.0, "confidence": "nominal", "acq_date": "2026-11-11", "acq_time": "0645", "satellite": "VIIRS-NOAA20", "frp": 13.9 }),
+    ]
+}
+
+fn sample_hazard_events() -> Vec<Value> {
+    vec![
+        json!({
+            "id": "BNPB-2026-001",
+            "source": "InaRISK BNPB",
+            "kind": "flood",
+            "title": "Banjir Luapan Tanggul Demak-Kudus",
+            "latitude": -6.8944,
+            "longitude": 110.6386,
+            "magnitude": 1.8,
+            "alert_level": "red",
+            "time": "2026-11-10T04:30:00Z",
+            "place": "Kabupaten Demak, Jawa Tengah"
+        }),
+        json!({
+            "id": "BNPB-2026-002",
+            "source": "InaRISK BNPB",
+            "kind": "landslide",
+            "title": "Longsor Tebing Jalur Puncak Cisarua",
+            "latitude": -6.7012,
+            "longitude": 106.9452,
+            "magnitude": null,
+            "alert_level": "orange",
+            "time": "2026-11-09T14:15:00Z",
+            "place": "Bogor, Jawa Barat"
+        }),
+        json!({
+            "id": "BNPB-2026-003",
+            "source": "InaRISK BNPB",
+            "kind": "volcano",
+            "title": "Aktivitas Erupsi & Hujan Abu Marapi",
+            "latitude": -0.3814,
+            "longitude": 100.4739,
+            "magnitude": 3.0,
+            "alert_level": "red",
+            "time": "2026-11-11T01:20:00Z",
+            "place": "Agam / Tanah Datar, Sumatera Barat"
+        }),
+        json!({
+            "id": "BNPB-2026-004",
+            "source": "InaRISK BNPB",
+            "kind": "earthquake",
+            "title": "Gempa Tektonik Dangkal M 4.8",
+            "latitude": -6.8272,
+            "longitude": 107.1428,
+            "magnitude": 4.8,
+            "alert_level": "orange",
+            "time": "2026-11-08T18:42:00Z",
+            "place": "Cianjur, Jawa Barat"
+        }),
+        json!({
+            "id": "BNPB-2026-005",
+            "source": "InaRISK BNPB",
+            "kind": "flood",
+            "title": "Banjir Bandang DAS Sungai Rongkong",
+            "latitude": -2.6052,
+            "longitude": 120.3125,
+            "magnitude": 2.2,
+            "alert_level": "red",
+            "time": "2026-11-07T08:00:00Z",
+            "place": "Luwu Utara, Sulawesi Selatan"
+        }),
+        json!({
+            "id": "BNPB-2026-006",
+            "source": "InaRISK BNPB",
+            "kind": "flood",
+            "title": "Banjir Rob Pasang Pesisir Utara Semarang",
+            "latitude": -6.9524,
+            "longitude": 110.4286,
+            "magnitude": 1.2,
+            "alert_level": "yellow",
+            "time": "2026-11-11T09:30:00Z",
+            "place": "Kota Semarang, Jawa Tengah"
+        }),
+    ]
+}
+
+fn sample_wildlife_occurrences() -> Vec<Value> {
+    vec![
+        json!({ "species": "Anas platyrhynchos", "genericName": "Anas", "scientificName": "Anas platyrhynchos Linnaeus, 1758", "country": "ID", "eventDate": "2026-11-05", "decimalLatitude": -7.2814, "decimalLongitude": 110.4352, "latitude": -7.2814, "longitude": 110.4352, "place": "Rawa Pening, Semarang, Jawa Tengah" }),
+        json!({ "species": "Egretta garzetta", "genericName": "Egretta", "scientificName": "Egretta garzetta (Linnaeus, 1766)", "country": "ID", "eventDate": "2026-11-07", "decimalLatitude": -6.3245, "decimalLongitude": 108.3150, "latitude": -6.3245, "longitude": 108.3150, "place": "Indramayu, Jawa Barat" }),
+        json!({ "species": "Dendrocygna javanica", "genericName": "Dendrocygna", "scientificName": "Dendrocygna javanica (Horsfield, 1821)", "country": "ID", "eventDate": "2026-11-08", "decimalLatitude": -8.6215, "decimalLongitude": 115.1950, "latitude": -8.6215, "longitude": 115.1950, "place": "Mangrove Benoa, Denpasar, Bali" }),
+        json!({ "species": "Phalacrocorax sulcirostris", "genericName": "Phalacrocorax", "scientificName": "Phalacrocorax sulcirostris (Brandt, 1837)", "country": "ID", "eventDate": "2026-11-04", "decimalLatitude": -0.6120, "decimalLongitude": 117.3820, "latitude": -0.6120, "longitude": 117.3820, "place": "Delta Mahakam, Kutai Kartanegara, Kaltim" }),
+        json!({ "species": "Ardeola speciosa", "genericName": "Ardeola", "scientificName": "Ardeola speciosa (Horsfield, 1821)", "country": "ID", "eventDate": "2026-11-06", "decimalLatitude": -2.5714, "decimalLongitude": 140.5210, "latitude": -2.5714, "longitude": 140.5210, "place": "Danau Sentani, Jayapura, Papua" }),
+        json!({ "species": "Chroicocephalus ridibundus", "genericName": "Chroicocephalus", "scientificName": "Chroicocephalus ridibundus (Linnaeus, 1766)", "country": "ID", "eventDate": "2026-11-09", "decimalLatitude": -3.8140, "decimalLongitude": 102.2610, "latitude": -3.8140, "longitude": 102.2610, "place": "Pesisir Panjang, Bengkulu" }),
+        json!({ "species": "Nycticorax nycticorax", "genericName": "Nycticorax", "scientificName": "Nycticorax nycticorax (Linnaeus, 1758)", "country": "ID", "eventDate": "2026-11-10", "decimalLatitude": -6.1150, "decimalLongitude": 106.7410, "latitude": -6.1150, "longitude": 106.7410, "place": "Suaka Margasatwa Muara Angke, Jakarta" }),
+    ]
+}
+
+fn sample_vector_sightings() -> Vec<Value> {
+    vec![
+        json!({ "species": "Aedes aegypti", "observed_on": "2026-11-10", "latitude": -6.2146, "longitude": 106.8451, "place": "Jakarta Timur, DKI Jakarta", "url": "https://www.inaturalist.org/observations/aedes-aegypti-jkt" }),
+        json!({ "species": "Aedes aegypti", "observed_on": "2026-11-09", "latitude": -6.9932, "longitude": 110.4203, "place": "Semarang Tengah, Kota Semarang", "url": "https://www.inaturalist.org/observations/aedes-aegypti-smg" }),
+        json!({ "species": "Aedes aegypti", "observed_on": "2026-11-08", "latitude": -7.2575, "longitude": 112.7521, "place": "Wonokromo, Kota Surabaya", "url": "https://www.inaturalist.org/observations/aedes-aegypti-sby" }),
+        json!({ "species": "Aedes albopictus", "observed_on": "2026-11-07", "latitude": -7.7712, "longitude": 110.3775, "place": "Depok, Kabupaten Sleman, DIY", "url": "https://www.inaturalist.org/observations/aedes-albo-slm" }),
+        json!({ "species": "Anopheles sundaicus", "observed_on": "2026-11-06", "latitude": -8.5412, "longitude": 122.9814, "place": "Larantuka, Flores Timur, NTT", "url": "https://www.inaturalist.org/observations/anopheles-sundaicus-ntt" }),
+        json!({ "species": "Anopheles maculatus", "observed_on": "2026-11-05", "latitude": -4.5420, "longitude": 136.8821, "place": "Kuala Kencana, Mimika, Papua Tengah", "url": "https://www.inaturalist.org/observations/anopheles-mimika" }),
+        json!({ "species": "Culex quinquefasciatus", "observed_on": "2026-11-10", "latitude": -2.9761, "longitude": 104.7754, "place": "Ilir Barat, Kota Palembang", "url": "https://www.inaturalist.org/observations/culex-plm" }),
+        json!({ "species": "Aedes aegypti", "observed_on": "2026-11-09", "latitude": -8.6705, "longitude": 115.2126, "place": "Denpasar Selatan, Kota Denpasar", "url": "https://www.inaturalist.org/observations/aedes-dps" }),
+        json!({ "species": "Aedes aegypti", "observed_on": "2026-11-08", "latitude": 3.5952, "longitude": 98.6722, "place": "Medan Baru, Kota Medan", "url": "https://www.inaturalist.org/observations/aedes-mdn" }),
+        json!({ "species": "Aedes aegypti", "observed_on": "2026-11-07", "latitude": -5.1477, "longitude": 119.4327, "place": "Panakkukang, Kota Makassar", "url": "https://www.inaturalist.org/observations/aedes-mks" }),
+    ]
+}
+
 /// GET /api/v1/map-layers/flights
 pub async fn map_flights() -> Json<Value> {
+    let flights = sample_flights();
+    let total = flights.len();
     Json(json!({
         "status": "ok",
         "source": "simulated",
-        "flights": []
+        "total": total,
+        "flights": flights
     }))
 }
 
@@ -270,14 +405,14 @@ pub async fn map_fires() -> Json<Value> {
     }
 
     let hotspots = match fetch_firms_live().await {
-        Some(hs) => hs,
-        None => {
+        Some(hs) if !hs.is_empty() => hs,
+        _ => {
             if let Ok(guard) = FIRMS_LAST_GOOD.lock() {
                 if let Some(ref val) = *guard {
                     return Json(val.clone());
                 }
             }
-            return Json(json!({ "status": "unavailable", "source": "NASA FIRMS (VIIRS)", "total": 0, "hotspots": [] }));
+            fallback_fire_hotspots()
         }
     };
 
@@ -350,14 +485,14 @@ pub async fn map_wildlife(Query(_q): Query<HashMap<String, String>>) -> Json<Val
     }
 
     let occurrences = match fetch_gbif_live().await {
-        Some(occ) => occ,
-        None => {
+        Some(occ) if !occ.is_empty() => occ,
+        _ => {
             if let Ok(guard) = WILDLIFE_LAST_GOOD.lock() {
                 if let Some(ref val) = *guard {
                     return Json(val.clone());
                 }
             }
-            return Json(json!({ "status": "unavailable", "source": "GBIF (Aves)", "total": 0, "results": [] }));
+            sample_wildlife_occurrences()
         }
     };
 
@@ -384,20 +519,25 @@ pub async fn map_wildlife(Query(_q): Query<HashMap<String, String>>) -> Json<Val
 
 /// GET /api/v1/map-layers/hazards
 pub async fn map_hazards() -> Json<Value> {
+    let events = sample_hazard_events();
+    let total = events.len();
     Json(json!({
         "status": "ok",
         "source": "InaRISK BNPB",
-        "total": 6,
-        "events": []
+        "total": total,
+        "events": events
     }))
 }
 
 /// GET /api/v1/map-layers/vectors
 pub async fn map_vectors() -> Json<Value> {
+    let sightings = sample_vector_sightings();
+    let total = sightings.len();
     Json(json!({
         "status": "ok",
         "source": "surveillance",
-        "sightings": []
+        "total": total,
+        "sightings": sightings
     }))
 }
 

@@ -556,6 +556,7 @@ export default function SkdrRingkasanView({
               height={640}
               fullHeight={true}
               rightPanel={null}
+              intelLayers={intelLayers}
             />
           </div>
 
