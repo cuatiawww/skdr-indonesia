@@ -377,7 +377,7 @@ export default function MbgWizard({ kid, target, viewOnly = false }: { kid: numb
             <section key={se.id} className={`${card} p-4 sm:p-5`} data-section={se.id}>
               <div className="skdr-section-head"><h2 className="skdr-section-title">{se.title}</h2>{se.desc && <p className="skdr-section-desc">{se.desc}</p>}</div>
               <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-                {se.fields.filter((f) => isVisible(f, data)).map((f) => (isId ? <FieldView key={f.key} f={f} ctx={fctx} /> : mctx ? <MbgFieldView key={f.key} f={f} ctx={mctx} /> : null))}
+                {se.fields.filter((f) => isVisible(f, data)).map((f, fIdx) => (isId ? <FieldView key={`${f.key}_${fIdx}`} f={f} ctx={fctx} /> : mctx ? <MbgFieldView key={`${f.key}_${fIdx}`} f={f} ctx={mctx} /> : null))}
               </div>
             </section>
           ))}
@@ -532,7 +532,7 @@ function Review({ def, data, stats, errors, warnings, ev, isId, geo, editable, g
             </div>
             {rows.length ? (
               <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs">
-                {rows.map(({ f, val }) => <div key={f.key}><dt className="text-[11px] font-semibold text-slate-400">{f.label}</dt><dd className="whitespace-pre-line text-slate-800">{val}</dd></div>)}
+                {rows.map(({ f, val }, rIdx) => <div key={`${f.key}_${rIdx}`}><dt className="text-[11px] font-semibold text-slate-400">{f.label}</dt><dd className="whitespace-pre-line text-slate-800">{val}</dd></div>)}
               </dl>
             ) : <p className="text-xs text-slate-400">{n ? 'Belum diisi.' : 'Tidak ada isian untuk ditinjau (dihitung otomatis).'}</p>}
           </section>

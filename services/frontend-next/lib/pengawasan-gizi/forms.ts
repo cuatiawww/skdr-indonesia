@@ -11,7 +11,11 @@ const mbg = (key: string, label: string, kind: string, extra: Partial<FieldDef> 
 const tinjau: StepDef = { id: 'tinjau', title: 'Tinjau & Kirim', review: true, sections: [] }
 const dokumen = (list: string[]): FieldDef => mbg('_dokumen', 'Dokumen yang dilihat', 'dokumen', {}, { list })
 const lampiran = (): FieldDef => mbg('_lampiran', 'Bukti dokumen/foto (opsional)', 'lampiran', {}, { item: '' })
-const hasil = (label: string, p: Record<string, any> = {}): FieldDef => mbg('_hasil_view', label, 'hasil', {}, p)
+let _hasilSeq = 0
+const hasil = (label: string, p: Record<string, any> = {}, customKey?: string): FieldDef => {
+  const k = customKey || (p.f1 ? `_hasil_f1_${p.f1}` : p.no ? `_hasil_f${p.no}_kes` : `_hasil_view_${++_hasilSeq}`)
+  return mbg(k, label, 'hasil', {}, p)
+}
 
 /** Rekomendasi 1–4; nomor 1 wajib bila `perlu(d)` */
 const rekFields = (prefix: string, perlu: (d: Data) => boolean): FieldDef[] =>
@@ -56,7 +60,7 @@ function cekDef(spec: CekNaskah): MbgDef {
   const dokFields: FieldDef[] = [...(spec.header || []).map((h): FieldDef => ({ key: h.key, label: h.label, type: 'text', required: true, maxLen: 200, wide: false })), dokumen(spec.dokumen)]
   if (spec.foto) dokFields.push(mbg('_foto_note', 'Dokumentasi foto', 'note', {}, { text: 'Unggah foto potongan bahan pangan langsung pada setiap butir penilaian (langkah berikutnya).' }))
   else dokFields.push(lampiran())
-  const kesFields: FieldDef[] = [hasil(spec.kesLabel, { skor: spec.skorLabel }), ...rekFields('rek', anyTidak(spec))]
+  const kesFields: FieldDef[] = [hasil(spec.kesLabel, { skor: spec.skorLabel }, `_hasil_f${spec.no}_kes`), ...rekFields('rek', anyTidak(spec))]
   const sections: SectionDef[] = [{ id: 'kes', title: 'Skor & Kesimpulan', fields: [kesFields[0]] }, { id: 'rek', title: 'Rekomendasi', desc: REK_HINT, fields: kesFields.slice(1) }]
   if (spec.alergi) sections.push({ id: 'alergi', title: 'Catatan tambahan', desc: ALERGI_Q, fields: [
     mbg('alergi', 'Ada sasaran yang alergi makanan?', 'choice', { required: true }, { opts: ['Ya', 'Tidak'] }),
@@ -74,7 +78,7 @@ function cekDef(spec: CekNaskah): MbgDef {
 }
 
 // ─── F1 ───────────────────────────────────────────────────────────────────────
-const f1Hasil = (key: string, label: string, rule: string) => hasil(label, { f1: key, rule })
+const f1Hasil = (key: string, label: string, rule: string) => hasil(label, { f1: key, rule }, `_hasil_f1_${key}`)
 const F1_DEF: MbgDef = {
   key: 'f1', no: 1, title: F1.title, short: F1.short,
   steps: [
@@ -104,7 +108,7 @@ const F1_DEF: MbgDef = {
       { id: 'b2kes', title: 'Kesimpulan B.2', fields: [f1Hasil('b2', 'Kesimpulan B.2. Pelatihan/pembekalan/sosialisasi penjamah makanan mengenai standar gizi MBG', F1.b2Rule)] },
     ] },
     { id: 'kes', title: 'Kesimpulan & Rekomendasi', sections: [
-      { id: 'kes', title: 'Ringkasan kesimpulan', fields: [hasil('Kesimpulan Formulir 1 (Ketenagaan)', { f1: 'all', rule: 'Sesuai apabila Kesimpulan Pengawas Gizi, B.1 dan B.2 = "sesuai"' })] },
+      { id: 'kes', title: 'Ringkasan kesimpulan', fields: [hasil('Kesimpulan Formulir 1 (Ketenagaan)', { f1: 'all', rule: 'Sesuai apabila Kesimpulan Pengawas Gizi, B.1 dan B.2 = "sesuai"' }, '_hasil_f1_all')] },
       { id: 'rekA', title: 'Rekomendasi A (Pengawas Gizi)', desc: F1.rekA, fields: rekFields('rekA', (d) => validateF1(d).hasil.a === TIDAK) },
       { id: 'rekB', title: 'Rekomendasi B (Penjamah Makanan)', desc: F1.rekB, fields: rekFields('rekB', (d) => { const h = validateF1(d).hasil; return h.b1 === TIDAK || h.b2 === TIDAK }) },
     ] },
@@ -122,7 +126,7 @@ const F2_DEF: MbgDef = {
     ] },
     { id: 'b', title: 'B. Sosialisasi SOP', sections: [{ id: 'b', title: F2.bTitle, desc: `Sesuai / Tidak Sesuai: ${F2.bRule}`, fields: F2.sop.map((l, x) => mbg(`b${x + 1}`, `${x + 1}. ${l}`, 'f2b', { required: true, filled: (d) => has(d, `b${x + 1}_sos`) && has(d, `b${x + 1}`) }, { r: x + 1 })) }] },
     { id: 'kes', title: 'Kesimpulan & Rekomendasi', sections: [
-      { id: 'kes', title: 'Kesimpulan Pemantauan SOP', fields: [hasil('Kesimpulan Pemantauan SOP', { rule: F2.kesRule })] },
+      { id: 'kes', title: 'Kesimpulan Pemantauan SOP', fields: [hasil('Kesimpulan Pemantauan SOP', { rule: F2.kesRule }, '_hasil_f2_kes')] },
       { id: 'rek', title: 'Rekomendasi', desc: F2.rek, fields: rekFields('rek', (d) => [1, 2, 3, 4, 5, 6, 7].some((r) => d[`a${r}`] === TIDAK) || [1, 2, 3, 4, 5, 6, 7, 8].some((r) => d[`b${r}`] === TIDAK)) },
     ] },
     tinjau,
@@ -139,7 +143,7 @@ const F9_DEF: MbgDef = {
     ] }] },
     ...F9.komponen.map((g) => komponenStep({ no: 9 }, g, 'f9')),
     { id: 'kes', title: 'Kesimpulan & Rekomendasi', sections: [
-      { id: 'kes', title: 'Skor & Kesimpulan', desc: F9.rule, fields: [hasil(F9.kesLabel, { skor: F9.skorLabel })] },
+      { id: 'kes', title: 'Skor & Kesimpulan', desc: F9.rule, fields: [hasil(F9.kesLabel, { skor: F9.skorLabel }, '_hasil_f9_kes')] },
       { id: 'rek', title: 'Rekomendasi', desc: REK_HINT, fields: rekFields('rek', (d) => [1, 2, 3, 4, 5, 6].some((k) => f9Item(d, k) === TIDAK)) },
     ] },
     tinjau,
