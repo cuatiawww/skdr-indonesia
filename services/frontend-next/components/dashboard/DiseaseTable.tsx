@@ -80,7 +80,7 @@ export default function DiseaseTable({ rows, sumber, ukuran }: { rows: SummaryDi
               {showPe ? <Th k="pe"><SourceKey source="pe" label={t('skdr.dtable.peCases')} /></Th> : null}
               <Th k="deaths" className="text-right">{t('skdr.dtable.deaths')}</Th>
               <th className="px-2 py-2 font-bold uppercase tracking-wider">{t('skdr.dtable.regions')}</th>
-              <th className="px-2 py-2 font-bold uppercase tracking-wider">{t('skdr.dtable.peForm')}</th>
+              {showPe ? <th className="px-2 py-2 font-bold uppercase tracking-wider">{t('skdr.dtable.peForm')}</th> : null}
               <th />
             </tr>
           </thead>
@@ -121,7 +121,9 @@ export default function DiseaseTable({ rows, sumber, ukuran }: { rows: SummaryDi
                   {showEbs ? <div>{t('skdr.dtable.provN', { n: fmt(r.ebs?.provinces ?? 0) })} <span className="text-slate-400">EBS</span></div> : null}
                   {showPe ? <div>{t('skdr.dtable.provN', { n: fmt(r.pe?.provinces ?? 0) })} <span className="text-slate-400">IBS</span></div> : null}
                 </td>
-                <td className="px-2 py-2 text-xs">{r.pe_form ? <Link href={`/pe/${r.pe_form}`} className="font-semibold text-brand-700 hover:underline">{t('skdr.dtable.openForm')}</Link> : <span className="text-slate-400">—</span>}</td>
+                {showPe ? (
+                  <td className="px-2 py-2 text-xs">{r.pe_form ? <Link href={`/pe/${r.pe_form}`} className="font-semibold text-brand-700 hover:underline">{t('skdr.dtable.openForm')}</Link> : <span className="text-slate-400">—</span>}</td>
+                ) : null}
                 <td className="px-1 text-slate-300 group-hover:text-brand-700"><ChevronRight className="h-4 w-4" /></td>
               </tr>
             ))}

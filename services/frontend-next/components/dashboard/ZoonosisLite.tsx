@@ -121,7 +121,7 @@ export default function ZoonosisLite() {
   const [applied, setApplied] = useState<Filters>(defaults)
   const { period, sel, provs, kabs, src } = applied
   const setD = (patch: Partial<Filters>) => setDraft((d) => ({ ...d, ...patch }))
-  /** Commit straight away (presets, Sumber pill, card / map clicks). */
+  /** Commit straight away (presets, card / map clicks, Sumber selector). */
   const commit = (patch: Partial<Filters>) => { setDraft((d) => ({ ...d, ...patch })); setApplied((a) => ({ ...a, ...patch })) }
   const setSel = (fn: (s: LiteCode[]) => LiteCode[]) => commit({ sel: fn(applied.sel) })
   const [provinces, setProvinces] = useState<MasterProvince[]>([])
@@ -143,21 +143,22 @@ export default function ZoonosisLite() {
   // All kab/kota once (same source as the main filter bar); the Kab/Kota dropdown is limited to the checked provinces.
   useEffect(() => { fetchFrom<MasterKabkota[]>('/api/v1/master/kabkota').then((ks) => setAllKabs([...(ks || [])].sort((a, b) => a.name.localeCompare(b.name, 'id')))).catch(() => setAllKabs([])) }, [])
 
-  // Always send the explicit period (public-dashboard 500s without it for kategori queries).
+  // Build query without duplicate params: only include source when filtered to 'ebs' or 'pe'.
   const qs = useMemo(() => toQs({
     kategori: 'ZOONOSIS',
+    source: src !== 'all' ? src : undefined,
     disease: ALL_CODES.join(','),
     start_year: period.startYear, start_week: period.startWeek, end_year: period.endYear, end_week: period.endWeek, year: period.endYear,
     province_id: provs.length ? provs.join(',') : undefined,
     kabkota_id: kabs.length ? kabs.join(',') : undefined,
-  }), [period, provs, kabs])
+  }), [period, provs, kabs, src])
 
   const load = useCallback((_fresh: boolean) => {
     let alive = true
     setLoading(true); setErr(null)
     Promise.allSettled([
-      fetchFrom<Overview>(`/api/v1/analytics/overview?${qs}${src !== 'all' ? `&source=${src}` : ''}`).then((x) => alive && setOv(x)),
-      fetchFrom<PublicDashboard>(`/api/v1/public-dashboard?${qs}${src !== 'all' ? `&source=${src}` : ''}`).then((x) => alive && setMap(x)),
+      fetchFrom<Overview>(`/api/v1/analytics/overview?${qs}`).then((x) => alive && setOv(x)),
+      fetchFrom<PublicDashboard>(`/api/v1/public-dashboard?${qs}`).then((x) => alive && setMap(x)),
       fetchFrom<Exec>(`/api/v1/dashboard/executive?${qs}`).then((x) => alive && setExec(x)),
     ]).then((rs) => {
       if (!alive) return
@@ -166,28 +167,33 @@ export default function ZoonosisLite() {
       setLoading(false)
     })
     return () => { alive = false }
-  }, [qs, src])
+  }, [qs])
   useEffect(() => load(tick > 0), [load, tick])
 
-  // Cards + CFR: the same EBS / Kasus PE rows as the heatmap (analytics/overview, all Lite filters + Sumber).
-  // Kasus = EBS cases (jml_kasus) + Kasus PE, Kematian = EBS deaths + PE deaths (outcome Meninggal), CFR = Wilson 95% CI.
+  // Cards + CFR: EBS + Kasus PE rows as provided by analytics/overview.
+  // Kasus = EBS cases + Kasus PE, Kematian = EBS deaths + PE deaths, CFR = Wilson 95% CI.
   const rows = useMemo(() => LITE_DISEASES.map((d) => {
     const e = ov?.trend.ebs.find((x) => x.code === d.code)
     const p = ov?.trend.pe.find((x) => x.code === d.code)
     const card = exec?.cards.find((c) => c.disease_code === d.code)
     const ebsCases = sumArr(e?.cases), ebsDeaths = sumArr(e?.deaths), ebsAlerts = sumArr(e?.alerts)
     const peCases = sumArr(p?.cases), peDeaths = sumArr(p?.deaths)
-    const cases = ebsCases + peCases, deaths = ebsDeaths + peDeaths
+    const cases = src === 'ebs' ? ebsCases : src === 'pe' ? peCases : (ebsCases + peCases)
+    const deaths = src === 'ebs' ? ebsDeaths : src === 'pe' ? peDeaths : (ebsDeaths + peDeaths)
     const n = ov?.weeks.length ?? 0
+    const spark = src === 'pe' ? Array.from({ length: n }, (_, i) => p?.cases[i] || 0)
+      : src === 'ebs' ? Array.from({ length: n }, (_, i) => e?.cases[i] || 0)
+      : Array.from({ length: n }, (_, i) => (e?.cases[i] || 0) + (p?.cases[i] || 0))
     return {
       ...d,
       color: card?.color || d.color,
       label: card?.label || d.label,
-      cases, deaths, alerts: ebsAlerts, cfr: wilsonCi(deaths, cases),
-      spark: Array.from({ length: n }, (_, i) => (e?.cases[i] || 0) + (p?.cases[i] || 0)),
-      ebs: ov ? ebsAlerts : null, ebsCases, pe: ov ? peCases : null,
+      cases, deaths, cfr: wilsonCi(deaths, cases),
+      spark,
+      ebs: ov ? ebsAlerts : null, ebsCases,
+      pe: peCases, peDeaths,
     }
-  }), [ov, exec])
+  }), [ov, exec, src])
 
   const allSel = sel.length === ALL_CODES.length
   const isSel = (c: LiteCode) => sel.includes(c)
@@ -196,9 +202,7 @@ export default function ZoonosisLite() {
   useEffect(() => { if (sel.length === 1 && sel[0] === 'AVIAN_INFLUENZA') setLayers((l) => ({ ...l, birds: true })) }, [sel])
 
   const selNames = useMemo(() => new Set(LITE_DISEASES.filter((d) => sel.includes(d.code)).map((d) => d.name as string)), [sel])
-  // PR 049: exclude IBS aggregate alerts from Zoonosis Lite map; keep strictly to EBS and Form PE (Kasus PE)
   const locations = useMemo(() => (map?.locations ?? []).filter((l) => selNames.has(l.disease)
-    && String((l as { source_type?: string | null }).source_type ?? '').toLowerCase() !== 'ibs'
     && (src === 'all' || String((l as { source_type?: string | null }).source_type ?? '').toLowerCase() === src)), [map?.locations, selNames, src])
   const locSplit = useMemo(() => {
     let ebs = 0, pe = 0, cases = 0
@@ -432,11 +436,12 @@ export default function ZoonosisLite() {
   const otherTab = shownTabs.find((x) => x !== 'lab')
   const modalQuery = useMemo(() => ({
     kategori: 'ZOONOSIS',
+    source: src !== 'all' ? src : undefined,
     disease: sel.join(','),
     start_year: period.startYear, start_week: period.startWeek, end_year: period.endYear, end_week: period.endWeek, year: period.endYear,
     province_id: provs.length ? provs.join(',') : undefined,
     kabkota_id: kabs.length ? kabs.join(',') : undefined,
-  }), [period, provs, kabs, sel])
+  }), [period, provs, kabs, sel, src])
   const modalDiseases = useMemo(() => LITE_DISEASES.filter((d) => sel.includes(d.code)).map((d) => ({ code: d.code as string, name: d.name as string, color: d.color as string })), [sel])
   const modalChips = {
     diseases: allSel ? t('skdr.lite.allDiseases') : modalDiseases.map((d) => d.name).join(', '),
@@ -499,6 +504,26 @@ export default function ZoonosisLite() {
               </select>
             </div>
           </div>
+          <div className="flex flex-col gap-1">
+            <span className={lbl}>Sumber</span>
+            <div className="flex h-10 items-center rounded-xl border border-line bg-slate-50 p-1 text-xs">
+              {(['all', 'ebs', 'pe'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => commit({ src: s })}
+                  className={`h-full rounded-lg px-2.5 text-[11px] font-bold transition ${
+                    src === s
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  data-testid={`lite-src-${s}`}
+                >
+                  {s === 'all' ? (t('skdr.lite.all') || 'Semua') : s === 'ebs' ? 'EBS' : 'Form PE'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-[0_0_auto] items-end gap-1.5 max-sm:flex-[1_1_100%]">
             <button type="button" onClick={apply} disabled={loading} data-testid="lite-apply" aria-busy={loading}
               className={`relative flex h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-primary-dark bg-primary px-4 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-wait disabled:opacity-80 sm:flex-none ${dirty ? 'ring-2 ring-brand-200 ring-offset-1' : ''}`}>
@@ -536,7 +561,17 @@ export default function ZoonosisLite() {
                   <div className="truncate text-[9px] leading-tight text-slate-500" title={`${t('skdr.lite.ci')} ${ciText(r.cfr)}`}>({ciText(r.cfr)})</div>
                 </div>
               </div>
-              <div className="truncate text-[10px] text-slate-500">{r.ebs !== null ? t('skdr.lite.ebsPeCases', { ebsCases: nf(r.ebsCases), ebs: nf(r.ebs), pe: nf(r.pe) }) : '\u00a0'}</div>
+              <div className="truncate text-[10px] text-slate-500">
+                {r.ebs !== null ? (
+                  src === 'ebs' ? (
+                    `${nf(r.ebs ?? 0)} sinyal alert EBS (${nf(r.ebsCases)} kasus)`
+                  ) : src === 'pe' ? (
+                    `${nf(r.pe)} kasus Form PE (${nf(r.peDeaths)} kematian)`
+                  ) : (
+                    t('skdr.lite.ebsPeCases', { ebsCases: nf(r.ebsCases), ebs: nf(r.ebs), pe: nf(r.pe) })
+                  )
+                ) : '\u00a0'}
+              </div>
               <Sparkline values={r.spark} color={r.color} />
             </button>
           )
