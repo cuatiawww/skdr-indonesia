@@ -128,7 +128,7 @@ export default function ZoonosisLiteHeatmap({ query, src, period, tick = 0, chip
   }, [data, src, m])
 
   const ebsLabel = m === 'alert' ? t('skdr.charts.metricAlerts') : t('skdr.charts.metricEbsCases')
-  const peLabel = t('skdr.charts.metricPeCases')
+  const peLabel = 'Kasus Form PE'
   // The API clamps the end to the current week and keeps at most 104 weeks; say so when the columns are cut.
   const first = view?.weeks[0]
   const cut = !!first && (first.year !== period.startYear || first.week !== period.startWeek) && (view?.weeks.length || 0) >= MAX_WEEKS
