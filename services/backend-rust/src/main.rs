@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/roles/:id", put(auth::role_update).delete(auth::role_delete))
         .route("/api/v1/access-log", get(auth::access_log))
         // settings + master data
-        .route("/api/v1/console/settings", get(master::console_settings))
+        .route("/api/v1/console/settings", get(master::console_settings).put(master::update_settings).post(master::update_settings))
         .route("/api/v1/master/diseases", get(master::diseases))
         // PR 021: kategori penyakit, Laboratorium, Klaster, Alert SKDR
         .route("/api/v1/master/disease-categories", get(kategori::list))

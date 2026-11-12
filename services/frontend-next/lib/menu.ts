@@ -44,6 +44,16 @@ import {
   ChevronRight,
   ChevronDown,
   Waypoints,
+  Clock,
+  TrendingUp,
+  Bug,
+  FolderTree,
+  FilePlus,
+  Key,
+  Lock,
+  Sparkles,
+  Share2,
+  Calendar,
 } from 'lucide-react'
 
 // Icon registry for serializable navigation configurations
@@ -90,6 +100,16 @@ export const MENU_ICON_MAP: Record<string, any> = {
   Eye,
   ExternalLink,
   Waypoints,
+  Clock,
+  TrendingUp,
+  Bug,
+  FolderTree,
+  FilePlus,
+  Key,
+  Lock,
+  Sparkles,
+  Share2,
+  Calendar,
 }
 
 export function resolveMenuIcon(name?: string) {
@@ -339,6 +359,7 @@ export const DEFAULT_NAVIGATION_CONFIG: SidebarGroupConfig[] = [
   ] },
   { id: 'grp_tatakelola', title: 'Tata Kelola', order: 4, enabled: true, area: 'tatakelola', requiresAuth: true, permission: 'tatakelola', items: [
     it('mod_tatakelola_home', 'Ringkasan Tata Kelola', '/tatakelola', 'Shield', 1),
+    it('mod_navigasi', 'Modul & Navigasi', '/tatakelola/navigasi', 'SlidersHorizontal', 2, { description: 'Pengaturan dinamis nama navigasi, menu, dan sub-menu sidebar' }),
   ] },
   { id: 'grp_transaksi', title: 'Transaksi', order: 5, enabled: true, area: 'tatakelola', items: [
     it('mod_form_pe', 'Form PE', '#', 'FileText', 1, { source: 'pe_forms', subItems: [

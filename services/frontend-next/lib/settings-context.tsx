@@ -33,6 +33,8 @@ interface SettingsContextType {
   loading: boolean;
   refetch: () => void;
   updateSettings: (partial: Partial<SystemSettings>) => void;
+  saveNavigationMenu: (menu: SidebarGroupConfig[]) => Promise<{ ok: boolean; error?: string }>;
+  resetNavigationMenu: () => Promise<{ ok: boolean; error?: string }>;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
@@ -40,6 +42,8 @@ const SettingsContext = createContext<SettingsContextType>({
   loading: false,
   refetch: () => {},
   updateSettings: () => {},
+  saveNavigationMenu: async () => ({ ok: false }),
+  resetNavigationMenu: async () => ({ ok: false }),
 });
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
@@ -98,12 +102,38 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, ...partial }));
   }, []);
 
+  const saveNavigationMenu = useCallback(async (newMenu: SidebarGroupConfig[]) => {
+    try {
+      const res = await fetch(`${PUBLIC_BASE_PATH}/api/v1/console/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          navigation_menu: newMenu,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        return { ok: false, error: data.error || 'Gagal menyimpan pengaturan navigasi' };
+      }
+      updateSettings({ navigation_menu: newMenu });
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Gagal menghubungi server' };
+    }
+  }, [updateSettings]);
+
+  const resetNavigationMenu = useCallback(async () => {
+    return saveNavigationMenu(DEFAULT_NAVIGATION_CONFIG);
+  }, [saveNavigationMenu]);
+
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
   return (
-    <SettingsContext.Provider value={{ settings, loading, refetch: fetchSettings, updateSettings }}>
+    <SettingsContext.Provider value={{ settings, loading, refetch: fetchSettings, updateSettings, saveNavigationMenu, resetNavigationMenu }}>
       {children}
     </SettingsContext.Provider>
   );

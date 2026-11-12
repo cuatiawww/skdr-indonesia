@@ -93,11 +93,12 @@ pub async fn kabkota(State(s): State<AppState>, Query(q): Query<KabQuery>) -> Re
 
 /// Same shape as NLP `GET /api/v1/console/settings` (branding + navigation menu from app_settings).
 /// PR 029: open without login (the login page needs the branding); anonymous callers get only the branding keys.
+/// PR 068: include navigation_menu & theme_palette in public keys so custom menus apply to all visitors.
 pub async fn console_settings(
     State(s): State<AppState>,
     me: Option<axum::Extension<crate::auth::AuthUser>>,
 ) -> Result<Json<Value>, ApiError> {
-    const BRANDING: [&str; 7] = ["app_name", "app_tagline", "footer_text", "sidebar_logo_url", "login_logo_url", "favicon_url", "ticker_text"];
+    const BRANDING: [&str; 9] = ["app_name", "app_tagline", "footer_text", "sidebar_logo_url", "login_logo_url", "favicon_url", "ticker_text", "navigation_menu", "theme_palette"];
     let c = s.pool.get().await.map_err(internal)?;
     let rows = c.query("SELECT key, value FROM app_settings", &[]).await.map_err(internal)?;
     let mut cfg = serde_json::Map::new();
@@ -113,4 +114,35 @@ pub async fn console_settings(
         cfg.insert(k, val);
     }
     Ok(Json(json!({ "success": true, "data": { "config_data": cfg, "updated_at": null, "updated_by": null } })))
+}
+
+/// PR 068: update app_settings (e.g. navigation_menu, branding) — requires login + tatakelola permission or admin role.
+pub async fn update_settings(
+    State(s): State<AppState>,
+    me: Option<axum::Extension<crate::auth::AuthUser>>,
+    Json(body): Json<serde_json::Map<String, Value>>,
+) -> Result<Json<Value>, ApiError> {
+    let user = me.ok_or_else(|| (axum::http::StatusCode::UNAUTHORIZED, Json(json!({ "success": false, "error": "Silakan masuk terlebih dahulu" }))))?.0;
+    if !user.has("tatakelola") && user.role != "admin" {
+        return Err((axum::http::StatusCode::FORBIDDEN, Json(json!({ "success": false, "error": "Akses ditolak: membutuhkan izin tatakelola" }))));
+    }
+    let c = s.pool.get().await.map_err(internal)?;
+    for (k, v) in body {
+        if k.starts_with("session_") {
+            continue;
+        }
+        let v_str = if v.is_string() {
+            v.as_str().unwrap().to_string()
+        } else {
+            v.to_string()
+        };
+        c.execute(
+            "INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, now())
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()",
+            &[&k, &v_str],
+        )
+        .await
+        .map_err(internal)?;
+    }
+    Ok(Json(json!({ "success": true, "message": "Pengaturan navigasi & modul berhasil disimpan" })))
 }
