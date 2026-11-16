@@ -42,8 +42,18 @@ export function hasPerm(permissions: string[] | undefined | null, perm?: string)
   return list.includes('*') || list.includes(perm)
 }
 
-/** Only allow same-app relative redirects after login (no open redirect). */
+/** Only allow same-app relative redirects after login (no open redirect; never redirect to /menu). */
 export function safeRedirect(raw: string | null | undefined, fallback = '/dashboard'): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\') || raw.startsWith('/login')) return fallback
+  if (
+    !raw ||
+    !raw.startsWith('/') ||
+    raw.startsWith('//') ||
+    raw.startsWith('/\\') ||
+    raw.startsWith('/login') ||
+    raw === '/menu' ||
+    raw.startsWith('/menu/')
+  ) {
+    return fallback
+  }
   return raw
 }

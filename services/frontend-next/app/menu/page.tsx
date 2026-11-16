@@ -385,44 +385,46 @@ export default function MenuPage() {
       {/* PR 075: When active tab is Kinerja, display KPI Cards and 4 Redesigned Charts */}
       {activeTab === 'kinerja' && <KinerjaView />}
 
-      {/* Cards Grid */}
-      <section className="space-y-3">
-        <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
-          DAFTAR MODUL {current.label}
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {current.items.map((it) => {
-            const Icon = it.icon
-            return (
-              <Link
-                key={it.href + it.title}
-                href={it.href}
-                className="group flex items-start gap-3 rounded-2xl border border-line bg-card p-4 shadow-xs transition hover:border-primary/40 hover:shadow-md"
-              >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-primary">
-                  {Icon && <Icon className="h-5 w-5" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                    {it.title}
-                    {it.badge && (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800">
-                        {it.badge}
+      {/* Cards Grid: Dihapus pada tab Kinerja sesuai permintaan user ("Daftar Modul Kerja pada Dashboard /menu dihapus") */}
+      {activeTab !== 'kinerja' && (
+        <section className="space-y-3">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+            DAFTAR MODUL {current.label}
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {current.items.map((it) => {
+              const Icon = it.icon
+              return (
+                <Link
+                  key={it.href + it.title}
+                  href={it.href}
+                  className="group flex items-start gap-3 rounded-2xl border border-line bg-card p-4 shadow-xs transition hover:border-primary/40 hover:shadow-md"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-primary">
+                    {Icon && <Icon className="h-5 w-5" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                      {it.title}
+                      {it.badge && (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800">
+                          {it.badge}
+                        </span>
+                      )}
+                    </span>
+                    {it.description && (
+                      <span className="mt-0.5 block text-xs text-slate-500 line-clamp-2">
+                        {it.description}
                       </span>
                     )}
                   </span>
-                  {it.description && (
-                    <span className="mt-0.5 block text-xs text-slate-500 line-clamp-2">
-                      {it.description}
-                    </span>
-                  )}
-                </span>
-                <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-primary" />
-              </Link>
-            )
-          })}
-        </div>
-      </section>
+                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

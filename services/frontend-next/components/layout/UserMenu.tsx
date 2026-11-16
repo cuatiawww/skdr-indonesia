@@ -96,7 +96,10 @@ export default function UserMenu() {
 
   if (loading) return <div className="h-10 w-24" aria-hidden />
   if (!user) {
-    const redirect = pathname === '/login' ? '' : `?redirect=${encodeURIComponent(pathname)}`
+    const redirect =
+      pathname === '/login' || pathname === '/menu' || pathname.startsWith('/menu/')
+        ? ''
+        : `?redirect=${encodeURIComponent(pathname)}`
     return (
       <Link href={`/login${redirect}`} data-testid="login-link"
         className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark">
