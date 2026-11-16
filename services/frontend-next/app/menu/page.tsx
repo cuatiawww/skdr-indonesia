@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/skdr-auth'
 import { useTranslation } from '@/lib/i18n/LanguageContext'
+import KinerjaView from '@/components/dasbor-menu/KinerjaView'
 
 type TabKey = 'kinerja' | 'ibs' | 'ebs' | 'mbg' | 'zoonosis'
 
@@ -380,6 +381,9 @@ export default function MenuPage() {
           </p>
         )}
       </div>
+
+      {/* PR 075: When active tab is Kinerja, display KPI Cards and 4 Redesigned Charts */}
+      {activeTab === 'kinerja' && <KinerjaView />}
 
       {/* Cards Grid */}
       <section className="space-y-3">

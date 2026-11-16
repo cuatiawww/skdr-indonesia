@@ -305,6 +305,10 @@ pub fn classify(method: &Method, path: &str) -> Need {
     if path == "/api/v1/console/settings" && *method == Method::GET {
         return Need::Public;
     }
+    // PR 075: Dasbor SKDR Kinerja endpoint open for dashboard viewing
+    if (path == "/api/v1/dasbor/skdr/kinerja" || path == "/api/v1/dasbor/kinerja") && *method == Method::GET {
+        return Need::Public;
+    }
     if under(path, "/api/v1/users") || under(path, "/api/v1/roles") || under(path, "/api/v1/access-log") {
         return Need::Perm("user_management");
     }

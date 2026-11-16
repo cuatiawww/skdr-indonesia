@@ -28,6 +28,7 @@ mod dasbor_ebs_ibs;
 mod dasbor_mbg;
 mod analisa;
 mod spasial;
+mod dasbor_skdr;
 
 use axum::{http::StatusCode, routing::{delete, get, patch, post, put}, Json, Router};
 use deadpool_postgres::Pool;
@@ -107,6 +108,9 @@ async fn main() -> anyhow::Result<()> {
         // PR 036: Dasbor MBG (dari transaksi Pengawasan Gizi MBG & Keracunan Pangan MBG)
         .route("/api/v1/dasbor/mbg/pengawasan-gizi", get(dasbor_mbg::pengawasan_gizi))
         .route("/api/v1/dasbor/mbg/keracunan", get(dasbor_mbg::keracunan))
+        // PR 075: Dasbor SKDR Kinerja (KPI Cards & 4 Charts analitik Kinerja SKDR)
+        .route("/api/v1/dasbor/skdr/kinerja", get(dasbor_skdr::kinerja))
+        .route("/api/v1/dasbor/kinerja", get(dasbor_skdr::kinerja))
         // PR 042: Matriks Analisa (Dasbor Limited, login): satu filter untuk Laporan EBS, Laporan Agregat IBS, Laporan Individu IBS
         .route("/api/v1/analisa/opsi", get(analisa::opsi))
         .route("/api/v1/analisa/ringkasan", get(analisa::ringkasan))
