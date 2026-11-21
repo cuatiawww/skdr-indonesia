@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ChevronDown, KeyRound, LayoutDashboard, LogIn, LogOut, Shield } from 'lucide-react'
+import { Activity, Bug, ChevronDown, KeyRound, LayoutDashboard, LogIn, LogOut, Radio, Shield, TrendingUp, Utensils } from 'lucide-react'
 import { toast } from 'sonner'
 import Modal from '@/components/Modal'
 import { Field, FormActions, inputCls } from '@/components/master/MasterUi'
@@ -17,6 +17,53 @@ export function AreaSwitch() {
   const { user, can } = useAuth()
   const pathname = usePathname() || '/'
   const { t } = useTranslation()
+  const [tab, setTab] = useState('kinerja')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      setTab(sp.get('tab') || 'kinerja')
+    }
+  }, [pathname])
+
+  // PR 074: On /menu route (with active Dashboard sidebar), replace Dasbor & Tata Kelola
+  // with 5 dashboard categories: Kinerja, IBS, EBS, MBG, and Zoonosis.
+  const isMenu = pathname === '/menu' || pathname.startsWith('/menu/')
+  if (isMenu) {
+    const cls = (on: boolean) =>
+      `flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
+        on ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-primary'
+      }`
+    return (
+      <nav
+        aria-label="Kategori Dasbor Menu"
+        data-testid="menu-tab-switch"
+        className="hidden items-center rounded-2xl border border-white/45 bg-white/90 p-1 shadow-sm backdrop-blur-sm sm:flex"
+      >
+        <Link href="/menu?tab=kinerja" onClick={() => setTab('kinerja')} className={cls(tab === 'kinerja')}>
+          <Activity className="h-3.5 w-3.5" />
+          Kinerja
+        </Link>
+        <Link href="/menu?tab=ibs" onClick={() => setTab('ibs')} className={cls(tab === 'ibs')}>
+          <TrendingUp className="h-3.5 w-3.5" />
+          IBS
+        </Link>
+        <Link href="/menu?tab=ebs" onClick={() => setTab('ebs')} className={cls(tab === 'ebs')}>
+          <Radio className="h-3.5 w-3.5" />
+          EBS
+        </Link>
+        <Link href="/menu?tab=mbg" onClick={() => setTab('mbg')} className={cls(tab === 'mbg')}>
+          <Utensils className="h-3.5 w-3.5" />
+          MBG
+        </Link>
+        <Link href="/menu?tab=zoonosis" onClick={() => setTab('zoonosis')} className={cls(tab === 'zoonosis')}>
+          <Bug className="h-3.5 w-3.5" />
+          Zoonosis
+        </Link>
+      </nav>
+    )
+  }
+
   if (!user || !can('tatakelola')) return null
   const area = routeArea(pathname)
   const cls = (on: boolean) =>
@@ -49,7 +96,10 @@ export default function UserMenu() {
 
   if (loading) return <div className="h-10 w-24" aria-hidden />
   if (!user) {
-    const redirect = pathname === '/login' ? '' : `?redirect=${encodeURIComponent(pathname)}`
+    const redirect =
+      pathname === '/login' || pathname === '/menu' || pathname.startsWith('/menu/')
+        ? ''
+        : `?redirect=${encodeURIComponent(pathname)}`
     return (
       <Link href={`/login${redirect}`} data-testid="login-link"
         className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useNavGroups, useNavMatch } from "@/lib/nav";
 import DashboardSidebar from "./DashboardSidebar";
+import MenuSidebar from "./MenuSidebar";
 import DashboardHeader from "./DashboardHeader";
 import { PUBLIC_BASE_PATH } from "@/lib/public-path";
 import Breadcrumbs from "./Breadcrumbs";
@@ -35,6 +36,8 @@ export default function AppShell({
   const authenticated = !!user;
   const isDirectoryPage = false;
   const isHome = pathname === "/" || pathname === "/beranda";
+  // PR 073: /menu route uses dedicated MenuSidebar with requested menu hierarchy
+  const isMenu = pathname === "/menu" || pathname?.startsWith("/menu/");
   // PR 027: Dasbor Zoonosis Lite has its own header title/subtitle (the page body carries no title).
   const isLite = pathname === "/dasbor/zoonosis-lite";
   // PR 050: Mode TV (/tv) is a full-viewport spatial epidemiological command center (no breadcrumbs/footer/padding).
@@ -96,14 +99,23 @@ export default function AppShell({
         />
       )}
       <div className="print:hidden">
-        <DashboardSidebar
-          open={sidebarOpen}
-          menuGroups={navGroups}
-          match={match}
-          collapsed={collapsed}
-          onToggleCollapse={toggleCollapse}
-          onClose={() => setSidebarOpen(false)}
-        />
+        {isMenu ? (
+          <MenuSidebar
+            open={sidebarOpen}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            onClose={() => setSidebarOpen(false)}
+          />
+        ) : (
+          <DashboardSidebar
+            open={sidebarOpen}
+            menuGroups={navGroups}
+            match={match}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            onClose={() => setSidebarOpen(false)}
+          />
+        )}
       </div>
       <div ref={homeWrapRef} className={isHome ? "relative isolate flex flex-1 flex-col" : "contents"}>
         {isHome ? (
@@ -135,8 +147,8 @@ export default function AppShell({
           />
         </div>
         <div className={`w-full flex-1 ${isDirectoryPage || isTv ? 'py-0' : 'pb-3 md:pb-5'}`}>
-          {/* PR 018: no breadcrumb on Dasbor Utama or Beranda; PR 027: nor on the one-screen Dasbor Zoonosis Lite; PR 050: nor on Mode TV */}
-          {pathname === "/main-dashboard" || isLite || isHome || isTv ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
+          {/* PR 018: no breadcrumb on Dasbor Utama or Beranda; PR 027: nor on the one-screen Dasbor Zoonosis Lite; PR 050: nor on Mode TV; PR 073: nor on /menu */}
+          {pathname === "/main-dashboard" || isLite || isHome || isTv || isMenu ? null : <div className="print:hidden"><Breadcrumbs match={match} /></div>}
           <div className={isHome || isTv ? "" : "pt-3 md:pt-4"}>{children}</div>
         </div>
       </div>
