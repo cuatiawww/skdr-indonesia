@@ -48,6 +48,8 @@ import { DEFAULT_LAYERS, type Focus, type Layers as MapLayers } from '@/componen
 import { defaultFilter, useAnalisa, type AFilter } from '@/lib/analisa-api'
 import { decodeTitik, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
 import { useChoroConfig } from '@/lib/choropleth-classes'
+import { PUBLIC_BASE_PATH } from '@/lib/public-path'
+import { buildRisikoPie, PIE_DISEASES, PIE_YEARS, type PieApiPayload, type PieDiseaseOption } from '@/lib/risiko-pie'
 
 const SpasialMap = dynamic(() => import('@/components/spasial/SpasialMap'), {
   ssr: false,
@@ -165,6 +167,35 @@ export default function SkdrRingkasanView({
   const [adminBoundaries, setAdminBoundaries] = useState(true)
   const [windFlow, setWindFlow] = useState(false)
 
+  // Lapisan Risiko Emerging (Peta Risiko PIE Kemenkes)
+  const [risikoPie, setRisikoPie] = useState(false)
+  const [pieYear, setPieYear] = useState<number>(2026)
+  const [pieDisease, setPieDisease] = useState<PieDiseaseOption>('all')
+  const [pieLevel, setPieLevel] = useState<'provinsi' | 'kabkota'>('provinsi')
+  const [piePayload, setPiePayload] = useState<PieApiPayload | null>(null)
+  const [pieLoading, setPieLoading] = useState(false)
+  const [pieError, setPieError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setPieLoading(true)
+    setPieError(null)
+    fetch(`${PUBLIC_BASE_PATH}/api/risiko-pie?year=${pieYear}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return
+        if (j?.ok) setPiePayload(j)
+        else setPieError(j?.error || 'Gagal memuat data Peta Risiko PIE')
+      })
+      .catch((e) => {
+        if (alive) setPieError(e?.message || 'Gagal memuat data Peta Risiko PIE')
+      })
+      .finally(() => {
+        if (alive) setPieLoading(false)
+      })
+    return () => { alive = false }
+  }, [pieYear])
+
   // Integrated layer toggles & filters
   const [intelLayers, setIntelLayers] = useState({
     flights: false,
@@ -205,6 +236,21 @@ export default function SkdrRingkasanView({
   const sp = useAnalisa<SpasialResp>('spasial', aFilter, {}, true)
   const data = sp.loading ? null : sp.data
   const titik = useMemo(() => decodeTitik(sp.data), [sp.data])
+
+  const provKode = useMemo(() => {
+    if (data?.level === 'kabkota' && data.wilayah?.[0]?.code) {
+      return String(data.wilayah[0].code).slice(0, 2)
+    }
+    return null
+  }, [data])
+  const catChoro = useMemo(
+    () => (risikoPie ? buildRisikoPie(piePayload, pieDisease, pieLevel, provKode) : null),
+    [risikoPie, piePayload, pieDisease, pieLevel, provKode],
+  )
+  const legendPie = useMemo(
+    () => (piePayload ? buildRisikoPie(piePayload, pieDisease, pieLevel, provKode)?.legend || [] : []),
+    [piePayload, pieDisease, pieLevel, provKode],
+  )
 
   const { totalTitik, countIbs, countEbs } = useMemo(() => {
     let ibs = 0
@@ -557,6 +603,7 @@ export default function SkdrRingkasanView({
               fullHeight={true}
               rightPanel={null}
               intelLayers={intelLayers}
+              catChoro={catChoro}
             />
           </div>
 
@@ -759,6 +806,118 @@ export default function SkdrRingkasanView({
                       Konteks Spasial & Risiko
                     </div>
                     <div className="space-y-1.5">
+                      {/* Risiko Emerging (Peta PIE Kemenkes) */}
+                      <div
+                        className={`rounded-xl border p-2.5 transition select-none ${
+                          risikoPie ? 'border-purple-300 bg-purple-50/40' : 'border-slate-100 bg-white hover:border-slate-200'
+                        }`}
+                        data-testid="skdr-risiko-pie-card"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-slate-800">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-purple-600" />
+                            <span className="truncate">Risiko Emerging (Peta PIE)</span>
+                          </span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {pieLoading ? (
+                              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">Memuat...</span>
+                            ) : piePayload ? (
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">API Langsung</span>
+                            ) : pieError ? (
+                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700" title={pieError}>Gagal</span>
+                            ) : null}
+                            <Switch
+                              on={risikoPie}
+                              color="#7e22ce"
+                              label="Risiko Emerging (Peta PIE)"
+                              onChange={() => {
+                                const next = !risikoPie
+                                setRisikoPie(next)
+                                if (next && !layers.choro) setLayers({ ...layers, choro: true })
+                              }}
+                            />
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
+                          Tingkat risiko penyakit infeksi emerging per wilayah (Peta Risiko PIE Kemenkes).
+                        </p>
+
+                        {risikoPie && piePayload ? (
+                          <div className="mt-2.5 space-y-2 border-t border-purple-200/60 pt-2">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-slate-500">Tahun:</span>
+                              <div className="flex items-center gap-1">
+                                {PIE_YEARS.map((yr) => (
+                                  <button
+                                    key={yr}
+                                    type="button"
+                                    onClick={() => setPieYear(yr)}
+                                    className={`rounded-full px-2 py-0.5 font-bold transition ${
+                                      pieYear === yr
+                                        ? 'bg-purple-700 text-white shadow-2xs'
+                                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {yr}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-slate-500">Tingkat wilayah:</span>
+                              <div className="flex items-center gap-1">
+                                {(['provinsi', 'kabkota'] as const).map((lv) => (
+                                  <button
+                                    key={lv}
+                                    type="button"
+                                    onClick={() => setPieLevel(lv)}
+                                    className={`rounded-full px-2 py-0.5 font-bold transition ${
+                                      pieLevel === lv
+                                        ? 'bg-purple-700 text-white shadow-2xs'
+                                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {lv === 'provinsi' ? 'Provinsi' : 'Kab/Kota'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold text-slate-500">Penyakit Emerging:</label>
+                              <select
+                                value={pieDisease}
+                                onChange={(e) => setPieDisease(e.target.value as PieDiseaseOption)}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-purple-500 focus:outline-none"
+                              >
+                                {PIE_DISEASES.map((d) => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {legendPie.map((g) => (
+                                <span
+                                  key={g.label}
+                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-700"
+                                >
+                                  <span className="h-2 w-2 rounded-full" style={{ background: g.color }} />
+                                  <span>{g.label}</span>
+                                  <span className="font-normal text-slate-400">({g.n})</span>
+                                </span>
+                              ))}
+                            </div>
+                            <p className="text-[10px] leading-tight text-slate-400">
+                              Skala risiko: TINGGI (merah), SEDANG (jingga), RENDAH (hijau). Menggantikan arsiran kasus saat aktif.
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+
                       {/* Batas Administrasi */}
                       <label className="flex items-start justify-between gap-2.5 rounded-lg border border-slate-100 bg-white p-2.5 hover:bg-slate-50 cursor-pointer">
                         <div className="flex items-start gap-2 min-w-0">
