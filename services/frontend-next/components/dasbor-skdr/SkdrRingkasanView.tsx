@@ -49,6 +49,7 @@ import { defaultFilter, useAnalisa, type AFilter } from '@/lib/analisa-api'
 import { decodeTitik, type Area, type Metric, type SpasialResp, type Titik } from '@/lib/spasial-api'
 import { useChoroConfig } from '@/lib/choropleth-classes'
 import { PUBLIC_BASE_PATH } from '@/lib/public-path'
+import { buildKabMetricCat, kabNetral } from '@/lib/skdr-kab-drill'
 import { buildRisikoPie, PIE_DISEASES, PIE_YEARS, type PieApiPayload, type PieDiseaseOption } from '@/lib/risiko-pie'
 
 const SpasialMap = dynamic(() => import('@/components/spasial/SpasialMap'), {
@@ -237,6 +238,30 @@ export default function SkdrRingkasanView({
   const data = sp.loading ? null : sp.data
   const titik = useMemo(() => decodeTitik(sp.data), [sp.data])
 
+  // ── Telusur provinsi (klik provinsi di peta / pilih provinsi di Filter Dasbor) ──
+  // Satu provinsi di filter (tanpa kab/kota) = mode telusur: peta tetap menampilkan seluruh provinsi (diredupkan)
+  // dan arsiran kab/kota provinsi terpilih dari respons API spasial level kab/kota.
+  const filterProv = f.prov?.length === 1 && !(f.kab && f.kab.length) ? String(f.prov[0]) : null
+  const [localProv, setLocalProv] = useState<string | null>(null) // cadangan bila halaman tanpa onApply
+  const drillId = filterProv || (onApply ? null : localProv)
+  const natFilter = useMemo<AFilter>(() => ({ ...aFilter, prov: '', kab: '' }), [aFilter])
+  const kabFilter = useMemo<AFilter>(() => ({ ...aFilter, prov: localProv || '', kab: '' }), [aFilter, localProv])
+  const spNat = useAnalisa<SpasialResp>('spasial', natFilter, {}, Boolean(filterProv))
+  const spKab = useAnalisa<SpasialResp>('spasial', kabFilter, {}, Boolean(!onApply && localProv && !filterProv))
+  // Respons nasional terakhir dipakai sementara selama respons nasional baru dimuat, agar zoom ke provinsi langsung jalan.
+  const [lastNat, setLastNat] = useState<SpasialResp | null>(null)
+  useEffect(() => {
+    if (!filterProv && data?.level === 'provinsi') setLastNat(data)
+    else if (filterProv && !spNat.loading && spNat.data?.level === 'provinsi') setLastNat(spNat.data)
+  }, [filterProv, data, spNat.loading, spNat.data])
+  const mapData = filterProv ? (!spNat.loading && spNat.data ? spNat.data : lastNat) : data
+  const kabSrc = filterProv ? sp : spKab
+  const drillArea = useMemo(
+    () => (drillId && mapData?.level === 'provinsi' ? mapData.wilayah.find((a) => String(a.id) === drillId) || null : null),
+    [drillId, mapData],
+  )
+  const drillCode = drillArea ? String(drillArea.code) : null
+
   const provKode = useMemo(() => {
     if (data?.level === 'kabkota' && data.wilayah?.[0]?.code) {
       return String(data.wilayah[0].code).slice(0, 2)
@@ -273,6 +298,30 @@ export default function SkdrRingkasanView({
     }
   }, [titik])
   const choroCfg = useChoroConfig()
+
+  const drillCat = useMemo(() => {
+    if (!drillCode) return null
+    if (risikoPie) {
+      const c = buildRisikoPie(piePayload, pieDisease, 'kabkota', drillCode)
+      if (c) return { ...c, kosong: 'belum ada penilaian risiko PIE dari API untuk kab/kota ini' }
+      return kabNetral(drillCode, 'Peta Risiko PIE', pieLoading ? 'Memuat data Peta Risiko PIE…' : 'Data belum tersedia dari API')
+    }
+    if (kabSrc.loading) return kabNetral(drillCode, 'Memuat kab/kota', 'Memuat data kab/kota dari API…')
+    const c = kabSrc.error ? null : buildKabMetricCat(kabSrc.data, metric, choroCfg, drillCode, f.sumber, metric === 'alert' ? (f.sumber === 'ebs' ? 'Sinyal EBS' : 'Alert / Sinyal') : metric === 'cfr' ? 'CFR' : undefined)
+    return c || kabNetral(drillCode, 'Kab/kota', 'Data belum tersedia dari API')
+  }, [drillCode, risikoPie, piePayload, pieDisease, pieLoading, kabSrc.loading, kabSrc.error, kabSrc.data, metric, choroCfg, f.sumber]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mulaiDrill = (a: Area) => {
+    setSel(null)
+    if (onApply) onApply({ ...f, prov: [String(a.id)], kab: [] })
+    else setLocalProv(String(a.id))
+  }
+  const keluarDrill = () => {
+    setSel(null)
+    if (onApply) onApply({ ...f, prov: [], kab: [] })
+    else setLocalProv(null)
+  }
+  const drill = drillArea && drillCode ? { prov: drillCode, nama: drillArea.nama, onExit: keluarDrill } : null
 
   // Sync KPI ribbon with real aggregated spatial data when available
   useEffect(() => {
@@ -584,7 +633,7 @@ export default function SkdrRingkasanView({
           {/* Map Canvas with Bottom Epiweek Replay Bar */}
           <div className="min-w-0 flex-1 relative h-full">
             <SpasialMap
-              data={data}
+              data={mapData}
               titik={titik}
               metric={metric}
               setMetric={setMetric}
@@ -593,7 +642,7 @@ export default function SkdrRingkasanView({
               choroCfg={choroCfg}
               sumber={f.sumber}
               selectedId={sel?.id ?? null}
-              onSelectArea={(a) => (a ? pickArea(a, true) : setSel(null))}
+              onSelectArea={(a) => (!a ? setSel(null) : !drill && mapData?.level === 'provinsi' ? mulaiDrill(a) : pickArea(a, true))}
               onDrill={onDrill}
               onUp={onUp}
               focus={focus}
@@ -603,7 +652,9 @@ export default function SkdrRingkasanView({
               fullHeight={true}
               rightPanel={null}
               intelLayers={intelLayers}
-              catChoro={catChoro}
+              catChoro={drill ? drillCat : catChoro}
+              drill={drill}
+              drillOnClick={!drill && mapData?.level === 'provinsi'}
             />
           </div>
 

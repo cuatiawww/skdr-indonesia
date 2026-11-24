@@ -41,6 +41,8 @@ export type CatChoro = {
   items: Record<string, { color: string; title: string; details: Array<{ label: string; value: string }> }>
   legend: Array<{ label: string; color: string; n: number }>
   catatan?: string
+  /** Teks tooltip/popup untuk wilayah tanpa item (mis. 'tidak ada data dari API'). */
+  kosong?: string
 }
 export interface Layers { base: BaseMap; choro: boolean; opChoro: number; points: PointMode; heat: boolean; status: string[]; kasusMin: number }
 export const DEFAULT_LAYERS: Layers = { base: 'light', choro: true, opChoro: 0.78, points: 'kluster', heat: false, status: [], kasusMin: 0 }
@@ -101,13 +103,17 @@ export interface MapHudCtrl {
   setShowLayers: (v: boolean) => void
 }
 
-export default function SpasialMap({ data, titik, metric, setMetric, layers, setLayers, choroCfg, sumber, selectedId, onSelectArea, onDrill, onUp, focus, rightPanel, panelOpen, setPanelOpen, height = 680, fullHeight = false, topHud, leftDock, topOffset, hideDefaultToolbar = false, intelLayers, catChoro }: {
+export default function SpasialMap({ data, titik, metric, setMetric, layers, setLayers, choroCfg, sumber, selectedId, onSelectArea, onDrill, onUp, focus, rightPanel, panelOpen, setPanelOpen, height = 680, fullHeight = false, topHud, leftDock, topOffset, hideDefaultToolbar = false, intelLayers, catChoro, drill = null, drillOnClick = false }: {
   data: SpasialResp | null; titik: Titik[]; metric: Metric; setMetric: (m: Metric) => void; layers: Layers; setLayers: (l: Layers) => void
   choroCfg: ChoroConfig | null; sumber: string; selectedId: number | null; onSelectArea: (a: Area | null) => void; onDrill: (a: Area) => void; onUp: (() => void) | null
   focus: Focus | null; rightPanel: ReactNode; panelOpen: boolean; setPanelOpen: (v: boolean) => void; height?: number
   fullHeight?: boolean; topHud?: ReactNode | ((ctrl: MapHudCtrl) => ReactNode); leftDock?: ReactNode; topOffset?: number; hideDefaultToolbar?: boolean
   intelLayers?: ExternalIntelLayers
   catChoro?: CatChoro | null
+  /** Mode telusur provinsi: provinsi lain diredupkan & tak bisa diklik, ada tombol kembali ke nasional. */
+  drill?: { prov: string; nama: string; onExit: () => void } | null
+  /** Klik poligon provinsi memicu telusur (tanpa popup), bukan popup ringkas. */
+  drillOnClick?: boolean
 }) {
   const wrap = useRef<HTMLDivElement>(null)
   const el = useRef<HTMLDivElement>(null)
@@ -139,6 +145,8 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
   const vectorsL = useRef<VectorLayer<any> | null>(null)
   const styleCtx = useRef<{ byCode: Record<string, Area>; cls: MapClass[]; wi: number; metric: Metric; sel: number | null; hover: string | null; op: number; maxK: number }>({ byCode: {}, cls: [], wi: -1, metric: 'kasus', sel: null, hover: null, op: 0.78, maxK: 1 })
   const catCtx = useRef<{ cat: CatChoro | null; hover: string | null; op: number }>({ cat: null, hover: null, op: 0.78 })
+  const drillRef = useRef<{ prov: string | null; onClick: boolean }>({ prov: null, onClick: false })
+  drillRef.current = { prov: drill?.prov ?? null, onClick: drillOnClick }
   const onSelectRef = useRef(onSelectArea)
   onSelectRef.current = onSelectArea
   const [geoErr, setGeoErr] = useState(false)
@@ -167,6 +175,16 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
       const hov = c.hover === f.get('code')
       const col = k.color
       const r = parseInt(col.slice(1, 3), 16), g = parseInt(col.slice(3, 5), 16), b = parseInt(col.slice(5, 7), 16)
+      const dim = drillRef.current.prov
+      if (dim) {
+        // telusur provinsi: provinsi terpilih hanya garis tebal (isi dari lapisan kab/kota), provinsi lain diredupkan
+        const me = String(f.get('code')) === dim
+        return new Style({
+          fill: new Fill({ color: me ? 'rgba(0,0,0,0)' : 'rgba(203,213,225,0.82)' }),
+          stroke: new Stroke({ color: me ? '#0f172a' : 'rgba(255,255,255,0.9)', width: me ? 2.6 : 0.6 }),
+          zIndex: me ? 2 : 0,
+        })
+      }
       return new Style({
         fill: new Fill({ color: `rgba(${r},${g},${b},${c.op})` }),
         stroke: new Stroke({ color: sel ? '#0f172a' : hov ? '#334155' : 'rgba(255,255,255,0.95)', width: sel ? 3 : hov ? 2 : 0.8 }),
@@ -184,11 +202,11 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
       const hov = c.hover === code
       return new Style({
         fill: new Fill({ color: `rgba(${r},${g},${b},${c.op})` }),
-        stroke: new Stroke({ color: sel ? '#0f172a' : hov ? '#334155' : 'rgba(100,116,139,0.55)', width: sel ? 3 : hov ? 2 : 0.6 }),
+        stroke: new Stroke({ color: sel ? '#0f172a' : hov ? '#0f172a' : c.cat?.level === 'kabkota' ? 'rgba(71,85,105,0.85)' : 'rgba(100,116,139,0.55)', width: sel ? 3 : hov ? 2.2 : c.cat?.level === 'kabkota' ? 0.9 : 0.6 }),
         zIndex: sel ? 2 : hov ? 1 : 0,
       })
     }
-    catL.current = new VectorLayer({ source: catSrc.current, style: catStyle, zIndex: 1, visible: false })
+    catL.current = new VectorLayer({ source: catSrc.current, style: catStyle, zIndex: 1.5, visible: false })
     heatL.current = new HeatmapLayer({ source: ptSrc.current, blur: 24, radius: 14, weight: (f) => f.get('hw') || 0, zIndex: 2, visible: false, opacity: 0.85 })
     const cache: Record<string, Style> = {}
     const ptStyle = (f: FeatureLike) => {
@@ -266,8 +284,10 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
       } else if (hit?.l === catL.current) {
         const cCode = String(hit.f.get('code'))
         const it = catCtx.current.cat?.items[cCode]
-        text = `${hit.f.get('name')}: ${it ? it.title : 'Belum ada data'}`
+        text = `${hit.f.get('name')}: ${it ? it.title : catCtx.current.cat?.kosong || 'Belum ada data'}`
         if (catCtx.current.hover !== cCode) { catCtx.current.hover = cCode; catL.current?.changed() }
+      } else if (hit?.l === choroL.current && drillRef.current.prov) {
+        text = String(hit.f.get('code')) === drillRef.current.prov ? null : `${hit.f.get('name')} · tekan "Kembali ke Nasional" untuk memilih provinsi lain`
       } else if (hit?.l === choroL.current) {
         code = String(hit.f.get('code'))
         const a = styleCtx.current.byCode[code]
@@ -303,23 +323,33 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
         overlay.current?.setPosition(e.coordinate)
         return
       }
+      if (hit.l === catL.current && catCtx.current.cat?.level === 'provinsi' && drillRef.current.onClick && !drillRef.current.prov) {
+        const a = styleCtx.current.byCode[String(hit.f.get('code'))]
+        if (a) { onSelectRef.current(a); setPopup(null); overlay.current?.setPosition(undefined); return }
+      }
       if (hit.l === catL.current) {
         const c = catCtx.current.cat
         const code = String(hit.f.get('code'))
         const it = c?.items[code]
-        if (c && it) {
+        if (c && (it || c.kosong)) {
           setPopup({
             kind: 'intel',
             type: 'kategori',
             badgeText: c.judul,
-            badgeColor: it.color,
+            badgeColor: it?.color || '#64748b',
             source: c.sumber,
             title: String(hit.f.get('name') || code),
-            subtitle: it.title,
-            details: it.details,
+            subtitle: it ? it.title : c.kosong,
+            details: it?.details || [],
           })
           overlay.current?.setPosition(e.coordinate)
         }
+        return
+      }
+      if (hit.l === choroL.current && drillRef.current.prov) { setPopup(null); overlay.current?.setPosition(undefined); return }
+      if (hit.l === choroL.current && drillRef.current.onClick) {
+        const a = styleCtx.current.byCode[String(hit.f.get('code'))]
+        if (a) { onSelectRef.current(a); setPopup(null); overlay.current?.setPosition(undefined) }
         return
       }
       if (hit.l === choroL.current) {
@@ -652,11 +682,12 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
     if (!m || !geoReady) return
     let ext = createEmpty()
     const selA = kabSel ? areas.find((a) => a.id === kabSel) : null
-    choroSrc.current.getFeatures().forEach((f) => { if (!selA || f.get('code') === selA.code) extend(ext, f.getGeometry()!.getExtent()) })
+    const dp = drillRef.current.prov
+    choroSrc.current.getFeatures().forEach((f) => { if (dp ? String(f.get('code')) === dp : !selA || f.get('code') === selA.code) extend(ext, f.getGeometry()!.getExtent()) })
     if (isEmpty(ext)) return
     const right = panelOpen && (wrap.current?.clientWidth || 0) > 900 ? (fullHeight ? 400 : 380) : 40
     const topPad = topOffset ? topOffset + 16 : 70
-    m.getView().fit(ext, { padding: [topPad, right, 70, 40], duration: 300, maxZoom: kabSel ? 11 : 9 })
+    m.getView().fit(ext, { padding: [topPad, right, 70, 40], duration: dp ? 700 : 300, maxZoom: dp ? 9 : kabSel ? 11 : 9 })
   }, [geoReady, kabSel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── choropleth style context ──
@@ -673,7 +704,24 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
     Object.assign(styleCtx.current, { byCode, cls, wi, metric, sel: selectedId, op: layers.opChoro })
     choroL.current?.changed()
   }, [areas, cls, wi, metric, selectedId, layers.opChoro, geoReady])
-  useEffect(() => { choroL.current?.setVisible(layers.choro && !catChoro) }, [layers.choro, catChoro])
+  useEffect(() => { choroL.current?.setVisible(layers.choro && (!catChoro || Boolean(drill))) }, [layers.choro, catChoro, drill])
+  // ── telusur provinsi ──
+  const drillProv = drill?.prov ?? null
+  const prevDrill = useRef<string | null>(null)
+  useEffect(() => {
+    choroL.current?.changed()
+    setPopup(null); setHover(null); overlay.current?.setPosition(undefined)
+    if (prevDrill.current && !drillProv) setGeoReady((n) => n + 1) // kembali: sesuaikan ke seluruh Indonesia
+    prevDrill.current = drillProv
+  }, [drillProv])
+  const exitRef = useRef(drill?.onExit)
+  exitRef.current = drill?.onExit
+  useEffect(() => {
+    if (!drillProv) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') exitRef.current?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drillProv])
 
   // ── arsiran kategorikal (mis. Peta Risiko PIE) ──
   const catGeoKey = catChoro ? `${catChoro.level}|${catChoro.prov || ''}` : ''
@@ -693,7 +741,7 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
       const fokus = pv ? feats.filter((f) => lv === 'kabkota' || String(f.get('code')) === pv) : []
       if (fokus.length && map.current) {
         const ext = fokus.reduce((e, f) => { const g = f.getGeometry()?.getExtent(); return g ? [Math.min(e[0], g[0]), Math.min(e[1], g[1]), Math.max(e[2], g[2]), Math.max(e[3], g[3])] : e }, [Infinity, Infinity, -Infinity, -Infinity])
-        map.current.getView().fit(ext, { padding: [120, 80, 80, 80], duration: 300, maxZoom: 9 })
+        map.current.getView().fit(ext, { padding: [120, 80, 80, 80], duration: drillRef.current.prov ? 700 : 300, maxZoom: 9 })
       }
     }).catch(() => alive && setGeoErr(true))
     return () => { alive = false }
@@ -764,6 +812,13 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
     <div ref={wrap} className={fullHeight ? "relative h-full w-full overflow-hidden bg-slate-100" : "relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs"} style={{ height: fs ? '100vh' : fullHeight ? '100%' : height }} data-testid="spasial-map" data-base={layers.base}>
       <style>{`[data-base="light"] .spasial-base canvas{filter:grayscale(1) brightness(1.08) contrast(0.88)}`}</style>
       <div ref={el} className="absolute inset-0" />
+      {!fullHeight && drill ? <div className="absolute left-1/2 top-3 z-30 -translate-x-1/2">
+                <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-lg backdrop-blur" data-testid="drill-bar">
+                  <button type="button" onClick={drill.onExit} data-testid="drill-kembali" className="flex items-center gap-1 rounded-lg bg-teal-700 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-teal-800">← Kembali ke Nasional</button>
+                  <span className="text-[11px] font-semibold text-slate-500">Indonesia <span className="text-slate-300">›</span> <b className="text-slate-800">{drill.nama}</b></span>
+                  <span className="hidden text-[10px] text-slate-400 sm:inline">· Esc</span>
+                </div>
+              </div> : null}
       {geoErr ? <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Batas wilayah gagal dimuat; titik tetap ditampilkan.</div> : null}
 
       {fullHeight ? (
@@ -776,10 +831,17 @@ export default function SpasialMap({ data, titik, metric, setMetric, layers, set
           <div className="flex min-h-0 flex-1 items-start justify-between gap-3">
             <div className="flex max-h-full flex-col gap-2 overflow-y-auto pr-0.5">
               {leftDock}
-              {showLegend ? <Legend metric={metric} cls={cls} lvLabel={lvLabel} sumber={sumber} weekly={wi >= 0} points={layers.points !== 'off'} heat={layers.heat} onClose={() => setShowLegend(false)} inline /> : null}
+              {showLegend ? <Legend cat={drill ? catChoro || null : null} metric={metric} cls={cls} lvLabel={lvLabel} sumber={sumber} weekly={wi >= 0} points={layers.points !== 'off'} heat={layers.heat} onClose={() => setShowLegend(false)} inline /> : null}
             </div>
             <div className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch pb-0.5">
-              {weeks.length > 1 ? (
+              {drill ? <div className="mb-auto">
+                <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 shadow-lg backdrop-blur" data-testid="drill-bar">
+                  <button type="button" onClick={drill.onExit} data-testid="drill-kembali" className="flex items-center gap-1 rounded-lg bg-teal-700 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-teal-800">← Kembali ke Nasional</button>
+                  <span className="text-[11px] font-semibold text-slate-500">Indonesia <span className="text-slate-300">›</span> <b className="text-slate-800">{drill.nama}</b></span>
+                  <span className="hidden text-[10px] text-slate-400 sm:inline">· Esc</span>
+                </div>
+              </div> : null}
+              {weeks.length > 1 && !drill ? (
                 <div className="pointer-events-auto flex w-[min(560px,100%)] items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur" data-testid="spasial-playback">
                   <button type="button" disabled={!data?.seri} onClick={() => { if (!playing && wi >= weeks.length - 1) setWi(0); else if (!playing && wi < 0) setWi(0); setPlaying(!playing) }}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-white disabled:opacity-40" aria-label={playing ? 'Jeda' : 'Putar per minggu epid'} data-testid="spasial-play">
